@@ -320,6 +320,18 @@ static int find_symbol(jvm_agent_t* J, const char *name, uint64_t* valuep) {
   return err;
 }
 
+/* Support both GCC and Solaris Studio JVM vtable symbols. */
+static int find_vtable_symbol(jvm_agent_t* J, const char *gcc_name,
+                             const char *studio_name, uint64_t* valuep) {
+  int err = find_symbol(J, gcc_name, valuep);
+  if (err == PS_OK) {
+    /* The object vptr addresses the first function slot, not the ABI header. */
+    *valuep += 2 * (DATA_MODEL == PR_MODEL_LP64 ? sizeof(uint64_t) : sizeof(uint32_t));
+    return PS_OK;
+  }
+  return find_symbol(J, studio_name, valuep);
+}
+
 static int read_volatiles(jvm_agent_t* J) {
   int i;
   uint64_t array_data;
@@ -482,15 +494,15 @@ jvm_agent_t *Jagent_create(struct ps_prochandle *P, int vers) {
   J->prev_fr.sp = 0;
   J->prev_fr.sender_sp = 0;
 
-  err = find_symbol(J, "__1cHnmethodG__vtbl_", &J->nmethod_vtbl);
+  err = find_vtable_symbol(J, "_ZTV7nmethod", "__1cHnmethodG__vtbl_", &J->nmethod_vtbl);
   CHECK_FAIL(err);
-  err = find_symbol(J, "__1cKBufferBlobG__vtbl_", &J->BufferBlob_vtbl);
+  err = find_vtable_symbol(J, "_ZTV10BufferBlob", "__1cKBufferBlobG__vtbl_", &J->BufferBlob_vtbl);
   if (err != PS_OK) J->BufferBlob_vtbl = 0;
-  err = find_symbol(J, "__1cICodeBlobG__vtbl_", &J->CodeBlob_vtbl);
+  err = find_vtable_symbol(J, "_ZTV8CodeBlob", "__1cICodeBlobG__vtbl_", &J->CodeBlob_vtbl);
   CHECK_FAIL(err);
-  err = find_symbol(J, "__1cLRuntimeStubG__vtbl_", &J->RuntimeStub_vtbl);
+  err = find_vtable_symbol(J, "_ZTV11RuntimeStub", "__1cLRuntimeStubG__vtbl_", &J->RuntimeStub_vtbl);
   CHECK_FAIL(err);
-  err = find_symbol(J, "__1cGMethodG__vtbl_", &J->Method_vtbl);
+  err = find_vtable_symbol(J, "_ZTV6Method", "__1cGMethodG__vtbl_", &J->Method_vtbl);
   CHECK_FAIL(err);
 
   err = parse_vmstructs(J);

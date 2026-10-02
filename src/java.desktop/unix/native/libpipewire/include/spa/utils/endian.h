@@ -19,6 +19,14 @@
 #define bswap_32 _byteswap_ulong
 #define bswap_64 _byteswap_uint64
 #elif defined(SOLARIS)
+/* Solaris has no endian.h or byteswap.h; define the byte order macros here. */
+#define __LITTLE_ENDIAN 1234
+#define __BIG_ENDIAN 4321
+#if defined(__sparc)
+#define __BYTE_ORDER __BIG_ENDIAN
+#else
+#define __BYTE_ORDER __LITTLE_ENDIAN
+#endif
 #else
 #include <endian.h>
 #include <byteswap.h>

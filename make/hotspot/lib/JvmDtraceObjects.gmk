@@ -109,16 +109,28 @@ ifeq ($(call check-jvm-feature, dtrace), true)
     DTRACE_GENSRC_DIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/dtracefiles
     JVM_OFFSETS_INDEX_H := $(DTRACE_GENSRC_DIR)/JvmOffsetsIndex.h
 
+    # DTrace marks external data as functions (JDK-6890703). Correct the
+    # declarations before linking against the actual JVM data definitions.
+    DTRACE_JHELPER_DATA_SYMBOLS := __JvmOffsets
+    ifeq ($(TOOLCHAIN_TYPE), gcc)
+      DTRACE_JHELPER_DATA_SYMBOLS += _ZTV6Method _ZTV7nmethod _ZTV10BufferBlob _ZN8Universe14_collectedHeapE _ZN9CodeCache6_heapsE
+    else
+      DTRACE_JHELPER_DATA_SYMBOLS += __1cGMethodG__vtbl_ __1cHnmethodG__vtbl_ __1cKBufferBlobG__vtbl_ __1cIUniverseO_collectedHeap_ __1cJCodeCacheG_heaps_
+    endif
+
     # Make sure we run our selected compiler for preprocessing instead of letting
     # the dtrace tool pick it on it's own.
     $(DTRACE_JHELPER_OBJ): $(JHELPER_DTRACE_SRC) $(JVM_OFFSETS_INDEX_H)
 	$(call LogInfo, Running dtrace for $(<F))
 	$(call MakeDir, $(DTRACE_SUPPORT_DIR))
 	$(call ExecuteWithLog, $(DTRACE_SUPPORT_DIR)/$(@F).dt, \
-	    ($(CPP) $(DTRACE_CPP_FLAGS) -I$(DTRACE_GENSRC_DIR) $^ \
+	    ($(CPP) $(DTRACE_CPP_FLAGS) -I$(DTRACE_GENSRC_DIR) $< \
 	    > $(DTRACE_SUPPORT_DIR)/$(@F).dt))
 	$(call ExecuteWithLog, $@, $(DTRACE) $(DTRACE_FLAGS) -o $@ \
 	    -s $(DTRACE_SUPPORT_DIR)/$(@F).dt)
+	$(call ExecuteWithLog, $@.elfedit, /usr/bin/elfedit \
+	    $(foreach symbol, $(DTRACE_JHELPER_DATA_SYMBOLS), \
+	        -e 'sym:st_type $(symbol) 1') $@)
 
   endif
 endif
