@@ -190,6 +190,10 @@ AC_DEFUN([PLATFORM_EXTRACT_VARS_FROM_OS],
       VAR_OS=linux
       VAR_OS_TYPE=unix
       ;;
+    *solaris*)
+      VAR_OS=solaris
+      VAR_OS_TYPE=unix
+      ;;
     *darwin*)
       VAR_OS=macosx
       VAR_OS_TYPE=unix
@@ -597,6 +601,9 @@ AC_DEFUN([PLATFORM_SETUP_LEGACY_VARS_HELPER],
 
 AC_DEFUN([PLATFORM_SET_RELEASE_FILE_OS_VALUES],
 [
+  if test "x$OPENJDK_TARGET_OS" = "xsolaris"; then
+    RELEASE_FILE_OS_NAME=SunOS
+  fi
   if test "x$OPENJDK_TARGET_OS" = "xlinux"; then
     RELEASE_FILE_OS_NAME=Linux
   fi

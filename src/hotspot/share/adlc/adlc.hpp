@@ -70,6 +70,10 @@ typedef unsigned __int64 uintptr_t;
   #include <inttypes.h>
 #endif // LINUX || _ALLBSD_SOURCE
 
+#ifndef SIZE_MAX
+#include <stdint.h>
+#endif
+
 // Macros
 #define uint32 unsigned int
 #define uint   unsigned int
