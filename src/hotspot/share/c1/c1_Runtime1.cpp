@@ -258,6 +258,9 @@ bool Runtime1::generate_blob_for(BufferBlob* buffer_blob, C1StubId id) {
   case C1StubId::unwind_exception_id:
   case C1StubId::counter_overflow_id:
   case C1StubId::is_instance_of_id:
+#if defined(SPARC)
+  case C1StubId::handle_exception_nofpu_id:
+#endif
     expect_oop_map = false;
     break;
   default:
@@ -1221,6 +1224,40 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* current, C1StubId stub_id ))
           ShouldNotReachHere();
         }
 
+#if defined(SPARC)
+        if (load_klass_or_mirror_patch_id ||
+            stub_id == Runtime1::load_appendix_patching_id) {
+          // Update the location in the nmethod with the proper
+          // metadata.  When the code was generated, a NULL was stuffed
+          // in the metadata table and that table needs to be update to
+          // have the right value.  On intel the value is kept
+          // directly in the instruction instead of in the metadata
+          // table, so set_data above effectively updated the value.
+          nmethod* nm = CodeCache::find_nmethod(instr_pc);
+          assert(nm != NULL, "invalid nmethod_pc");
+          RelocIterator mds(nm, copy_buff, copy_buff + 1);
+          bool found = false;
+          while (mds.next() && !found) {
+            if (mds.type() == relocInfo::oop_type) {
+              assert(stub_id == Runtime1::load_mirror_patching_id ||
+                     stub_id == Runtime1::load_appendix_patching_id, "wrong stub id");
+              oop_Relocation* r = mds.oop_reloc();
+              oop* oop_adr = r->oop_addr();
+              *oop_adr = stub_id == Runtime1::load_mirror_patching_id ? mirror() : appendix();
+              r->fix_oop_relocation();
+              found = true;
+            } else if (mds.type() == relocInfo::metadata_type) {
+              assert(stub_id == Runtime1::load_klass_patching_id, "wrong stub id");
+              metadata_Relocation* r = mds.metadata_reloc();
+              Metadata** metadata_adr = r->metadata_addr();
+              *metadata_adr = load_klass;
+              r->fix_metadata_relocation();
+              found = true;
+            }
+          }
+          assert(found, "the metadata must exist!");
+        }
+#endif
         if (do_patch) {
           // replace instructions
           // first replace the tail, then the call
@@ -1278,6 +1315,13 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* current, C1StubId stub_id ))
             RelocIterator iter(nm, (address)instr_pc, (address)(instr_pc + 1));
             relocInfo::change_reloc_info_for_address(&iter, (address) instr_pc,
                                                      relocInfo::none, rtype);
+#ifdef SPARC
+            // Sparc takes two relocations for an metadata so update the second one.
+            address instr_pc2 = instr_pc + NativeMovConstReg::add_offset;
+            RelocIterator iter2(nm, instr_pc2, instr_pc2 + 1);
+            relocInfo::change_reloc_info_for_address(&iter2, (address) instr_pc2,
+                                                     relocInfo::none, rtype);
+#endif
           }
 
         } else {

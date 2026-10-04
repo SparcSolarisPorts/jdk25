@@ -909,6 +909,11 @@ class JavaValue {
  jshort get_jshort() const { return (jshort) (_value.i);}
 
 };
+// V9 Sparc CPU's running in 64 Bit mode use a stack bias of 7ff
+#if defined(SPARC) && defined(_LP64)
+#undef STACK_BIAS
+#define STACK_BIAS      0x7ff
+#endif
 
 
 // TosState describes the top-of-stack state before and after the execution of

@@ -44,7 +44,15 @@ class JfrIntrinsicSupport : AllStatic {
   static address epoch_generation_address();
 };
 
+// SPARC does not generate the JFR write_checkpoint / return_lease stubs
+// (StubRoutines::_jfr_write_checkpoint / _jfr_return_lease), which the
+// EventWriter intrinsics below call into. Oracle's Solaris/SPARC builds
+// (JDK 14 - 17) ran JFR without these intrinsics; the EventWriter falls
+// back to the portable implementation. Keep the same arrangement here:
+// JFR is fully functional, only event-commit is not intrinsified on SPARC.
+#if !defined(SPARC)
 #define JFR_HAVE_INTRINSICS
+#endif
 
 #define JFR_TEMPLATES(template)                                                                                      \
   template(jdk_jfr_internal_management_HiddenWait,                    "jdk/jfr/internal/management/HiddenWait")      \

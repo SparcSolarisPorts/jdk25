@@ -684,7 +684,8 @@ STATIC_ASSERT(num_java_farg_registers == Argument::n_float_register_parameters_j
 
 int SharedRuntime::java_calling_convention(const BasicType *sig_bt,
                                            VMRegPair *regs,
-                                           int total_args_passed) {
+                                           int total_args_passed,
+                                           int is_outgoing) {
   // C2c calling conventions for compiled-compiled calls.
   // Put 8 ints/longs into registers _AND_ 13 float/doubles into
   // registers _AND_ put the rest on the stack.

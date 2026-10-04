@@ -35,6 +35,19 @@
 
 #define pointer uint64_t
 
+/* GCC uses the Itanium C++ ABI. Its primary vtable address point follows
+ * the offset-to-top and typeinfo entries. */
+#ifdef __GNUC__
+#define __1cGMethodG__vtbl_ _ZTV6Method
+#define __1cHnmethodG__vtbl_ _ZTV7nmethod
+#define __1cKBufferBlobG__vtbl_ _ZTV10BufferBlob
+#define __1cIUniverseO_collectedHeap_ _ZN8Universe14_collectedHeapE
+#define __1cJCodeCacheG_heaps_ _ZN9CodeCache6_heapsE
+#define JVM_VTABLE_OFFSET (2 * sizeof(pointer))
+#else
+#define JVM_VTABLE_OFFSET 0
+#endif
+
 extern pointer __JvmOffsets;
 
 /* GrowableArray<CodeHeaps*>* */
@@ -138,7 +151,10 @@ dtrace:helper:ustack:
    */
   this->pc = arg0;
 
-#if defined(__i386) || defined(__amd64)
+/* The interpreter method is in saved register %l2 on SPARC. */
+#if defined(__sparc) || defined(__sparc__)
+  this->methodPtr = copyin_ptr(arg1 + 2 * sizeof(pointer) + STACK_BIAS);
+#elif defined(__i386) || defined(__amd64)
   this->methodPtr = copyin_ptr(arg1 + OFFSET_interpreter_frame_method);
 #else
 #error "Don't know architecture"
@@ -152,7 +168,7 @@ dtrace:helper:ustack:
   this->code_heaps_array_address = copyin_ptr(this->code_heaps_address + OFFSET_GrowableArray_CodeHeap_data);
   this->number_of_heaps = copyin_uint32(this->code_heaps_address + OFFSET_GrowableArray_CodeHeap_len);
 
-  this->Method_vtbl = (pointer) &``__1cGMethodG__vtbl_;
+  this->Method_vtbl = (pointer) &``__1cGMethodG__vtbl_ + JVM_VTABLE_OFFSET;
 
   /*
    * Get Java heap bounds
@@ -391,8 +407,8 @@ dtrace:helper:ustack:
   this->start = this->block + SIZE_HeapBlockHeader;
   this->vtbl = copyin_ptr(this->start);
 
-  this->nmethod_vtbl            = (pointer) &``__1cHnmethodG__vtbl_;
-  this->BufferBlob_vtbl         = (pointer) &``__1cKBufferBlobG__vtbl_;
+  this->nmethod_vtbl            = (pointer) &``__1cHnmethodG__vtbl_ + JVM_VTABLE_OFFSET;
+  this->BufferBlob_vtbl         = (pointer) &``__1cKBufferBlobG__vtbl_ + JVM_VTABLE_OFFSET;
 }
 
 dtrace:helper:ustack:

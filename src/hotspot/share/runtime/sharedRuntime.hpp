@@ -420,7 +420,7 @@ class SharedRuntime: AllStatic {
   // slot in the bottom of the frame. SharedInfo::stack0+1 refers to the memory word
   // 4-bytes higher.
   // return value is the maximum number of VMReg stack slots the convention will use.
-  static int java_calling_convention(const BasicType* sig_bt, VMRegPair* regs, int total_args_passed);
+  static int java_calling_convention(const BasicType* sig_bt, VMRegPair* regs, int total_args_passed, int is_outgoing);
 
   static void check_member_name_argument_is_last_argument(const methodHandle& method,
                                                           const BasicType* sig_bt,

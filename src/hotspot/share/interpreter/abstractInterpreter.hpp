@@ -244,7 +244,11 @@ class AbstractInterpreter: AllStatic {
 #if !defined(ZERO) && (defined(PPC) || defined(S390))
     return stackElementSize * i + wordSize;  // both point to one word past TOS
 #else
+#if !defined(ZERO) && (defined(PPC) || defined(S390) || defined(SPARC))
+    return stackElementSize * i + wordSize;  // both point to one word past TOS
+#else
     return stackElementSize * i;
+#endif
 #endif
   }
 

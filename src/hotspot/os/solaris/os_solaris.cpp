@@ -23,6 +23,15 @@
  */
 
 #include "jvm.h"
+
+// EM_486 is the withdrawn original-ABI i486 machine type (value 6). It is
+// present in Sun/Solaris <sys/elf.h> but missing from some gcc toolchain
+// headers on Solaris, which breaks the arch compatibility table in
+// os::dll_load below. Provide the ABI value if the headers do not.
+#ifndef EM_486
+#define EM_486 6
+#endif
+
 #include "classfile/classLoader.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmSymbols.hpp"
@@ -230,7 +239,7 @@ void os::current_stack_base_and_size(address* stack_base, size_t* stack_size) {
 jint os::Solaris::_os_thread_limit = 0;
 volatile jint os::Solaris::_os_thread_count = 0;
 
-bool os::available_memory(size_t& value) {
+bool os::available_memory(physical_memory_size_type& value) {
   return Solaris::available_memory(value);
 }
 
@@ -239,8 +248,8 @@ bool os::free_memory(physical_memory_size_type& value) {
 }
 
 bool os::Solaris::available_memory(physical_memory_size_type& value) {
-  julong available = (julong)sysconf(_SC_AVPHYS_PAGES) * os::vm_page_size();
-  value = static_cast<physical_memory_size_type>(available);
+  julong avail_mem = (julong)sysconf(_SC_AVPHYS_PAGES) * os::vm_page_size();
+  value = static_cast<physical_memory_size_type>(avail_mem);
   return true;
 }
 
@@ -1275,11 +1284,10 @@ void os::pd_print_cpu_info(outputStream* st, char* buf, size_t buflen) {
 void os::print_memory_info(outputStream* st) {
   st->print("Memory:");
   st->print(" %zuk page", os::vm_page_size()>>10);
-  size_t phys_mem = physical_memory();
-  st->print(", physical %zuk", phys_mem >> 10);
-  size_t avail_mem = 0;
+  st->print(", physical " PHYS_MEM_TYPE_FORMAT "k", os::physical_memory()>>10);
+  physical_memory_size_type avail_mem = 0;
   (void)os::available_memory(avail_mem);
-  st->print("%zuk free)", avail_mem >> 10);
+  st->print("(" PHYS_MEM_TYPE_FORMAT "k free)", avail_mem >> 10);
   st->cr();
 }
 

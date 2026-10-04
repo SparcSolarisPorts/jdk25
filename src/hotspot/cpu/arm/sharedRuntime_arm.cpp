@@ -360,7 +360,8 @@ int SharedRuntime::vector_calling_convention(VMRegPair *regs,
 
 int SharedRuntime::java_calling_convention(const BasicType *sig_bt,
                                            VMRegPair *regs,
-                                           int total_args_passed) {
+                                           int total_args_passed,
+                                           int is_outgoing) {
 #ifdef __SOFTFP__
   // soft float is the same as the C calling convention.
   return c_calling_convention(sig_bt, regs, nullptr, total_args_passed);

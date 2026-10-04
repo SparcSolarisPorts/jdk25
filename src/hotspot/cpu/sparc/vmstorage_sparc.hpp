@@ -1,0 +1,58 @@
+/*
+ * Copyright (c) 2022, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023 SAP SE. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details.
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ *
+ */
+
+#ifndef CPU_SPARC_VMSTORAGE_SPARC_INLINE_HPP
+#define CPU_SPARC_VMSTORAGE_SPARC_INLINE_HPP
+
+#include <cstdint>
+
+#include "asm/register.hpp"
+
+// The Foreign Function & Memory API is not supported on SPARC.  This mapping
+// only exists so that shared code referencing VMStorage keeps compiling
+// (mirrors the other unsupported ports, e.g. ppc).
+enum class StorageType : int8_t {
+  INTEGER = 0,
+  FLOAT = 1,
+  STACK = 2,
+  PLACEHOLDER = 3,
+// special locations used only by native code
+  FRAME_DATA = 4,
+  INVALID = -1
+};
+
+// need to define this before constructing VMStorage (below)
+constexpr inline bool VMStorage::is_reg(StorageType type) {
+   return type == StorageType::INTEGER || type == StorageType::FLOAT;
+}
+constexpr inline StorageType VMStorage::stack_type() { return StorageType::STACK; }
+constexpr inline StorageType VMStorage::placeholder_type() { return StorageType::PLACEHOLDER; }
+constexpr inline StorageType VMStorage::frame_data_type() { return StorageType::FRAME_DATA; }
+
+inline VMStorage as_VMStorage(VMReg reg, BasicType bt) {
+  ShouldNotReachHere();
+  return VMStorage::invalid();
+}
+
+#endif // CPU_SPARC_VMSTORAGE_SPARC_INLINE_HPP

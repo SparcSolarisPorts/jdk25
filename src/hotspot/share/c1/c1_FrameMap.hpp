@@ -25,6 +25,7 @@
 #ifndef SHARE_C1_C1_FRAMEMAP_HPP
 #define SHARE_C1_C1_FRAMEMAP_HPP
 
+#include "asm/macroAssembler.hpp"  // sparc: Address is defined in macroAssembler_sparc.hpp
 #include "c1/c1_Defs.hpp"
 #include "c1/c1_LIR.hpp"
 #include "code/vmreg.hpp"

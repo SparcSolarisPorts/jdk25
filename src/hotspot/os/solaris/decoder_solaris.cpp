@@ -23,6 +23,7 @@
  */
 
 #include "jvm.h"
+#include "jvm_io.h"  // for jio_snprintf (moved out of jvm.h in jdk25)
 #include "utilities/decoder_elf.hpp"
 #include "utilities/permitForbiddenFunctions.hpp"
 

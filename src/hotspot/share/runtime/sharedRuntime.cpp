@@ -1765,7 +1765,7 @@ void SharedRuntime::check_member_name_argument_is_last_argument(const methodHand
   assert(member_arg_pos >= 0 && member_arg_pos < total_args_passed, "oob");
   assert(sig_bt[member_arg_pos] == T_OBJECT, "dispatch argument must be an object");
 
-  java_calling_convention(sig_bt, regs_without_member_name, total_args_passed - 1);
+  java_calling_convention(sig_bt, regs_without_member_name, total_args_passed - 1, method->is_method_handle_intrinsic());
 
   for (int i = 0; i < member_arg_pos; i++) {
     VMReg a =    regs_with_member_name[i].first();
@@ -2817,7 +2817,7 @@ bool AdapterHandlerLibrary::generate_adapter_code(AdapterBlob*& adapter_blob,
   VMRegPair* regs = (total_args_passed <= 16) ? stack_regs : NEW_RESOURCE_ARRAY(VMRegPair, total_args_passed);
 
   // Get a description of the compiled java calling convention and the largest used (VMReg) stack slot usage
-  int comp_args_on_stack = SharedRuntime::java_calling_convention(sig_bt, regs, total_args_passed);
+  int comp_args_on_stack = SharedRuntime::java_calling_convention(sig_bt, regs, total_args_passed, false);
   SharedRuntime::generate_i2c2i_adapters(&masm,
                                          total_args_passed,
                                          comp_args_on_stack,
@@ -3165,7 +3165,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
       BasicType ret_type = si.return_type();
 
       // Now get the compiled-Java arguments layout.
-      SharedRuntime::java_calling_convention(sig_bt, regs, total_args_passed);
+      SharedRuntime::java_calling_convention(sig_bt, regs, total_args_passed, method->is_method_handle_intrinsic());
 
       // Generate the compiled-to-native wrapper code
       nm = SharedRuntime::generate_native_wrapper(&_masm, method, compile_id, sig_bt, regs, ret_type);
@@ -3209,7 +3209,7 @@ void AdapterHandlerLibrary::create_native_wrapper(const methodHandle& method) {
 VMReg SharedRuntime::name_for_receiver() {
   VMRegPair regs;
   BasicType sig_bt = T_OBJECT;
-  (void) java_calling_convention(&sig_bt, &regs, 1);
+  (void) java_calling_convention(&sig_bt, &regs, 1, true);
   // Return argument 0 register.  In the LP64 build pointers
   // take 2 registers, but the VM wants only the 'main' name.
   return regs.first();
@@ -3240,7 +3240,7 @@ VMRegPair *SharedRuntime::find_callee_arguments(Symbol* sig, bool has_receiver, 
   assert(cnt < 256, "grow table size");
 
   int comp_args_on_stack;
-  comp_args_on_stack = java_calling_convention(sig_bt, regs, cnt);
+  comp_args_on_stack = java_calling_convention(sig_bt, regs, cnt, true);
 
   // the calling convention doesn't count out_preserve_stack_slots so
   // we must add that in to get "true" stack offsets.

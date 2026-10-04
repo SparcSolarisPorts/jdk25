@@ -280,7 +280,8 @@ bool SharedRuntime::is_wide_vector(int size) {
 
 int SharedRuntime::java_calling_convention(const BasicType *sig_bt,
                                            VMRegPair *regs,
-                                           int total_args_passed) {
+                                           int total_args_passed,
+                                           int is_outgoing) {
 
   // Create the mapping between argument positions and
   // registers.

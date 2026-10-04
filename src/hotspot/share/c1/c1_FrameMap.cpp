@@ -71,7 +71,7 @@ CallingConvention* FrameMap::java_calling_convention(const BasicTypeArray* signa
     }
   }
 
-  intptr_t out_preserve = align_up(SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs), 2);
+  intptr_t out_preserve = align_up(SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs, outgoing), 2);
   LIR_OprList* args = new LIR_OprList(signature->length());
   for (i = 0; i < sizeargs;) {
     BasicType t = sig_bt[i];
@@ -81,7 +81,7 @@ CallingConvention* FrameMap::java_calling_convention(const BasicTypeArray* signa
     if (opr->is_address()) {
       LIR_Address* addr = opr->as_address_ptr();
       assert(addr->disp() == (int)addr->disp(), "out of range value");
-      out_preserve = MAX2(out_preserve, (intptr_t)addr->disp() / 4);
+      out_preserve = MAX2(out_preserve, (intptr_t)(addr->disp() - STACK_BIAS) / 4);
     }
     i += type2size[t];
   }
@@ -132,7 +132,7 @@ CallingConvention* FrameMap::c_calling_convention(const BasicTypeArray* signatur
     args->append(opr);
     if (opr->is_address()) {
       LIR_Address* addr = opr->as_address_ptr();
-      out_preserve = MAX2(out_preserve, (intptr_t)addr->disp() / 4);
+      out_preserve = MAX2(out_preserve, (intptr_t)(addr->disp() - STACK_BIAS) / 4);
     }
     i += type2size[t];
   }
@@ -177,7 +177,7 @@ FrameMap::FrameMap(ciMethod* method, int monitors, int reserved_argument_area_si
     LIR_Opr opr = _incoming_arguments->at(i);
     if (opr->is_address()) {
       LIR_Address* address = opr->as_address_ptr();
-      _argument_locations->at_put(java_index, address->disp());
+      _argument_locations->at_put(java_index, address->disp() - STACK_BIAS);
       _incoming_arguments->args()->at_put(i, LIR_OprFact::stack(java_index, as_BasicType(as_ValueType(address->type()))));
     }
     java_index += type2size[opr->type()];

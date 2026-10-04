@@ -346,9 +346,13 @@ class AbstractAssembler : public ResourceObj  {
     return -limes <= x && x < limes;
   }
 
+  static bool is_simm5(int64_t x) { return is_simm(x, 5); }   // used by SPARC
   static bool is_simm8(int64_t x) { return is_simm(x, 8); }
   static bool is_simm9(int64_t x) { return is_simm(x, 9); }
   static bool is_simm10(int64_t x) { return is_simm(x, 10); }
+  static bool is_simm11(int64_t x) { return is_simm(x, 11); } // used by SPARC cbcond
+  static bool is_simm12(int64_t x) { return is_simm(x, 12); } // used by SPARC cbcond
+  static bool is_simm13(int64_t x) { return is_simm(x, 13); } // used by SPARC loads/stores
   static bool is_simm16(int64_t x) { return is_simm(x, 16); }
   static bool is_simm32(int64_t x) { return is_simm(x, 32); }
 

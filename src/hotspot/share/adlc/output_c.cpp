@@ -758,7 +758,13 @@ void ArchDesc::build_pipe_classes(FILE *fp_cpp) {
   if (!_pipeline)
     /* Do Nothing */;
 
-  else if (_pipeline->_maxcycleused <= 32) {
+  else if (_pipeline->_maxcycleused <=
+#ifdef SPARC
+    64
+#else
+    32
+#endif
+    ) {
     fprintf(fp_cpp, "Pipeline_Use_Cycle_Mask operator&(const Pipeline_Use_Cycle_Mask &in1, const Pipeline_Use_Cycle_Mask &in2) {\n");
     fprintf(fp_cpp, "  return Pipeline_Use_Cycle_Mask(in1._mask & in2._mask);\n");
     fprintf(fp_cpp, "}\n\n");
@@ -4224,11 +4230,11 @@ void ArchDesc::buildFrameMethods(FILE *fp_cpp) {
   fprintf(fp_cpp,"uint Compile::varargs_C_out_slots_killed() const ");
   fprintf(fp_cpp,"{ return %s; }\n\n", _frame->_varargs_C_out_slots_killed);
   // Java Return Value Location
-  fprintf(fp_cpp,"OptoRegPair Matcher::return_value(uint ideal_reg) {\n");
+  fprintf(fp_cpp,"OptoRegPair Matcher::return_value(uint ideal_reg, bool is_outgoing) {\n");
   fprintf(fp_cpp,"%s\n", _frame->_return_value);
   fprintf(fp_cpp,"}\n\n");
   // Native Return Value Location
-  fprintf(fp_cpp,"OptoRegPair Matcher::c_return_value(uint ideal_reg) {\n");
+  fprintf(fp_cpp,"OptoRegPair Matcher::c_return_value(uint ideal_reg, bool is_outgoing) {\n");
   fprintf(fp_cpp,"%s\n", _frame->_c_return_value);
   fprintf(fp_cpp,"}\n\n");
 

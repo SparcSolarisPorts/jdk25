@@ -32,6 +32,13 @@
 // lookups for that information all over the place.
 struct G1HeapRegionAttr {
 public:
+#ifdef SPARC
+  typedef int32_t region_type_t;
+  typedef uint32_t remset_is_tracked_t;
+  // _is_pinned_t is essentially bool, but we want precise control
+  // on the size, and sizeof(bool) is implementation specific.
+  typedef uint32_t is_pinned_t;
+#else
   typedef int8_t region_type_t;
   // remset_is_tracked_t is essentially bool, but we need precise control
   // on the size, and sizeof(bool) is implementation specific.
@@ -39,6 +46,7 @@ public:
   // _is_pinned_t is essentially bool, but we want precise control
   // on the size, and sizeof(bool) is implementation specific.
   typedef uint8_t is_pinned_t;
+#endif
 
 private:
   remset_is_tracked_t _remset_is_tracked;

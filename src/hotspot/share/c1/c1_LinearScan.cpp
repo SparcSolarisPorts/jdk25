@@ -2117,7 +2117,11 @@ LIR_Opr LinearScan::calc_operand_for_interval(const Interval* interval) {
 #ifdef _LP64
         return LIR_OprFact::double_cpu(assigned_reg, assigned_reg);
 #else
+#if defined(SPARC)
+        return LIR_OprFact::double_cpu(assigned_regHi, assigned_reg);
+#else
         return LIR_OprFact::double_cpu(assigned_reg, assigned_regHi);
+#endif // SPARC
 #endif // LP64
       }
 
@@ -2147,6 +2151,13 @@ LIR_Opr LinearScan::calc_operand_for_interval(const Interval* interval) {
         assert(assigned_reg >= pd_first_xmm_reg && assigned_reg <= last_xmm_reg, "no xmm register");
         assert(interval->assigned_regHi() == any_reg, "must not have hi register (double xmm values are stored in one register)");
         LIR_Opr result = LIR_OprFact::double_xmm(assigned_reg - pd_first_xmm_reg);
+#endif // X86
+
+#ifdef SPARC
+        assert(assigned_reg >= pd_first_fpu_reg && assigned_reg <= pd_last_fpu_reg, "no fpu register");
+        assert(interval->assigned_regHi() >= pd_first_fpu_reg && interval->assigned_regHi() <= pd_last_fpu_reg, "no fpu register");
+        assert(assigned_reg % 2 == 0 && assigned_reg + 1 == interval->assigned_regHi(), "must be sequential and even");
+        LIR_Opr result = LIR_OprFact::double_fpu(interval->assigned_regHi() - pd_first_fpu_reg, assigned_reg - pd_first_fpu_reg);
 #elif defined(ARM32)
         assert(assigned_reg >= pd_first_fpu_reg && assigned_reg <= pd_last_fpu_reg, "no fpu register");
         assert(interval->assigned_regHi() >= pd_first_fpu_reg && interval->assigned_regHi() <= pd_last_fpu_reg, "no fpu register");
@@ -2728,6 +2739,9 @@ int LinearScan::append_scope_value_for_operand(LIR_Opr opr, GrowableArray<ScopeV
 
 #ifdef AMD64
       assert(false, "FPU not used on x86-64");
+#endif
+#ifdef SPARC
+      assert(opr->fpu_regnrLo() == opr->fpu_regnrHi() + 1, "assumed in calculation (only fpu_regnrHi is used)");
 #endif
 #ifdef ARM32
       assert(opr->fpu_regnrHi() == opr->fpu_regnrLo() + 1, "assumed in calculation (only fpu_regnrLo is used)");
