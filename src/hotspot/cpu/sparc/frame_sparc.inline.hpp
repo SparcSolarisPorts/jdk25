@@ -65,6 +65,64 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp,
   _sp_adjustment_by_callee = 0;
 }
 
+#if INCLUDE_JFR
+
+// Static helper routines (used by the JFR sampler to walk raw stack frames)
+
+// On SPARC, all interpreter state (bcp, saved caller fp/pc) lives in the
+// frame's register save area, indexed relative to the (unbiased) frame base,
+// and the frame pointer of a frame is the (unbiased) stack pointer of its
+// sender. The "fp" used by the JFR sampler is therefore simply the frame
+// base itself.
+
+inline address frame::interpreter_bcp(const intptr_t* fp) {
+  assert(fp != nullptr, "invariant");
+  return reinterpret_cast<address>(fp[Lbcp->sp_offset_in_saved_window()]);
+}
+
+inline address frame::interpreter_return_address(const intptr_t* fp) {
+  assert(fp != nullptr, "invariant");
+  return reinterpret_cast<address>(fp[I7->sp_offset_in_saved_window()]) + pc_return_offset;
+}
+
+inline intptr_t* frame::interpreter_sender_sp(const intptr_t* fp) {
+  assert(fp != nullptr, "invariant");
+  return reinterpret_cast<intptr_t*>(fp[FP->sp_offset_in_saved_window()] + STACK_BIAS);
+}
+
+inline bool frame::is_interpreter_frame_setup_at(const intptr_t* fp, const void* sp) {
+  assert(fp != nullptr, "invariant");
+  assert(sp != nullptr, "invariant");
+  // The frame is fully set up once the stack pointer has been extended to
+  // (or below) the frame base, i.e. the register save area is in place.
+  return static_cast<const intptr_t*>(sp) <= fp;
+}
+
+inline intptr_t* frame::sender_sp(intptr_t* fp) {
+  assert(fp != nullptr, "invariant");
+  return reinterpret_cast<intptr_t*>(fp[FP->sp_offset_in_saved_window()] + STACK_BIAS);
+}
+
+inline intptr_t* frame::link(const intptr_t* fp) {
+  assert(fp != nullptr, "invariant");
+  return reinterpret_cast<intptr_t*>(fp[FP->sp_offset_in_saved_window()] + STACK_BIAS);
+}
+
+inline address frame::return_address(const intptr_t* sp) {
+  assert(sp != nullptr, "invariant");
+  return reinterpret_cast<address>(sp[I7->sp_offset_in_saved_window()]) + pc_return_offset;
+}
+
+inline intptr_t* frame::fp(const intptr_t* sp) {
+  assert(sp != nullptr, "invariant");
+  // The sampled stack pointer (as recorded in the frame anchor) is already
+  // the unbiased base of the frame, which is what all the accessors above
+  // index into.
+  return const_cast<intptr_t*>(sp);
+}
+
+#endif // INCLUDE_JFR
+
 inline frame::frame(intptr_t* sp)
   : frame(sp,
           sp,

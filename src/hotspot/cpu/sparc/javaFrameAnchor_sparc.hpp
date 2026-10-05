@@ -94,6 +94,14 @@ public:
     return _last_Java_sp;
   }
 
+  // On SPARC, the frame pointer of a frame is identical to the (unbiased)
+  // stack pointer of its sender, and the youngest Java frame's anchor stack
+  // pointer serves as the frame base that the JFR sampler's static frame
+  // helpers index into (see frame_sparc.inline.hpp). Hence no separate
+  // _last_Java_fp member is needed: the fp of the anchor frame is exactly
+  // its recorded stack pointer.
+  intptr_t* last_Java_fp(void)                     { return _last_Java_sp; }
+
   // These are only used by friends
 private:
 
