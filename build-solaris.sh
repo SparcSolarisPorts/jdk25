@@ -13,6 +13,7 @@ bash configure \
     --with-jvm-variants=server \
     --enable-dtrace \
     --disable-warnings-as-errors \
+  --disable-java-warnings-as-errors \
     --with-jtreg="$HOME/tools/jtreg-8.2.1/jtreg" \
     DATE=/usr/gnu/bin/date \
     STRIP=/usr/gnu/bin/gstrip \
