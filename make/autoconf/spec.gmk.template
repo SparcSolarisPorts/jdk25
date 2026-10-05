@@ -700,6 +700,7 @@ INTERIM_LANGTOOLS_ADD_EXPORTS := \
 INTERIM_LANGTOOLS_MODULES_COMMA := $(strip $(subst $(SPACE),$(COMMA),$(strip \
     $(INTERIM_LANGTOOLS_MODULES))))
 INTERIM_LANGTOOLS_ARGS := \
+          --enable-preview \
     --limit-modules java.base,jdk.zipfs,$(INTERIM_LANGTOOLS_MODULES_COMMA) \
     --add-modules $(INTERIM_LANGTOOLS_MODULES_COMMA) \
     --module-path $(BUILDTOOLS_OUTPUTDIR)/interim_langtools_modules \
