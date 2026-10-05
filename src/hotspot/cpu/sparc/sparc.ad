@@ -1050,10 +1050,10 @@ void MachPrologNode::format( PhaseRegAlloc *ra_, outputStream *st ) const {
   }
 
   if (Assembler::is_simm13(-framesize)) {
-    st->print   ("SAVE   R_SP,-" SIZE_FORMAT ",R_SP",framesize);
+    st->print   ("SAVE   R_SP,-%d,R_SP",framesize);
   } else {
-    st->print_cr("SETHI  R_SP,hi%%(-" SIZE_FORMAT "),R_G3",framesize); st->print("\t");
-    st->print_cr("ADD    R_G3,lo%%(-" SIZE_FORMAT "),R_G3",framesize); st->print("\t");
+    st->print_cr("SETHI  R_SP,hi%%(-%d),R_G3",framesize); st->print("\t");
+    st->print_cr("ADD    R_G3,lo%%(-%d),R_G3",framesize); st->print("\t");
     st->print   ("SAVE   R_SP,R_G3,R_SP");
   }
 
@@ -1556,7 +1556,7 @@ static FloatRegister reg_to_DoubleFloatRegister_object(int register_encoding) {
   return as_DoubleFloatRegister(register_encoding);
 }
 
-const bool Matcher::match_rule_supported(int opcode) {
+bool Matcher::match_rule_supported(int opcode) {
   if (!has_match_rule(opcode))
     return false;
 
@@ -1579,7 +1579,7 @@ const bool Matcher::match_rule_supported(int opcode) {
   return true;  // Per default match rules are supported.
 }
 
-const bool Matcher::match_rule_supported_vector(int opcode, int vlen, BasicType bt) {
+bool Matcher::match_rule_supported_vector(int opcode, int vlen, BasicType bt) {
 
   // TODO
   // identify extra cases that we might want to provide match rules for
@@ -1590,15 +1590,15 @@ const bool Matcher::match_rule_supported_vector(int opcode, int vlen, BasicType 
   return ret_value;  // Per default match rules are supported.
 }
 
-const bool Matcher::match_rule_supported_vector_masked(int opcode, int vlen, BasicType bt) {
+bool Matcher::match_rule_supported_vector_masked(int opcode, int vlen, BasicType bt) {
   return false;
 }
 
-const bool Matcher::match_rule_supported_superword(int opcode, int vlen, BasicType bt) {
+bool Matcher::match_rule_supported_auto_vectorization(int opcode, int vlen, BasicType bt) {
   return match_rule_supported_vector(opcode, vlen, bt);
 }
 
-const bool Matcher::vector_needs_partial_operations(Node* node, const TypeVect* vt) {
+bool Matcher::vector_needs_partial_operations(Node* node, const TypeVect* vt) {
   return false;
 }
 
@@ -1606,12 +1606,9 @@ const RegMask* Matcher::predicate_reg_mask(void) {
   return NULL;
 }
 
-const TypeVectMask* Matcher::predicate_reg_type(const Type* elemTy, int length) {
-  return NULL;
-}
 
 // Vector calling convention not yet implemented.
-const bool Matcher::supports_vector_calling_convention(void) {
+bool Matcher::supports_vector_calling_convention(void) {
   return false;
 }
 
@@ -1625,33 +1622,33 @@ address last_rethrow = NULL;  // debugging aid for Rethrow encoding
 #endif
 
 // Vector width in bytes
-const int Matcher::vector_width_in_bytes(BasicType bt) {
+int Matcher::vector_width_in_bytes(BasicType bt) {
   assert(MaxVectorSize == 8, "");
   return 8;
 }
 
-const int Matcher::scalable_vector_reg_size(const BasicType bt) {
+int Matcher::scalable_vector_reg_size(const BasicType bt) {
   return -1;
 }
 // Vector ideal reg
-const uint Matcher::vector_ideal_reg(int size) {
+uint Matcher::vector_ideal_reg(int size) {
   assert(MaxVectorSize == 8, "");
   return Op_RegD;
 }
 
 // Limits on vector size (number of elements) loaded into vector.
-const int Matcher::max_vector_size(const BasicType bt) {
+int Matcher::max_vector_size(const BasicType bt) {
   assert(is_java_primitive(bt), "only primitive type vectors");
   return vector_width_in_bytes(bt)/type2aelembytes(bt);
 }
 
-const int Matcher::min_vector_size(const BasicType bt) {
+int Matcher::min_vector_size(const BasicType bt) {
   return max_vector_size(bt); // Same as max.
 }
 
 // Max number of elements a vector can hold for this type when using
 // superword (auto-vectorization); added in JDK 21. Same as max.
-const int Matcher::superword_max_vector_size(const BasicType bt) {
+int Matcher::max_vector_size_auto_vectorization(const BasicType bt) {
   return Matcher::max_vector_size(bt);
 }
 
@@ -5454,6 +5451,7 @@ instruct loadI_freg(regF dst, memory mem) %{
 
 // Load Pointer
 instruct loadP(iRegP dst, memory mem) %{
+  predicate(n->as_Load()->barrier_data() == 0);
   match(Set dst (LoadP mem));
   ins_cost(MEMORY_REF_COST);
   size(4);
@@ -5467,6 +5465,7 @@ instruct loadP(iRegP dst, memory mem) %{
 
 // Load Compressed Pointer
 instruct loadN(iRegN dst, memory mem) %{
+  predicate(n->as_Load()->barrier_data() == 0);
   match(Set dst (LoadN mem));
   ins_cost(MEMORY_REF_COST);
   size(4);
@@ -5867,6 +5866,7 @@ instruct storeI_Freg(memory mem, regF src) %{
 
 // Store Pointer
 instruct storeP(memory dst, sp_ptr_RegP src) %{
+  predicate(n->as_Store()->barrier_data() == 0);
   match(Set dst (StoreP dst src));
   ins_cost(MEMORY_REF_COST);
 
@@ -5877,6 +5877,7 @@ instruct storeP(memory dst, sp_ptr_RegP src) %{
 %}
 
 instruct storeP0(memory dst, immP0 src) %{
+  predicate(n->as_Store()->barrier_data() == 0);
   match(Set dst (StoreP dst src));
   ins_cost(MEMORY_REF_COST);
 
@@ -5888,6 +5889,7 @@ instruct storeP0(memory dst, immP0 src) %{
 
 // Store Compressed Pointer
 instruct storeN(memory dst, iRegN src) %{
+   predicate(n->as_Store()->barrier_data() == 0);
    match(Set dst (StoreN dst src));
    ins_cost(MEMORY_REF_COST);
    size(4);
@@ -5926,6 +5928,7 @@ instruct storeNKlass(memory dst, iRegN src) %{
 %}
 
 instruct storeN0(memory dst, immN0 src) %{
+   predicate(n->as_Store()->barrier_data() == 0);
    match(Set dst (StoreN dst src));
    ins_cost(MEMORY_REF_COST);
    size(4);
@@ -6674,7 +6677,7 @@ instruct compareAndSwapI_bool(iRegP mem_ptr, iRegI oldval, iRegI newval, iRegI r
 %}
 
 instruct compareAndSwapP_bool(iRegP mem_ptr, iRegP oldval, iRegP newval, iRegI res, o7RegI tmp1, flagsReg ccr ) %{
-  predicate(VM_Version::supports_cx8());
+  predicate(VM_Version::supports_cx8() && n->as_LoadStore()->barrier_data() == 0);
   match(Set res (CompareAndSwapP mem_ptr (Binary oldval newval)));
   match(Set res (WeakCompareAndSwapP mem_ptr (Binary oldval newval)));
   effect( USE mem_ptr, KILL ccr, KILL tmp1);
@@ -6691,6 +6694,7 @@ instruct compareAndSwapP_bool(iRegP mem_ptr, iRegP oldval, iRegP newval, iRegI r
 %}
 
 instruct compareAndSwapN_bool(iRegP mem_ptr, iRegN oldval, iRegN newval, iRegI res, o7RegI tmp1, flagsReg ccr ) %{
+  predicate(n->as_LoadStore()->barrier_data() == 0);
   match(Set res (CompareAndSwapN mem_ptr (Binary oldval newval)));
   match(Set res (WeakCompareAndSwapN mem_ptr (Binary oldval newval)));
   effect( USE mem_ptr, KILL ccr, KILL tmp1);
@@ -6732,6 +6736,7 @@ instruct compareAndExchangeL(iRegP mem_ptr, iRegL oldval, iRegL newval)
 
 instruct compareAndExchangeP(iRegP mem_ptr, iRegP oldval, iRegP newval)
 %{
+  predicate(n->as_LoadStore()->barrier_data() == 0);
   match(Set newval (CompareAndExchangeP mem_ptr (Binary oldval newval)));
   effect( USE mem_ptr );
 
@@ -6744,6 +6749,7 @@ instruct compareAndExchangeP(iRegP mem_ptr, iRegP oldval, iRegP newval)
 
 instruct compareAndExchangeN(iRegP mem_ptr, iRegN oldval, iRegN newval)
 %{
+  predicate(n->as_LoadStore()->barrier_data() == 0);
   match(Set newval (CompareAndExchangeN mem_ptr (Binary oldval newval)));
   effect( USE mem_ptr );
 
@@ -6766,6 +6772,7 @@ instruct xchgI( memory mem, iRegI newval) %{
 
 
 instruct xchgN( memory mem, iRegN newval) %{
+  predicate(n->as_LoadStore()->barrier_data() == 0);
   match(Set newval (GetAndSetN mem newval));
   format %{ "SWAP  [$mem],$newval" %}
   size(4);

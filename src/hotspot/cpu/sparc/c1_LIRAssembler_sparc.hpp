@@ -67,7 +67,4 @@
   };
 
  public:
-  void   pack64(LIR_Opr src, LIR_Opr dst);
-  void unpack64(LIR_Opr src, LIR_Opr dst);
-
 #endif // CPU_SPARC_C1_LIRASSEMBLER_SPARC_HPP

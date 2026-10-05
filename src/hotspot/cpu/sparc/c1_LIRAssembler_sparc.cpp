@@ -410,7 +410,7 @@ void LIR_Assembler::jobject2reg(jobject o, Register reg) {
 #endif
     int oop_index = __ oop_recorder()->find_index(o);
     RelocationHolder rspec = oop_Relocation::spec(oop_index);
-    __ set(NULL_WORD, reg, rspec); // Will be set when the nmethod is created
+    __ set((address)NULL_WORD, reg, rspec); // Will be set when the nmethod is created
   }
 }
 
@@ -3117,30 +3117,6 @@ void LIR_Assembler::membar_storeload() {
 
 void LIR_Assembler::on_spin_wait() {
   Unimplemented();
-}
-
-// Pack two sequential registers containing 32 bit values
-// into a single 64 bit register.
-// src and src->successor() are packed into dst
-// src and dst may be the same register.
-// Note: src is destroyed
-void LIR_Assembler::pack64(LIR_Opr src, LIR_Opr dst) {
-  Register rs = src->as_register();
-  Register rd = dst->as_register_lo();
-  __ sllx(rs, 32, rs);
-  __ srl(rs->successor(), 0, rs->successor());
-  __ or3(rs, rs->successor(), rd);
-}
-
-// Unpack a 64 bit value in a register into
-// two sequential registers.
-// src is unpacked into dst and dst->successor()
-void LIR_Assembler::unpack64(LIR_Opr src, LIR_Opr dst) {
-  Register rs = src->as_register_lo();
-  Register rd = dst->as_register_hi();
-  assert_different_registers(rs, rd, rd->successor());
-  __ srlx(rs, 32, rd);
-  __ srl (rs,  0, rd->successor());
 }
 
 void LIR_Assembler::leal(LIR_Opr addr_opr, LIR_Opr dest, LIR_PatchCode patch_code, CodeEmitInfo* info) {

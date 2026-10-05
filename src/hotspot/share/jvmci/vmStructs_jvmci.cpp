@@ -1055,10 +1055,10 @@
 
 #ifdef SPARC
 
-#define VM_STRUCTS_CPU(nonstatic_field, static_field, unchecked_nonstatic_field, volatile_nonstatic_field, nonproduct_nonstatic_field, c2_nonstatic_field, unchecked_c1_static_field, unchecked_c2_static_field) \
+#define VM_STRUCTS_CPU(nonstatic_field, static_field, unchecked_nonstatic_field, volatile_nonstatic_field, nonproduct_nonstatic_field) \
   volatile_nonstatic_field(JavaFrameAnchor, _flags, int)
 
-#define VM_INT_CONSTANTS_CPU(declare_constant, declare_preprocessor_constant, declare_c1_constant, declare_c2_constant, declare_c2_preprocessor_constant) \
+#define VM_INT_CONSTANTS_CPU(declare_constant, declare_preprocessor_constant) \
   declare_constant(VM_Version::ISA_V9)                  \
   declare_constant(VM_Version::ISA_POPC)                \
   declare_constant(VM_Version::ISA_VIS1)                \

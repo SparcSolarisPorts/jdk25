@@ -346,8 +346,8 @@ JVMFlag::Error InteriorEntryAlignmentConstraintFunc(intx value, bool verbose) {
 #ifdef SPARC
   if (InteriorEntryAlignment % relocInfo::addr_unit() != 0) {
     JVMFlag::printError(verbose,
-                        "InteriorEntryAlignment (" INTX_FORMAT ") must be "
-                        "multiple of NOP size\n", InteriorEntryAlignment);
+                        "InteriorEntryAlignment (%d) must be "
+                        "multiple of NOP size\n", (int)InteriorEntryAlignment);
     return JVMFlag::VIOLATES_CONSTRAINT;
   }
 #endif

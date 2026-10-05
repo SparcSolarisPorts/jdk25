@@ -1633,7 +1633,7 @@ uint PhaseChaitin::Select( ) {
     // Check if a color is available and if so pick the color
     OptoReg::Name reg = choose_color( *lrg, chunk );
 #ifdef SPARC
-    debug_only(lrg->compute_set_mask_size());
+    DEBUG_ONLY(lrg->compute_set_mask_size());
     assert(lrg->num_regs() < 2 || lrg->is_bound() || is_even(reg-1), "allocate all doubles aligned");
 #endif
 

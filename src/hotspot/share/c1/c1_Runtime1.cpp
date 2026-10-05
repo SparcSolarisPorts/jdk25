@@ -1226,7 +1226,7 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* current, C1StubId stub_id ))
 
 #if defined(SPARC)
         if (load_klass_or_mirror_patch_id ||
-            stub_id == Runtime1::load_appendix_patching_id) {
+            stub_id == C1StubId::load_appendix_patching_id) {
           // Update the location in the nmethod with the proper
           // metadata.  When the code was generated, a NULL was stuffed
           // in the metadata table and that table needs to be update to
@@ -1239,15 +1239,15 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* current, C1StubId stub_id ))
           bool found = false;
           while (mds.next() && !found) {
             if (mds.type() == relocInfo::oop_type) {
-              assert(stub_id == Runtime1::load_mirror_patching_id ||
-                     stub_id == Runtime1::load_appendix_patching_id, "wrong stub id");
+              assert(stub_id == C1StubId::load_mirror_patching_id ||
+                     stub_id == C1StubId::load_appendix_patching_id, "wrong stub id");
               oop_Relocation* r = mds.oop_reloc();
               oop* oop_adr = r->oop_addr();
-              *oop_adr = stub_id == Runtime1::load_mirror_patching_id ? mirror() : appendix();
+              *oop_adr = stub_id == C1StubId::load_mirror_patching_id ? mirror() : appendix();
               r->fix_oop_relocation();
               found = true;
             } else if (mds.type() == relocInfo::metadata_type) {
-              assert(stub_id == Runtime1::load_klass_patching_id, "wrong stub id");
+              assert(stub_id == C1StubId::load_klass_patching_id, "wrong stub id");
               metadata_Relocation* r = mds.metadata_reloc();
               Metadata** metadata_adr = r->metadata_addr();
               *metadata_adr = load_klass;

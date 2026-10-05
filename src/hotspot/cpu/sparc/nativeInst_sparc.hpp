@@ -315,7 +315,7 @@ class NativePostCallNop: public NativeInstruction {
 public:
   bool check() const { return false; }
   int displacement() const { return 0; }
-  void patch(jint diff) { Unimplemented(); }
+  bool patch(int32_t oopmap_slot, int32_t cb_offset) { ShouldNotReachHere(); return false; }
   void make_deopt() { Unimplemented(); }
   // jdk25 shared frame::get_oop_map decodes post-call nop reloc info.
   // SPARC never emits post-call nops (check() is always false and
@@ -352,6 +352,7 @@ class NativeCall: public NativeInstruction {
     displacement_offset                = 0,
     instruction_offset                 = 0
   };
+  static int byte_size()                    { return instruction_size; }
   address instruction_address() const       { return addr_at(0); }
   address next_instruction_address() const  { return addr_at(instruction_size); }
   address return_address() const            { return addr_at(return_address_offset); }
@@ -451,6 +452,7 @@ class NativeFarCall: public NativeInstruction {
     displacement_offset                = 0,
     instruction_offset                 = 0
   };
+  static int byte_size()                    { return instruction_size; }
   address instruction_address() const       { return addr_at(0); }
   address next_instruction_address() const  { return addr_at(instruction_size); }
   address return_address() const            { return addr_at(return_address_offset); }
@@ -516,6 +518,7 @@ class NativeMovConstReg32: public NativeInstruction {
     instruction_size       = 8
   };
 
+  static int byte_size()                    { return instruction_size; }
   address instruction_address() const       { return addr_at(0); }
   address next_instruction_address() const  { return addr_at(instruction_size); }
 
@@ -556,6 +559,7 @@ class NativeMovConstReg: public NativeInstruction {
     instruction_size       = 8 * BytesPerInstWord
   };
 
+  static int byte_size()                    { return instruction_size; }
   address instruction_address() const       { return addr_at(0); }
   address next_instruction_address() const  { return addr_at(instruction_size); }
 
@@ -612,6 +616,7 @@ class NativeMovConstRegPatching: public NativeInstruction {
     instruction_size       = add_offset   + BytesPerInstWord
   };
 
+  static int byte_size()                    { return instruction_size; }
   address instruction_address() const       { return addr_at(0); }
   address next_instruction_address() const  { return addr_at(instruction_size); }
 
@@ -751,6 +756,7 @@ class NativeJump: public NativeInstruction {
     instruction_size       = 9 * BytesPerInstWord  // includes delay slot
   };
 
+  static int byte_size()                    { return instruction_size; }
   address instruction_address() const       { return addr_at(0); }
   address next_instruction_address() const  { return addr_at(instruction_size); }
 

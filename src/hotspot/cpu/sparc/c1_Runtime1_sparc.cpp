@@ -487,9 +487,8 @@ OopMapSet* Runtime1::generate_code_for(C1StubId id, StubAssembler* sasm) {
         Label register_finalizer;
         Register t = O1;
         __ load_klass(O0, t);
-        __ ld(t, in_bytes(Klass::access_flags_offset()), t);
-        __ set(JVM_ACC_HAS_FINALIZER, G3);
-        __ andcc(G3, t, G0);
+        __ ldub(t, in_bytes(Klass::misc_flags_offset()), t);
+        __ andcc(t, KlassFlags::_misc_has_finalizer, G0);
         __ br(Assembler::notZero, false, Assembler::pt, register_finalizer);
         __ delayed()->nop();
 

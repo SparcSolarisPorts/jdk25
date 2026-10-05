@@ -356,4 +356,7 @@ class QuadFloatRegisterImpl {
   }
 };
 
+typedef AbstractRegSet<Register> RegSet;
+typedef AbstractRegSet<FloatRegister> FloatRegSet;
+
 #endif // CPU_SPARC_REGISTER_SPARC_HPP
