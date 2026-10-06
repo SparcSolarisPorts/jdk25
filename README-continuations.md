@@ -1,19 +1,26 @@
-# JDK 25 Solaris/SPARC continuation candidate (v15)
+# JDK 25 Solaris/SPARC continuation candidate (v16)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
 
-v15 fixes the javadoc helper compilation when using boot JDK 21 and interim
-javac 25. Gendata.gmk filters --enable-preview from this rule's JAVAC_FLAGS,
-while preserving TARGET_RELEASE_BOOTJDK, exports, module options, and the runtime
-INTERIM_LANGTOOLS_ARGS on compiler/generator launches. Preview compiler options
-cannot target an older release. The helper classes remain compatible with boot 21.
-The full replacement makefile is based on the file supplied in this conversation;
-make/common/JavaCompilation.gmk is unchanged. A GNU make expansion harness confirms
-that the compiler flag is removed while the target and runtime flags are retained.
-Actual Solaris compilation/generation remains to be verified. All v14 HotSpot files
-are included byte-for-byte.
+v16 corrects the javadoc rule's source/target and generator runtime for Solaris.
+The v15 flag filtering exposed a second incompatibility: CreateSymbols.java uses
+unnamed variables and cannot compile as source 21. On Solaris, this rule now uses
+TARGET_RELEASE_NEWJDK (source/target 25), retains the interim compiler's preview
+flags, and launches both data generators with $(JDK_OUTPUTDIR)/bin/java plus
+JAVA_FLAGS_SMALL. This uses the already-built JDK 25 runtime rather than boot 21.
+Other platforms retain the original target/runtime selection. The rest of the
+Solaris build can continue bootstrapping with JDK 21; no reconfigure is required
+for this targeted change. It assumes the existing build/jdk Java 25 executable and
+runtime modules/libraries are runnable, as in the reported builds. This does not
+establish that a clean bootstrap from scratch has all needed dependencies.
+
+GNU make expansion checks passed for Solaris (target/runtime 25) and the unchanged
+non-Solaris path, with compiler/runtime preview flags retained. The full makefile
+is based on the file supplied in this conversation. JavaCompilation.gmk and every
+HotSpot file are unchanged from v15. Actual Solaris build/generation validation
+remains necessary.
 
 v14 implements SPARC lightweight locking (LockingMode=2) in the interpreter,
 C1, C2, and synchronized JNI wrapper paths. VM initialization now accepts mode 2
@@ -62,7 +69,7 @@ The only added HotSpot files relative to v10 are:
 
 This corrects concrete source defects and matches the crash evidence; SPARC
 compilation/runtime validation is still required. All continuation fast-path
-changes remain included. The javadoc source/preview mismatch is addressed by v15.
+changes remain included. The javadoc source/preview mismatch is addressed by v16.
 
 ## Apply and build
 
@@ -73,7 +80,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v15.zip
+unzip -o /path/to/jdk25-sparc-continuations-v16.zip
 gmake images 2>&1 | tee /tmp/build25.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version

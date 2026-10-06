@@ -1345,22 +1345,41 @@
      // Still preempted (monitor not acquired) so no frames were thawed.
 --- a/make/modules/jdk.javadoc/Gendata.gmk
 +++ b/make/modules/jdk.javadoc/Gendata.gmk
-@@ -47,6 +47,9 @@
+@@ -47,8 +47,18 @@
      --add-exports jdk.compiler.interim/com.sun.tools.javac.jvm=ALL-UNNAMED \
      #
  
-+# These tools target the boot JDK release. The interim compiler may require
-+# --enable-preview as a JVM option, but javac cannot enable preview when
-+# compiling for an older release. Keep the runtime options on launch commands.
++# The Solaris port can bootstrap with an older JDK. These tools use current-JDK
++# language features, including unnamed variables, so both compilation and
++# generation must use the new JDK release on that build path.
++JAVADOC_TOOL_TARGET_RELEASE := $(TARGET_RELEASE_BOOTJDK)
++JAVADOC_TOOL_JAVA := $(JAVA_SMALL)
++ifeq ($(OPENJDK_TARGET_OS), solaris)
++  JAVADOC_TOOL_TARGET_RELEASE := $(TARGET_RELEASE_NEWJDK)
++  JAVADOC_TOOL_JAVA := $(JDK_OUTPUTDIR)/bin/java $(JAVA_FLAGS_SMALL)
++endif
++
  $(eval $(call SetupJavaCompilation, COMPILE_CREATE_SYMBOLS, \
-     TARGET_RELEASE := $(TARGET_RELEASE_BOOTJDK), \
+-    TARGET_RELEASE := $(TARGET_RELEASE_BOOTJDK), \
++    TARGET_RELEASE := $(JAVADOC_TOOL_TARGET_RELEASE), \
      SRC := $(TOPDIR)/make/langtools/src/classes \
-@@ -55,7 +58,7 @@
-     BIN := $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc, \
-     DISABLED_WARNINGS := options, \
-     JAVAC_FLAGS := \
--        $(INTERIM_LANGTOOLS_ARGS) \
-+        $(filter-out --enable-preview, $(INTERIM_LANGTOOLS_ARGS)) \
-         $(COMPILECREATESYMBOLS_ADD_EXPORTS), \
- ))
- 
+         $(TOPDIR)/src/jdk.jdeps/share/classes, \
+     INCLUDES := build/tools/symbolgenerator, \
+@@ -75,7 +85,7 @@
+ 	                         $(JDK_SOURCE_TARGET_VERSION)))}.txt
+ 	# Generate element-list files for JDK 11 to current-1
+ 	$(call ExecuteWithLog, $@_historic, \
+-	    $(JAVA_SMALL) $(INTERIM_LANGTOOLS_ARGS) \
++	    $(JAVADOC_TOOL_JAVA) $(INTERIM_LANGTOOLS_ARGS) \
+ 	        $(COMPILECREATESYMBOLS_ADD_EXPORTS) \
+ 	        -classpath $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc \
+ 	        build.tools.symbolgenerator.CreateSymbols \
+@@ -86,7 +96,7 @@
+ 	)
+ 	# Generate element-list file for the current JDK version
+ 	$(call ExecuteWithLog, $@_current, \
+-	    $(JAVA_SMALL) $(INTERIM_LANGTOOLS_ARGS) \
++	    $(JAVADOC_TOOL_JAVA) $(INTERIM_LANGTOOLS_ARGS) \
+ 	        $(COMPILECREATESYMBOLS_ADD_EXPORTS) \
+ 	        -classpath $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc \
+ 	        build.tools.symbolgenerator.JavadocElementList \
