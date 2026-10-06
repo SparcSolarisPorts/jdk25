@@ -1,8 +1,40 @@
-# JDK 25 Solaris/SPARC continuation candidate (v18)
+# JDK 25 Solaris/SPARC continuation candidate (v19)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v19 fixes the supplied C2 ConcurrentHashMap.transfer SIGSEGV. The G1 reference
+CAS rules wrote the Boolean result before the post-write barrier, while their
+register constraints permitted that result to reuse an input register. The
+crash uses L0 both as the CASA address and as the result; MOV 1,L0 destroys the
+address. The post barrier then calculates its card from 1. This gives exactly
+0xffffffff557f0000, the reported fault address. Both g1CompareAndSwapP_bool and
+g1CompareAndSwapN_bool now declare TEMP_DEF res, preventing the result from
+sharing an instruction input. This covers strong and weak reference CAS.
+
+ADLC successfully generated the combined SPARC/G1 matcher, including result
+MachTempNode constraints for both strong and weak variants. The new
+ConcurrentHashMapResizeSmoke test passed with G1/C2 on Linux/x86 JDK 17 with
+compressed oops enabled and disabled. This host cannot compile or run the
+Solaris/SPARC JVM; rebuild and reproduce the jtreg test on that machine.
+Only cpu/sparc/gc/g1/g1_sparc.ad changes relative to v18. All previous changes,
+including continuation fast paths, lightweight locking, and the javadoc build
+fix, remain included.
+
+Targeted validation after rebuilding images and test-image:
+
+```bash
+mkdir -p /tmp/jdk25-cas-test
+build/solaris-sparcv9-server-release/images/jdk/bin/javac \
+  -d /tmp/jdk25-cas-test tests/ConcurrentHashMapResizeSmoke.java
+build/solaris-sparcv9-server-release/images/jdk/bin/java \
+  -Xbatch -XX:+UseG1GC -XX:-TieredCompilation -Xmx256m \
+  -cp /tmp/jdk25-cas-test ConcurrentHashMapResizeSmoke
+build/solaris-sparcv9-server-release/images/jdk/bin/java \
+  -Xbatch -XX:+UseG1GC -XX:-TieredCompilation -XX:-UseCompressedOops -Xmx256m \
+  -cp /tmp/jdk25-cas-test ConcurrentHashMapResizeSmoke
+```
 
 v18 fixes generation after the helper compilation succeeded with v17. The Java 25
 runtime rejected Check$CheckContext from the interim compiler because it was built
@@ -77,7 +109,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v18.zip
+unzip -o /path/to/jdk25-sparc-continuations-v19.zip
 gmake images 2>&1 | tee /tmp/build25.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version

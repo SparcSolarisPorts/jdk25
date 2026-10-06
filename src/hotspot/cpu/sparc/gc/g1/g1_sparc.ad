@@ -172,7 +172,9 @@ instruct g1CompareAndSwapP_bool(iRegP mem_ptr, iRegP oldval, iRegP newval, iRegI
   predicate(UseG1GC && VM_Version::supports_cx8() && n->as_LoadStore()->barrier_data() != 0);
   match(Set res (CompareAndSwapP mem_ptr (Binary oldval newval)));
   match(Set res (WeakCompareAndSwapP mem_ptr (Binary oldval newval)));
-  effect(USE mem_ptr, TEMP tmp2, TEMP tmp3, TEMP tmp4, KILL tmp1, KILL ccr);
+  // The post barrier still uses mem_ptr and newval after res is written.
+  // Keep the Boolean result distinct from all instruction inputs.
+  effect(TEMP_DEF res, USE mem_ptr, TEMP tmp2, TEMP tmp3, TEMP tmp4, KILL tmp1, KILL ccr);
   ins_cost(MEMORY_REF_COST*2+DEFAULT_COST*4);
   format %{
             "MOV    $newval,O7\n\t"
@@ -212,7 +214,9 @@ instruct g1CompareAndSwapN_bool(iRegP mem_ptr, iRegN oldval, iRegN newval, iRegI
   predicate(UseG1GC && n->as_LoadStore()->barrier_data() != 0);
   match(Set res (CompareAndSwapN mem_ptr (Binary oldval newval)));
   match(Set res (WeakCompareAndSwapN mem_ptr (Binary oldval newval)));
-  effect(USE mem_ptr, TEMP tmp2, TEMP tmp3, TEMP tmp4, KILL tmp1, KILL ccr);
+  // The post barrier still uses mem_ptr and newval after res is written.
+  // Keep the Boolean result distinct from all instruction inputs.
+  effect(TEMP_DEF res, USE mem_ptr, TEMP tmp2, TEMP tmp3, TEMP tmp4, KILL tmp1, KILL ccr);
   ins_cost(MEMORY_REF_COST*2+DEFAULT_COST*4);
   format %{
             "MOV    $newval,O7\n\t"
