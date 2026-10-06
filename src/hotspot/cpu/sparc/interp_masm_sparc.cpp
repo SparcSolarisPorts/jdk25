@@ -1171,6 +1171,16 @@ void InterpreterMacroAssembler::remove_activation(TosState state,
 // Argument - lock_reg points to the BasicObjectLock to be used for locking,
 //            it must be initialized with the object to lock
 void InterpreterMacroAssembler::lock_object(Register lock_reg, Register Object) {
+  if (LockingMode == LM_LIGHTWEIGHT) {
+    Label slow, done;
+    lightweight_lock(lock_reg, Object, G4_scratch, G1_scratch, slow);
+    ba(done);
+    delayed()->nop();
+    bind(slow);
+    call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter), lock_reg);
+    bind(done);
+    return;
+  }
   if (LockingMode == LM_MONITOR) {
     call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter), lock_reg);
   }
@@ -1241,6 +1251,18 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg, Register Object) 
 // Argument - lock_reg points to the BasicObjectLock for lock
 // Throw IllegalMonitorException if object is not locked by current thread
 void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
+  if (LockingMode == LM_LIGHTWEIGHT) {
+    Label slow, done;
+    assert_different_registers(lock_reg, G3_scratch, G4_scratch, G1_scratch);
+    ld_ptr(lock_reg, BasicObjectLock::obj_offset(), G3_scratch);
+    lightweight_unlock(G3_scratch, G4_scratch, G1_scratch, slow);
+    ba(done);
+    delayed()->st_ptr(G0, lock_reg, BasicObjectLock::obj_offset());
+    bind(slow);
+    call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
+    bind(done);
+    return;
+  }
   if (LockingMode == LM_MONITOR) {
     call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
   } else {

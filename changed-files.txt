@@ -1,3 +1,4 @@
+src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.cpp
 src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
 src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
 src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
@@ -9,10 +10,12 @@ src/hotspot/cpu/sparc/gc/shared/barrierSetAssembler_sparc.cpp
 src/hotspot/cpu/sparc/globals_sparc.hpp
 src/hotspot/cpu/sparc/interp_masm_sparc.cpp
 src/hotspot/cpu/sparc/macroAssembler_sparc.cpp
+src/hotspot/cpu/sparc/macroAssembler_sparc.hpp
 src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 src/hotspot/cpu/sparc/sparc.ad
 src/hotspot/cpu/sparc/stackChunkFrameStream_sparc.inline.hpp
 src/hotspot/cpu/sparc/stubGenerator_sparc.cpp
 src/hotspot/cpu/sparc/templateInterpreterGenerator_sparc.cpp
 src/hotspot/cpu/sparc/templateTable_sparc.cpp
+src/hotspot/cpu/sparc/vm_version_sparc.cpp
 src/hotspot/share/runtime/continuationFreezeThaw.cpp

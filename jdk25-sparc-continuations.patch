@@ -1,3 +1,35 @@
+--- a/src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.cpp
++++ b/src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.cpp
+@@ -59,6 +59,14 @@
+ 
+ void C1_MacroAssembler::lock_object(Register Rmark, Register Roop, Register Rbox, Register Rscratch, Label& slow_case) {
+   assert_different_registers(Rmark, Roop, Rbox, Rscratch);
++
++  if (LockingMode == LM_LIGHTWEIGHT) {
++    // Preserve the first-instruction null check before storing the oop.
++    ld_ptr(Roop, oopDesc::mark_offset_in_bytes(), Rmark);
++    st_ptr(Roop, Rbox, BasicObjectLock::obj_offset());
++    lightweight_lock(Rbox, Roop, Rmark, Rscratch, slow_case);
++    return;
++  }
+ 
+   Label done;
+ 
+@@ -103,6 +111,14 @@
+ 
+ void C1_MacroAssembler::unlock_object(Register Rmark, Register Roop, Register Rbox, Label& slow_case) {
+   assert_different_registers(Rmark, Roop, Rbox);
++
++  if (LockingMode == LM_LIGHTWEIGHT) {
++    // O7 is excluded from C1 allocation. The caller's return PC is in I7.
++    assert_different_registers(Rmark, Roop, Rbox, O7);
++    ld_ptr(Rbox, BasicObjectLock::obj_offset(), Roop);
++    lightweight_unlock(Roop, Rmark, O7, slow_case);
++    return;
++  }
+ 
+   Label done;
+ 
 --- a/src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
 @@ -27,6 +27,7 @@
@@ -404,9 +436,53 @@
    btst(JVM_ACC_SYNCHRONIZED, G3_scratch);
    br(zero, false, pt, unlocked);
    delayed()->nop();
+@@ -1171,6 +1171,16 @@
+ // Argument - lock_reg points to the BasicObjectLock to be used for locking,
+ //            it must be initialized with the object to lock
+ void InterpreterMacroAssembler::lock_object(Register lock_reg, Register Object) {
++  if (LockingMode == LM_LIGHTWEIGHT) {
++    Label slow, done;
++    lightweight_lock(lock_reg, Object, G4_scratch, G1_scratch, slow);
++    ba(done);
++    delayed()->nop();
++    bind(slow);
++    call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter), lock_reg);
++    bind(done);
++    return;
++  }
+   if (LockingMode == LM_MONITOR) {
+     call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter), lock_reg);
+   }
+@@ -1241,6 +1251,18 @@
+ // Argument - lock_reg points to the BasicObjectLock for lock
+ // Throw IllegalMonitorException if object is not locked by current thread
+ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
++  if (LockingMode == LM_LIGHTWEIGHT) {
++    Label slow, done;
++    assert_different_registers(lock_reg, G3_scratch, G4_scratch, G1_scratch);
++    ld_ptr(lock_reg, BasicObjectLock::obj_offset(), G3_scratch);
++    lightweight_unlock(G3_scratch, G4_scratch, G1_scratch, slow);
++    ba(done);
++    delayed()->st_ptr(G0, lock_reg, BasicObjectLock::obj_offset());
++    bind(slow);
++    call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
++    bind(done);
++    return;
++  }
+   if (LockingMode == LM_MONITOR) {
+     call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
+   } else {
 --- a/src/hotspot/cpu/sparc/macroAssembler_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/macroAssembler_sparc.cpp
-@@ -278,22 +278,22 @@
+@@ -41,6 +41,7 @@
+ #include "runtime/interfaceSupport.inline.hpp"
+ #include "runtime/javaThread.hpp"
+ #include "runtime/jniHandles.inline.hpp"
++#include "runtime/lockStack.hpp"
+ #include "runtime/objectMonitor.hpp"
+ #include "runtime/os.inline.hpp"
+ #include "runtime/safepoint.hpp"
+@@ -278,22 +279,22 @@
  void MacroAssembler::inc_held_monitor_count(Register java_thread) {
    if (!Continuations::enabled()) return;
    assert(java_thread != G1_scratch, "thread must not be scratch");
@@ -434,6 +510,170 @@
  }
  
  void MacroAssembler::post_call_nop() {
+@@ -2491,6 +2492,105 @@
+ }
+ 
+ 
++// Lightweight locks retain the object header and record ownership in the
++// JavaThread's LockStack. No stack address is installed in the mark word.
++void MacroAssembler::lightweight_lock(Register box, Register obj, Register mark,
++                                      Register tmp, Label& slow) {
++  assert(LockingMode == LM_LIGHTWEIGHT, "lightweight locking only");
++  assert_different_registers(box, obj, mark, tmp, G2_thread);
++  assert(oopDesc::mark_offset_in_bytes() == 0, "CAS requires zero displacement");
++  assert(in_bytes(BasicObjectLock::lock_offset()) == 0, "box points to BasicLock");
++  Label push;
++
++  // Keep this first for implicit null-check information in compiled callers.
++  ld_ptr(obj, oopDesc::mark_offset_in_bytes(), mark);
++  if (UseObjectMonitorTable) {
++    st_ptr(G0, box, BasicLock::object_monitor_cache_offset_in_bytes());
++  }
++  if (DiagnoseSyncOnValueBasedClasses != 0) {
++    load_klass(obj, tmp);
++    ldub(tmp, in_bytes(Klass::misc_flags_offset()), tmp);
++    andcc(tmp, KlassFlags::_misc_is_value_based_class, G0);
++    brx(Assembler::notZero, false, Assembler::pn, slow);
++    delayed()->nop();
++  }
++
++  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
++  cmp(tmp, LockStack::end_offset());
++  brx(Assembler::greaterEqualUnsigned, false, Assembler::pn, slow);
++  delayed()->nop();
++
++  // The sentinel below the stack makes this safe even for an empty stack.
++  sub(tmp, oopSize, tmp);
++  ld_ptr(G2_thread, tmp, tmp);
++  cmp(tmp, obj);
++  brx(Assembler::equal, false, Assembler::pt, push);
++  delayed()->nop();
++
++  // Only 01 (unlocked) may become 00 (fast locked).
++  and3(mark, markWord::lock_mask_in_place, tmp);
++  cmp(tmp, markWord::unlocked_value);
++  brx(Assembler::notEqual, false, Assembler::pn, slow);
++  delayed()->nop();
++  andn(mark, markWord::unlocked_value, tmp);
++  cas_ptr(obj, mark, tmp);
++  cmp(mark, tmp);
++  brx(Assembler::notEqual, false, Assembler::pn, slow);
++  delayed()->nop();
++  membar(Assembler::Membar_mask_bits(LoadLoad | LoadStore));
++
++  bind(push);
++  // Reload top rather than needing a third scratch register across CAS.
++  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
++  st_ptr(obj, G2_thread, tmp);
++  add(tmp, oopSize, tmp);
++  st(tmp, G2_thread, in_bytes(JavaThread::lock_stack_top_offset()));
++}
++
++void MacroAssembler::lightweight_unlock(Register obj, Register mark,
++                                        Register tmp, Label& slow) {
++  assert(LockingMode == LM_LIGHTWEIGHT, "lightweight locking only");
++  assert_different_registers(obj, mark, tmp, G2_thread);
++  assert(oopDesc::mark_offset_in_bytes() == 0, "CAS requires zero displacement");
++  Label pop;
++
++  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
++  cmp(tmp, LockStack::start_offset());
++  brx(Assembler::lessEqualUnsigned, false, Assembler::pn, slow);
++  delayed()->nop();
++  sub(tmp, oopSize, tmp);
++  ld_ptr(G2_thread, tmp, mark);
++  cmp(mark, obj);
++  brx(Assembler::notEqual, false, Assembler::pn, slow);
++  delayed()->nop();
++
++  sub(tmp, oopSize, tmp);
++  ld_ptr(G2_thread, tmp, mark);
++  cmp(mark, obj);
++  brx(Assembler::equal, false, Assembler::pt, pop);
++  delayed()->nop();
++
++  ld_ptr(obj, oopDesc::mark_offset_in_bytes(), mark);
++  andcc(mark, markWord::lock_mask_in_place, G0);
++  brx(Assembler::notZero, false, Assembler::pn, slow);
++  delayed()->nop();
++  // Release the critical section before publishing the unlocked mark.
++  membar(Assembler::Membar_mask_bits(LoadStore | StoreStore));
++  or3(mark, markWord::unlocked_value, tmp);
++  cas_ptr(obj, mark, tmp);
++  cmp(mark, tmp);
++  brx(Assembler::notEqual, false, Assembler::pn, slow);
++  delayed()->nop();
++
++  bind(pop);
++  // Defer the pop until success. Inflation/CAS failure therefore reaches the
++  // runtime with the original stack, with no rollback or hidden scratch needed.
++  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
++  sub(tmp, oopSize, tmp);
++  DEBUG_ONLY(st_ptr(G0, G2_thread, tmp);)
++  st(tmp, G2_thread, in_bytes(JavaThread::lock_stack_top_offset()));
++}
++
+ // compiler_lock_object() and compiler_unlock_object() are direct transliterations
+ // of i486.ad fast_lock() and fast_unlock().  See those methods for detailed comments.
+ // The code could be tightened up considerably.
+@@ -2515,6 +2615,21 @@
+ 
+ void MacroAssembler::compiler_lock_object(Register Roop, Register Rmark,
+                                           Register Rbox, Register Rscratch) {
++   if (LockingMode == LM_LIGHTWEIGHT) {
++     Label slow, done;
++     lightweight_lock(Rbox, Roop, Rmark, Rscratch, slow);
++     ba(done);
++     delayed()->cmp(G0, G0); // ICC.Z=1: success, as required by C2/JNI callers
++     bind(slow);
++     cmp(G0, 1);            // ICC.Z=0: runtime fallback
++     bind(done);
++     return;
++   }
++   if (LockingMode == LM_MONITOR) {
++     cmp(G0, 1);
++     return;
++   }
++
+    Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
+ 
+    verify_oop(Roop);
+@@ -2595,6 +2710,21 @@
+ 
+ void MacroAssembler::compiler_unlock_object(Register Roop, Register Rmark,
+                                             Register Rbox, Register Rscratch) {
++   if (LockingMode == LM_LIGHTWEIGHT) {
++     Label slow, done;
++     lightweight_unlock(Roop, Rmark, Rscratch, slow);
++     ba(done);
++     delayed()->cmp(G0, G0); // ICC.Z=1: success, as required by C2/JNI callers
++     bind(slow);
++     cmp(G0, 1);            // ICC.Z=0: runtime fallback
++     bind(done);
++     return;
++   }
++   if (LockingMode == LM_MONITOR) {
++     cmp(G0, 1);
++     return;
++   }
++
+    Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
+ 
+    Label done ;
+--- a/src/hotspot/cpu/sparc/macroAssembler_sparc.hpp
++++ b/src/hotspot/cpu/sparc/macroAssembler_sparc.hpp
+@@ -1179,6 +1179,11 @@
+ 
+   // These set the icc condition code to equal if the lock succeeded
+   // and notEqual if it failed and requires a slow case
++  // Lightweight locking preserves obj and the BasicLock pointer; only the
++  // two explicit temporaries are clobbered. Slow exits leave LockStack intact.
++  void lightweight_lock(Register box, Register obj, Register mark, Register tmp, Label& slow);
++  void lightweight_unlock(Register obj, Register mark, Register tmp, Label& slow);
++
+   void compiler_lock_object(Register Roop, Register Rmark, Register Rbox,
+                             Register Rscratch);
+   void compiler_unlock_object(Register Roop, Register Rmark, Register Rbox,
 --- a/src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 @@ -33,8 +33,11 @@
@@ -866,6 +1106,18 @@
  
    resolve_cache_and_index_for_field(byte_no, Rcache, index);
    jvmti_post_field_mod(Rcache, index, is_static);
+--- a/src/hotspot/cpu/sparc/vm_version_sparc.cpp
++++ b/src/hotspot/cpu/sparc/vm_version_sparc.cpp
+@@ -460,7 +460,8 @@
+     FLAG_SET_DEFAULT(UseVectorizedMismatchIntrinsic, false);
+   }
+ 
+-  if ((LockingMode != LM_LEGACY) && (LockingMode != LM_MONITOR)) {
++  if ((LockingMode != LM_LEGACY) && (LockingMode != LM_MONITOR) &&
++      (LockingMode != LM_LIGHTWEIGHT)) {
+     warning("Unsupported locking mode for this CPU.");
+     FLAG_SET_DEFAULT(LockingMode, LM_LEGACY);
+   }
 --- a/src/hotspot/share/runtime/continuationFreezeThaw.cpp
 +++ b/src/hotspot/share/runtime/continuationFreezeThaw.cpp
 @@ -326,8 +326,9 @@

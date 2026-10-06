@@ -460,7 +460,8 @@ void VM_Version::initialize() {
     FLAG_SET_DEFAULT(UseVectorizedMismatchIntrinsic, false);
   }
 
-  if ((LockingMode != LM_LEGACY) && (LockingMode != LM_MONITOR)) {
+  if ((LockingMode != LM_LEGACY) && (LockingMode != LM_MONITOR) &&
+      (LockingMode != LM_LIGHTWEIGHT)) {
     warning("Unsupported locking mode for this CPU.");
     FLAG_SET_DEFAULT(LockingMode, LM_LEGACY);
   }

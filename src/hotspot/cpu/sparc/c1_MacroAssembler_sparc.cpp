@@ -60,6 +60,14 @@ void C1_MacroAssembler::verified_entry(bool breakAtEntry) {
 void C1_MacroAssembler::lock_object(Register Rmark, Register Roop, Register Rbox, Register Rscratch, Label& slow_case) {
   assert_different_registers(Rmark, Roop, Rbox, Rscratch);
 
+  if (LockingMode == LM_LIGHTWEIGHT) {
+    // Preserve the first-instruction null check before storing the oop.
+    ld_ptr(Roop, oopDesc::mark_offset_in_bytes(), Rmark);
+    st_ptr(Roop, Rbox, BasicObjectLock::obj_offset());
+    lightweight_lock(Rbox, Roop, Rmark, Rscratch, slow_case);
+    return;
+  }
+
   Label done;
 
   Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
@@ -103,6 +111,14 @@ void C1_MacroAssembler::lock_object(Register Rmark, Register Roop, Register Rbox
 
 void C1_MacroAssembler::unlock_object(Register Rmark, Register Roop, Register Rbox, Label& slow_case) {
   assert_different_registers(Rmark, Roop, Rbox);
+
+  if (LockingMode == LM_LIGHTWEIGHT) {
+    // O7 is excluded from C1 allocation. The caller's return PC is in I7.
+    assert_different_registers(Rmark, Roop, Rbox, O7);
+    ld_ptr(Rbox, BasicObjectLock::obj_offset(), Roop);
+    lightweight_unlock(Roop, Rmark, O7, slow_case);
+    return;
+  }
 
   Label done;
 

@@ -41,6 +41,7 @@
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/javaThread.hpp"
 #include "runtime/jniHandles.inline.hpp"
+#include "runtime/lockStack.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/os.inline.hpp"
 #include "runtime/safepoint.hpp"
@@ -2491,6 +2492,105 @@ Address MacroAssembler::argument_address(RegisterOrConstant arg_slot,
 }
 
 
+// Lightweight locks retain the object header and record ownership in the
+// JavaThread's LockStack. No stack address is installed in the mark word.
+void MacroAssembler::lightweight_lock(Register box, Register obj, Register mark,
+                                      Register tmp, Label& slow) {
+  assert(LockingMode == LM_LIGHTWEIGHT, "lightweight locking only");
+  assert_different_registers(box, obj, mark, tmp, G2_thread);
+  assert(oopDesc::mark_offset_in_bytes() == 0, "CAS requires zero displacement");
+  assert(in_bytes(BasicObjectLock::lock_offset()) == 0, "box points to BasicLock");
+  Label push;
+
+  // Keep this first for implicit null-check information in compiled callers.
+  ld_ptr(obj, oopDesc::mark_offset_in_bytes(), mark);
+  if (UseObjectMonitorTable) {
+    st_ptr(G0, box, BasicLock::object_monitor_cache_offset_in_bytes());
+  }
+  if (DiagnoseSyncOnValueBasedClasses != 0) {
+    load_klass(obj, tmp);
+    ldub(tmp, in_bytes(Klass::misc_flags_offset()), tmp);
+    andcc(tmp, KlassFlags::_misc_is_value_based_class, G0);
+    brx(Assembler::notZero, false, Assembler::pn, slow);
+    delayed()->nop();
+  }
+
+  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
+  cmp(tmp, LockStack::end_offset());
+  brx(Assembler::greaterEqualUnsigned, false, Assembler::pn, slow);
+  delayed()->nop();
+
+  // The sentinel below the stack makes this safe even for an empty stack.
+  sub(tmp, oopSize, tmp);
+  ld_ptr(G2_thread, tmp, tmp);
+  cmp(tmp, obj);
+  brx(Assembler::equal, false, Assembler::pt, push);
+  delayed()->nop();
+
+  // Only 01 (unlocked) may become 00 (fast locked).
+  and3(mark, markWord::lock_mask_in_place, tmp);
+  cmp(tmp, markWord::unlocked_value);
+  brx(Assembler::notEqual, false, Assembler::pn, slow);
+  delayed()->nop();
+  andn(mark, markWord::unlocked_value, tmp);
+  cas_ptr(obj, mark, tmp);
+  cmp(mark, tmp);
+  brx(Assembler::notEqual, false, Assembler::pn, slow);
+  delayed()->nop();
+  membar(Assembler::Membar_mask_bits(LoadLoad | LoadStore));
+
+  bind(push);
+  // Reload top rather than needing a third scratch register across CAS.
+  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
+  st_ptr(obj, G2_thread, tmp);
+  add(tmp, oopSize, tmp);
+  st(tmp, G2_thread, in_bytes(JavaThread::lock_stack_top_offset()));
+}
+
+void MacroAssembler::lightweight_unlock(Register obj, Register mark,
+                                        Register tmp, Label& slow) {
+  assert(LockingMode == LM_LIGHTWEIGHT, "lightweight locking only");
+  assert_different_registers(obj, mark, tmp, G2_thread);
+  assert(oopDesc::mark_offset_in_bytes() == 0, "CAS requires zero displacement");
+  Label pop;
+
+  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
+  cmp(tmp, LockStack::start_offset());
+  brx(Assembler::lessEqualUnsigned, false, Assembler::pn, slow);
+  delayed()->nop();
+  sub(tmp, oopSize, tmp);
+  ld_ptr(G2_thread, tmp, mark);
+  cmp(mark, obj);
+  brx(Assembler::notEqual, false, Assembler::pn, slow);
+  delayed()->nop();
+
+  sub(tmp, oopSize, tmp);
+  ld_ptr(G2_thread, tmp, mark);
+  cmp(mark, obj);
+  brx(Assembler::equal, false, Assembler::pt, pop);
+  delayed()->nop();
+
+  ld_ptr(obj, oopDesc::mark_offset_in_bytes(), mark);
+  andcc(mark, markWord::lock_mask_in_place, G0);
+  brx(Assembler::notZero, false, Assembler::pn, slow);
+  delayed()->nop();
+  // Release the critical section before publishing the unlocked mark.
+  membar(Assembler::Membar_mask_bits(LoadStore | StoreStore));
+  or3(mark, markWord::unlocked_value, tmp);
+  cas_ptr(obj, mark, tmp);
+  cmp(mark, tmp);
+  brx(Assembler::notEqual, false, Assembler::pn, slow);
+  delayed()->nop();
+
+  bind(pop);
+  // Defer the pop until success. Inflation/CAS failure therefore reaches the
+  // runtime with the original stack, with no rollback or hidden scratch needed.
+  lduw(G2_thread, in_bytes(JavaThread::lock_stack_top_offset()), tmp);
+  sub(tmp, oopSize, tmp);
+  DEBUG_ONLY(st_ptr(G0, G2_thread, tmp);)
+  st(tmp, G2_thread, in_bytes(JavaThread::lock_stack_top_offset()));
+}
+
 // compiler_lock_object() and compiler_unlock_object() are direct transliterations
 // of i486.ad fast_lock() and fast_unlock().  See those methods for detailed comments.
 // The code could be tightened up considerably.
@@ -2515,6 +2615,21 @@ Address MacroAssembler::argument_address(RegisterOrConstant arg_slot,
 
 void MacroAssembler::compiler_lock_object(Register Roop, Register Rmark,
                                           Register Rbox, Register Rscratch) {
+   if (LockingMode == LM_LIGHTWEIGHT) {
+     Label slow, done;
+     lightweight_lock(Rbox, Roop, Rmark, Rscratch, slow);
+     ba(done);
+     delayed()->cmp(G0, G0); // ICC.Z=1: success, as required by C2/JNI callers
+     bind(slow);
+     cmp(G0, 1);            // ICC.Z=0: runtime fallback
+     bind(done);
+     return;
+   }
+   if (LockingMode == LM_MONITOR) {
+     cmp(G0, 1);
+     return;
+   }
+
    Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
 
    verify_oop(Roop);
@@ -2595,6 +2710,21 @@ void MacroAssembler::compiler_lock_object(Register Roop, Register Rmark,
 
 void MacroAssembler::compiler_unlock_object(Register Roop, Register Rmark,
                                             Register Rbox, Register Rscratch) {
+   if (LockingMode == LM_LIGHTWEIGHT) {
+     Label slow, done;
+     lightweight_unlock(Roop, Rmark, Rscratch, slow);
+     ba(done);
+     delayed()->cmp(G0, G0); // ICC.Z=1: success, as required by C2/JNI callers
+     bind(slow);
+     cmp(G0, 1);            // ICC.Z=0: runtime fallback
+     bind(done);
+     return;
+   }
+   if (LockingMode == LM_MONITOR) {
+     cmp(G0, 1);
+     return;
+   }
+
    Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
 
    Label done ;

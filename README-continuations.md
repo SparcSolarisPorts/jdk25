@@ -1,8 +1,23 @@
-# JDK 25 Solaris/SPARC continuation candidate (v13)
+# JDK 25 Solaris/SPARC continuation candidate (v14)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v14 implements SPARC lightweight locking (LockingMode=2) in the interpreter,
+C1, C2, and synchronized JNI wrapper paths. VM initialization now accepts mode 2
+instead of replacing it with legacy locking. The fast path updates the mark-word
+lock bits with CAS and records oops on the JavaThread LockStack. Adjacent recursive
+locks push/pop stack entries; full stacks, nonadjacent recursion, inflated monitors,
+and failed CAS use the shared runtime. Slow unlocks retain the complete lock stack.
+Object-monitor-table caches are cleared before acquisition when enabled. Explicit
+acquire/release barriers are emitted; object, BasicLock, and thread registers survive.
+C1 unlock uses O7, which is outside the C1 register allocator; I7 holds the frame's
+return address. Only named temporaries are clobbered in C2 and JNI helpers.
+
+The warning is removed by implementing the selected mode, not by hiding the message.
+This source candidate still requires a Solaris/SPARC build and runtime validation.
+No .gmk files are changed.
 
 v13 changes Solaris/SPARC compressed class-space placement to use the existing
 Metaspace OS-selected mapping fallback, keeping compressed class pointers enabled.
@@ -50,7 +65,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v13.zip
+unzip -o /path/to/jdk25-sparc-continuations-v14.zip
 gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version
@@ -92,6 +107,61 @@ version alone does not establish that C1 and C2 are working.
 
 The included patch is cumulative relative to the original attached jdk25.zip;
 use the full files when your tree already has v2/v3/v4.
+
+## Lightweight locking tests
+
+Compile with the working JDK 21, then run the new JDK 25 VM. Require PASS and
+verify that PrintFlagsFinal reports LockingMode=2 without the unsupported-mode warning.
+
+```bash
+mkdir -p continuation-test-classes
+/usr/jdk/jdk-21/bin/javac -d continuation-test-classes tests/LightweightLockingSmoke.java
+build/solaris-sparcv9-server-release/jdk/bin/java -XX:+PrintFlagsFinal -version 2>&1 | ggrep LockingMode
+build/solaris-sparcv9-server-release/jdk/bin/java -Xint -XX:LockingMode=2 -Xmx128m -cp continuation-test-classes LightweightLockingSmoke
+build/solaris-sparcv9-server-release/jdk/bin/java -XX:TieredStopAtLevel=1 -Xbatch -XX:LockingMode=2 -Xmx128m -cp continuation-test-classes LightweightLockingSmoke
+build/solaris-sparcv9-server-release/jdk/bin/java -XX:-TieredCompilation -Xbatch -XX:LockingMode=2 -Xmx128m -cp continuation-test-classes LightweightLockingSmoke
+build/solaris-sparcv9-server-release/jdk/bin/java -XX:LockingMode=2 -Xmx128m -cp continuation-test-classes LightweightLockingSmoke virtual
+```
+
+Repeat the three platform modes with `-XX:+UseObjectMonitorTable`. The test covers
+recursive locking, sixteen distinct nested locks (overflow), nonadjacent recursion,
+hash-code inflation, exception exits, contended updates, wait/notify, and GC.
+Virtual mode additionally sleeps and collects while holding recursive locks.
+Platform test expectations passed here on x86 JDK 17 in interpreter/C1/C2 modes.
+Virtual mode cannot run on that host VM.
+
+For synchronized native wrappers, compile the optional JNI library on Solaris:
+
+```bash
+/usr/gcc/15/bin/g++ -m64 -shared -fPIC \
+  -I/usr/jdk/jdk-21/include -I/usr/jdk/jdk-21/include/solaris \
+  tests/LightweightLockingSmoke.cpp -o continuation-test-classes/libLightweightLockingSmoke.so
+build/solaris-sparcv9-server-release/jdk/bin/java -XX:LockingMode=2 -Xmx128m \
+  -Djava.library.path=continuation-test-classes -cp continuation-test-classes LightweightLockingSmoke native
+```
+
+For direct yield and carrier migration while holding recursive lightweight locks:
+
+```bash
+/usr/jdk/jdk-21/bin/javac --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+  -d continuation-test-classes tests/LightweightContinuationSmoke.java
+build/solaris-sparcv9-server-release/jdk/bin/java -XX:LockingMode=2 -Xmx128m \
+  --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+  -cp continuation-test-classes LightweightContinuationSmoke
+build/solaris-sparcv9-server-release/jdk/bin/java -XX:LockingMode=2 -Xmx128m \
+  --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
+  -cp continuation-test-classes LightweightContinuationSmoke migration
+```
+
+Repeat direct mode with `-Xcomp -XX:-TieredCompilation` and a fastdebug VM's
+`-Xlog:continuations=trace` to check freeze_fast/thaw_fast execution. Require PASS;
+a mounted continuation must own its locks, and a suspended one must leave no locks
+on the carrier's LockStack. These continuation and native tests are not host-validated.
+
+`tests/check_lightweight_sequences.py` models the actual helper instruction-call
+sequences, including SPARC delay slots, recursion, underflow/overflow, and injected
+CAS/inflation races. 160000 cases passed, with debug clearing and monitor caches
+both enabled and disabled. This checks semantics, not binary encodings or hardware.
 
 ## G1 C2 regression test
 
@@ -206,7 +276,7 @@ not execute generated SPARC instructions or validate GC maps.
 
 HotSpot C++ compilation and SPARC execution were not available locally. Startup,
 yield/resume, GC, migration, compiled frames and exception propagation therefore
-remain unverified. Legacy SPARC locking still pins synchronized sections; this
-candidate does not implement lightweight locking or asynchronous preemption.
+remain unverified. Lightweight locking is implemented in v14; explicit legacy
+mode still pins synchronized sections. Asynchronous preemption is not implemented.
 It also does not address the separate source-21/--enable-preview build error in
 the JDK build makefiles, which were not included in the attached source archives.

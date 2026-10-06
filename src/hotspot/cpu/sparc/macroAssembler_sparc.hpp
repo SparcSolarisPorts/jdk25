@@ -1179,6 +1179,11 @@ public:
 
   // These set the icc condition code to equal if the lock succeeded
   // and notEqual if it failed and requires a slow case
+  // Lightweight locking preserves obj and the BasicLock pointer; only the
+  // two explicit temporaries are clobbered. Slow exits leave LockStack intact.
+  void lightweight_lock(Register box, Register obj, Register mark, Register tmp, Label& slow);
+  void lightweight_unlock(Register obj, Register mark, Register tmp, Label& slow);
+
   void compiler_lock_object(Register Roop, Register Rmark, Register Rbox,
                             Register Rscratch);
   void compiler_unlock_object(Register Roop, Register Rmark, Register Rbox,
