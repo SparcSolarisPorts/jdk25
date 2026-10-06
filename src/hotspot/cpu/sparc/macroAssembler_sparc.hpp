@@ -1197,8 +1197,6 @@ public:
     Label&   slow_case                 // continuation point if fast allocation fails
   );
   void zero_memory(Register base, Register index);
-  void incr_allocated_bytes(RegisterOrConstant size_in_bytes,
-                            Register t1, Register t2);
 
   // interface method calling
   void lookup_interface_method(Register recv_klass,

@@ -2417,7 +2417,7 @@ void MacroAssembler::check_klass_subtype_slow_path(Register sub_klass,
   // This code is rarely used, so simplicity is a virtue here.
 
 #ifndef PRODUCT
-  int* pst_counter = &SharedRuntime::_partial_subtype_ctr;
+  uint* pst_counter = &SharedRuntime::_partial_subtype_ctr;
   inc_counter((address) pst_counter, count_temp, scan_temp);
 #endif // PRODUCT
 
@@ -2630,9 +2630,8 @@ void MacroAssembler::compiler_unlock_object(Register Roop, Register Rmark,
    orcc(Rbox, G0, G0);
    brx(Assembler::notZero, false, Assembler::pn, done);
    delayed()->
-   ld_ptr(Address(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(EntryList)), Rscratch);
-   ld_ptr(Address(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(cxq)), Rbox);
-   orcc(Rbox, Rscratch, G0);
+   ld_ptr(Address(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(entry_list)), Rscratch);
+   andcc(Rscratch, Rscratch, G0);
    brx(Assembler::zero, false, Assembler::pt, done);
    delayed()->
    st_ptr(G0, Address(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)));
@@ -2809,17 +2808,6 @@ void MacroAssembler::zero_memory(Register base, Register index) {
   subcc(index, HeapWordSize, index);
   brx(Assembler::greaterEqual, true, Assembler::pt, loop);
   delayed()->st_ptr(G0, base, index);
-}
-
-void MacroAssembler::incr_allocated_bytes(RegisterOrConstant size_in_bytes,
-                                          Register t1, Register t2) {
-  // Bump total bytes allocated by this thread
-  assert(t1->is_global(), "must be global reg"); // so all 64 bits are saved on a context switch
-  assert_different_registers(size_in_bytes.register_or_noreg(), t1, t2);
-  // v8 support has gone the way of the dodo
-  ldx(G2_thread, in_bytes(JavaThread::allocated_bytes_offset()), t1);
-  add(t1, ensure_simm13_or_reg(size_in_bytes, t2), t1);
-  stx(t1, G2_thread, in_bytes(JavaThread::allocated_bytes_offset()));
 }
 
 Assembler::Condition MacroAssembler::negate_condition(Assembler::Condition cond) {
@@ -3149,12 +3137,10 @@ void MacroAssembler::encode_klass_not_null(Register r) {
     set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
     sub(r, G6_heapbase, r);
     if (CompressedKlassPointers::shift() != 0) {
-      assert (LogKlassAlignmentInBytes == CompressedKlassPointers::shift(), "decode alg wrong");
-      srlx(r, LogKlassAlignmentInBytes, r);
+      srlx(r, CompressedKlassPointers::shift(), r);
     }
     reinit_heapbase();
   } else {
-    assert (LogKlassAlignmentInBytes == CompressedKlassPointers::shift() || CompressedKlassPointers::shift() == 0, "decode alg wrong");
     srlx(r, CompressedKlassPointers::shift(), r);
   }
 }
@@ -3168,11 +3154,10 @@ void MacroAssembler::encode_klass_not_null(Register src, Register dst) {
       set((intptr_t)CompressedKlassPointers::base(), dst);
       sub(src, dst, dst);
       if (CompressedKlassPointers::shift() != 0) {
-        srlx(dst, LogKlassAlignmentInBytes, dst);
+        srlx(dst, CompressedKlassPointers::shift(), dst);
       }
     } else {
       // shift src into dst
-      assert (LogKlassAlignmentInBytes == CompressedKlassPointers::shift() || CompressedKlassPointers::shift() == 0, "decode alg wrong");
       srlx(src, CompressedKlassPointers::shift(), dst);
     }
   }
@@ -3187,7 +3172,7 @@ int MacroAssembler::instr_size_for_decode_klass_not_null() {
   if (CompressedKlassPointers::base() != NULL) {
     // set + add + set
     num_instrs += insts_for_internal_set((intptr_t)CompressedKlassPointers::base()) +
-                  insts_for_internal_set((intptr_t)CompressedOops::ptrs_base());
+                  insts_for_internal_set((intptr_t)CompressedOops::base());
     if (CompressedKlassPointers::shift() != 0) {
       num_instrs += 1;  // sllx
     }
@@ -3205,11 +3190,10 @@ void  MacroAssembler::decode_klass_not_null(Register r) {
     assert(r != G6_heapbase, "bad register choice");
     set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
     if (CompressedKlassPointers::shift() != 0)
-      sllx(r, LogKlassAlignmentInBytes, r);
+      sllx(r, CompressedKlassPointers::shift(), r);
     add(r, G6_heapbase, r);
     reinit_heapbase();
   } else {
-    assert (LogKlassAlignmentInBytes == CompressedKlassPointers::shift() || CompressedKlassPointers::shift() == 0, "decode alg wrong");
     sllx(r, CompressedKlassPointers::shift(), r);
   }
 }
@@ -3225,7 +3209,7 @@ void  MacroAssembler::decode_klass_not_null(Register src, Register dst) {
       if (CompressedKlassPointers::shift() != 0) {
         assert((src != G6_heapbase) && (dst != G6_heapbase), "bad register choice");
         set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
-        sllx(src, LogKlassAlignmentInBytes, dst);
+        sllx(src, CompressedKlassPointers::shift(), dst);
         add(dst, G6_heapbase, dst);
         reinit_heapbase();
       } else {
@@ -3234,7 +3218,6 @@ void  MacroAssembler::decode_klass_not_null(Register src, Register dst) {
       }
     } else {
       // shift/mov src into dst.
-      assert (LogKlassAlignmentInBytes == CompressedKlassPointers::shift() || CompressedKlassPointers::shift() == 0, "decode alg wrong");
       sllx(src, CompressedKlassPointers::shift(), dst);
     }
   }
@@ -3243,9 +3226,9 @@ void  MacroAssembler::decode_klass_not_null(Register src, Register dst) {
 void MacroAssembler::reinit_heapbase() {
   if (UseCompressedOops || UseCompressedClassPointers) {
     if (Universe::heap() != NULL) {
-      set((intptr_t)CompressedOops::ptrs_base(), G6_heapbase);
+      set((intptr_t)CompressedOops::base(), G6_heapbase);
     } else {
-      AddressLiteral base(CompressedOops::ptrs_base_addr());
+      AddressLiteral base(CompressedOops::base_addr());
       load_ptr_contents(base, G6_heapbase);
     }
   }
