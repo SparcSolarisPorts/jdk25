@@ -12,6 +12,7 @@ bash configure \
     --with-boot-jdk="$BOOT_JDK" \
     --with-jvm-variants=server \
     --enable-dtrace \
+--with-native-debug-symbols=internal \
     --disable-warnings-as-errors \
   --disable-java-warnings-as-errors \
     --with-jtreg="$HOME/tools/jtreg-8.2.1/jtreg" \
