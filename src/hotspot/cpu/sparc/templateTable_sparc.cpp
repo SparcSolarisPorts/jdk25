@@ -2006,9 +2006,8 @@ void TemplateTable::_return(TosState state) {
     __ mov(G0, G3_scratch);
     __ access_local_ptr(G3_scratch, Otos_i);
     __ load_klass(Otos_i, O2);
-    __ set(JVM_ACC_HAS_FINALIZER, G3);
-    __ ld(O2, in_bytes(Klass::access_flags_offset()), O2);
-    __ andcc(G3, O2, G0);
+    __ ldub(O2, in_bytes(Klass::misc_flags_offset()), O2);
+    __ andcc(O2, KlassFlags::_misc_has_finalizer, G0);
     Label skip_register_finalizer;
     __ br(Assembler::zero, false, Assembler::pn, skip_register_finalizer);
     __ delayed()->nop();

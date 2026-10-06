@@ -194,4 +194,9 @@
     return false;
   }
 
+  // Does target support predicated operation emulation.
+  static bool supports_vector_predicate_op_emulation(int vopc, int vlen, BasicType bt) {
+    return false;
+  }
+
 #endif // CPU_SPARC_MATCHER_SPARC_HPP

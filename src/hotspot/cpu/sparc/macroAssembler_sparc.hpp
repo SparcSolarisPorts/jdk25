@@ -1314,6 +1314,7 @@ public:
   // Unconditional increment.
   void inc_counter(address counter_addr, Register Rtmp1, Register Rtmp2);
   void inc_counter(int*    counter_addr, Register Rtmp1, Register Rtmp2);
+  void inc_counter(uint*   counter_addr, Register Rtmp1, Register Rtmp2);
 
   // Use BIS for zeroing
   void bis_zeroing(Register to, Register count, Register temp, Label& Ldone);

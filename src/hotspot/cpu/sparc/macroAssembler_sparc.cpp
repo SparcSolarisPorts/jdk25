@@ -2857,6 +2857,10 @@ void MacroAssembler::inc_counter(int* counter_addr, Register Rtmp1, Register Rtm
   inc_counter((address) counter_addr, Rtmp1, Rtmp2);
 }
 
+void MacroAssembler::inc_counter(uint* counter_addr, Register Rtmp1, Register Rtmp2) {
+  inc_counter((address) counter_addr, Rtmp1, Rtmp2);
+}
+
 SkipIfEqual::SkipIfEqual(
     MacroAssembler* masm, Register temp, const bool* flag_addr,
     Assembler::Condition condition) {

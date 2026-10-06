@@ -5608,7 +5608,7 @@ class StubGenerator: public StubCodeGenerator {
 
     Label thaw_success;
     __ br_notnull_short(L2, Assembler::pt, thaw_success);
-    __ jump_to(AddressLiteral(StubRoutines::throw_StackOverflowError_entry()), G1);
+    __ jump_to(AddressLiteral(SharedRuntime::throw_StackOverflowError_entry()), G1);
     __ delayed()->nop();
     __ bind(thaw_success);
 
