@@ -33,6 +33,7 @@
 #include "memory/resourceArea.hpp"
 #include "code/compiledIC.hpp"
 #include "oops/klass.inline.hpp"
+#include "oops/method.inline.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/jniHandles.hpp"
 #include "runtime/continuation.hpp"

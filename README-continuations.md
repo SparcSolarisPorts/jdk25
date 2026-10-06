@@ -1,13 +1,13 @@
-# JDK 25 Solaris/SPARC continuation candidate (v7)
+# JDK 25 Solaris/SPARC continuation candidate (v8)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
 
-v7 fixes the release-build error in v6: the compiled-frame lock inspection
-helper is ASSERT-only. Fast-freeze eligibility now uses the product
-held-monitor counter, matching the shared freeze pinning check. The fast paths
-remain enabled. This is the only HotSpot source change from v6.
+v8 fixes the unresolved Method::is_continuation_*_intrinsic symbols from v7
+by including oops/method.inline.hpp in sharedRuntime_sparc.cpp. All three helper
+bodies are defined inline in that header. This is the only HotSpot source
+change from v7. The fast paths and the v7 release-build fix remain included.
 
 ## Apply and build
 
@@ -18,7 +18,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v7.zip
+unzip -o /path/to/jdk25-sparc-continuations-v8.zip
 gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version
