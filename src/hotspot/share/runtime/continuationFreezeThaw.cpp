@@ -1706,7 +1706,10 @@ bool FreezeBase::check_valid_fast_path() {
                   RegisterMap::ProcessFrames::skip,
                   RegisterMap::WalkContinuation::skip);
   map.set_include_argument_oops(false);
-  SPARC_ONLY(if (_preempt || _cont.argsize() != 0) return false;)
+  // The per-frame monitor inspection helper is ASSERT-only. Use the
+  // product held-monitor counter, as freeze_internal does for pinning.
+  SPARC_ONLY(if (_preempt || _cont.argsize() != 0 ||
+                _thread->held_monitor_count() > 0) return false;)
   bool is_top_frame = true;
   for (frame f = freeze_start_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map), is_top_frame = false) {
 #ifdef SPARC
@@ -1715,8 +1718,7 @@ bool FreezeBase::check_valid_fast_path() {
     if (_preempt || f.sp() != f.unextended_sp() || !f.is_compiled_frame() ||
         f.is_deoptimized_frame() || f.cb() == nullptr ||
         f.fp() != f.sp() + f.cb()->frame_size() ||
-        f.fp() > _cont.entry()->bottom_sender_sp() ||
-        ContinuationHelper::CompiledFrame::is_owning_locks(_thread, &map, f)) {
+        f.fp() > _cont.entry()->bottom_sender_sp()) {
       return false;
     }
 #endif

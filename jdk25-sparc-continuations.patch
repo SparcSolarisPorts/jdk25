@@ -832,7 +832,7 @@
  
    if (_monitors_in_lockstack > 0) {
      freeze_lockstack(chunk);
-@@ -1663,19 +1695,31 @@
+@@ -1663,19 +1695,33 @@
  }
  #endif // INCLUDE_JVMTI
  
@@ -849,7 +849,10 @@
                    RegisterMap::ProcessFrames::skip,
                    RegisterMap::WalkContinuation::skip);
    map.set_include_argument_oops(false);
-+  SPARC_ONLY(if (_preempt || _cont.argsize() != 0) return false;)
++  // The per-frame monitor inspection helper is ASSERT-only. Use the
++  // product held-monitor counter, as freeze_internal does for pinning.
++  SPARC_ONLY(if (_preempt || _cont.argsize() != 0 ||
++                _thread->held_monitor_count() > 0) return false;)
    bool is_top_frame = true;
    for (frame f = freeze_start_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map), is_top_frame = false) {
 +#ifdef SPARC
@@ -858,15 +861,14 @@
 +    if (_preempt || f.sp() != f.unextended_sp() || !f.is_compiled_frame() ||
 +        f.is_deoptimized_frame() || f.cb() == nullptr ||
 +        f.fp() != f.sp() + f.cb()->frame_size() ||
-+        f.fp() > _cont.entry()->bottom_sender_sp() ||
-+        ContinuationHelper::CompiledFrame::is_owning_locks(_thread, &map, f)) {
++        f.fp() > _cont.entry()->bottom_sender_sp()) {
 +      return false;
 +    }
 +#endif
      if (!((f.is_compiled_frame() && !f.is_deoptimized_frame()) || (is_top_frame && (f.is_runtime_frame() || f.is_native_frame())))) {
        return false;
      }
-@@ -1761,8 +1805,9 @@
+@@ -1761,8 +1807,9 @@
  
    Freeze<ConfigT> freeze(current, cont, sp, preempt);
  
@@ -878,7 +880,7 @@
    if (fast && freeze.size_if_fast_freeze_available() > 0) {
      freeze.freeze_fast_existing_chunk();
      CONT_JFR_ONLY(freeze.jfr_info().post_jfr_event(&event, oopCont, current);)
-@@ -1994,7 +2039,19 @@
+@@ -1994,7 +2041,19 @@
    Thaw(JavaThread* thread, ContinuationWrapper& cont) : ThawBase(thread, cont) {}
  
    inline bool can_thaw_fast(stackChunkOop chunk) {
@@ -899,7 +901,7 @@
             &&  _thread->cont_fastpath_thread_state()
             && !chunk->has_thaw_slowpath_condition()
             && !PreserveFramePointer;
-@@ -2100,7 +2157,8 @@
+@@ -2100,7 +2159,8 @@
        intptr_t* retaddr_slot = (chunk_sp
                                  + frame_size
                                  - frame::sender_sp_ret_address_offset());
@@ -909,7 +911,7 @@
               "unexpected pc");
      }
  #endif
-@@ -2196,11 +2254,20 @@
+@@ -2196,11 +2256,20 @@
    log_develop_trace(continuations)("setting entry argsize: %d", _cont.argsize());
    assert(rs.bottom_sp() == _cont.entry()->bottom_sender_sp(), "");
  
@@ -933,7 +935,7 @@
  
    assert(is_last == _cont.is_empty(), "");
    assert(_cont.chunk_invariant(), "");
-@@ -2469,7 +2536,8 @@
+@@ -2469,7 +2538,8 @@
  intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::preempt_kind preempt_kind, bool fast_case) {
    assert(preempt_kind == Continuation::freeze_on_wait || preempt_kind == Continuation::freeze_on_monitorenter, "");
    frame top(sp);
@@ -943,7 +945,7 @@
  
  #if INCLUDE_JVMTI
    // Finish the VTMS transition.
-@@ -2985,7 +3053,8 @@
+@@ -2985,7 +3055,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;
