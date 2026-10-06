@@ -1,20 +1,32 @@
-# JDK 25 Solaris/SPARC continuation candidate (v10)
+# JDK 25 Solaris/SPARC continuation candidate (v11)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
 
-v10 fixes v9's reversed load_klass operands in the C1 Class.isInstance stub.
-SPARC's API is load_klass(source_oop, destination_klass). The corrected call
-loads the object in I1 into L1. The attached faulting instruction instead
-loaded from L1+8 into I1; its address exactly matches the reported unaligned
-SIGBUS address. This operand correction is the only HotSpot change from v9.
-All earlier continuation/fast-path fixes remain included.
+v11 fixes the C2 G1 barrier runtime-call register preservation implicated by
+the attached HashMap.putVal crash. Normal -version startup now succeeded on
+the user's v10 build. The javac crash occurred at the return polling load,
+with G2 different from the current JavaThread; its last runtime call was the
+G1 post-write barrier. That barrier used call_VM_leaf(G2_thread, ...), which
+cannot cache the JavaThread in a register that the C call itself may clobber.
 
-The reported JVM crashed after 0.724 seconds. The lengthy crash output includes
-compiled machine code; core-dump writing can add further delay. For quick
-startup diagnosis, use -XX:-CreateCoredumpOnCrash; hs_err reporting remains.
-The fix has not yet been compiled or executed on SPARC locally.
+SaveLiveRegisters now always saves/restores G2, and places saved registers
+after all 16 V9 register-save words plus 6 outgoing argument-home words.
+G1 C2 stubs marshal their two arguments and call the non-safepointing leaf
+runtime directly under that save scope. The shared save area protects G2
+across the call without an invalid global-register thread-cache argument.
+The only added HotSpot files relative to v10 are:
+* cpu/sparc/gc/shared/barrierSetAssembler_sparc.cpp
+* cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
+
+This corrects concrete source defects and matches the crash evidence; SPARC
+compilation/runtime validation is still required. All continuation fast-path
+changes remain included. Separately, the image build fails because javadoc
+uses source 21 with Java 25 preview mode. The provided archives contain only
+HotSpot sources, so this candidate does not change the missing build makefiles.
+Please supply make/modules/jdk.javadoc/Gendata.gmk and, if necessary, its Java
+compilation setup/configuration so that mismatch can be corrected separately.
 
 ## Apply and build
 
@@ -25,7 +37,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v10.zip
+unzip -o /path/to/jdk25-sparc-continuations-v11.zip
 gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version
@@ -67,6 +79,23 @@ version alone does not establish that C1 and C2 are working.
 
 The included patch is cumulative relative to the original attached jdk25.zip;
 use the full files when your tree already has v2/v3/v4.
+
+## G1 C2 regression test
+
+Compile the included test using the working JDK 21 compiler, then run with
+the new JDK 25 binary and C2 enabled:
+
+```bash
+mkdir -p continuation-test-classes
+/usr/jdk/jdk-21/bin/javac -d continuation-test-classes tests/G1BarrierSmoke.java
+build/solaris-sparcv9-server-release/jdk/bin/java \
+  -XX:-CreateCoredumpOnCrash -Xmx64m -XX:+UseG1GC -Xbatch \
+  -cp continuation-test-classes G1BarrierSmoke
+```
+
+The HashMap update/readback and GC stress test passed on the host x86 JDK 17.
+That confirms its expectations, not the SPARC barrier patch. A host-side layout
+check verified disjoint window/home/save areas with 1..96 saved slots.
 
 ## C1 Class.isInstance regression test
 

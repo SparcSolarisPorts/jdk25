@@ -302,6 +302,54 @@
  }
  
  inline address* frame::I7_addr() const  { return (address*) &sp()[ I7->sp_offset_in_saved_window()]; }
+--- a/src/hotspot/cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
++++ b/src/hotspot/cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
+@@ -820,7 +820,12 @@
+ 
+ static void generate_c2_barrier_runtime_call(MacroAssembler* masm, G1BarrierStubC2* stub, const Register arg, const address runtime_path) {
+   SaveLiveRegisters save_registers(masm, stub);
+-  __ call_VM_leaf(G2_thread, runtime_path, arg, G2_thread);
++  // SaveLiveRegisters also preserves G2. It cannot serve as its own thread
++  // cache in call_VM_leaf: a C call can overwrite this global register.
++  __ mov(arg, O0);
++  __ mov(G2_thread, O1);
++  __ call(runtime_path, relocInfo::runtime_call_type);
++  __ delayed()->nop();
+ }
+ 
+ void G1BarrierSetAssembler::g1_write_barrier_pre_c2(MacroAssembler* masm,
+--- a/src/hotspot/cpu/sparc/gc/shared/barrierSetAssembler_sparc.cpp
++++ b/src/hotspot/cpu/sparc/gc/shared/barrierSetAssembler_sparc.cpp
+@@ -143,13 +143,17 @@
+ SaveLiveRegisters::SaveLiveRegisters(MacroAssembler *masm, BarrierStubC2 *stub)
+   : _masm(masm), _reg_mask(stub->preserve_set()) {
+ 
++  // G2 is the reserved JavaThread register, so liveness does not normally
++  // include it. The Solaris C ABI can clobber it in a barrier runtime call.
++  _reg_mask.Insert(OptoReg::as_OptoReg(G2_thread->as_VMReg()));
++
+   const int register_save_size = iterate_over_register_mask(ACTION_COUNT_ONLY) * BytesPerWord;
+-  _frame_size = align_up(frame::register_save_words * BytesPerWord + register_save_size,
++  _frame_size = align_up(frame::memory_parameter_word_sp_offset * BytesPerWord + register_save_size,
+                          2 * BytesPerWord);
+ 
+   // Push a frame without rotating the register windows; keep the register
+-  // window spill area (frame::register_save_words) at the bottom of the new
+-  // frame free for the callee, as mandated by the SPARC ABI.
++  // window spill area and six outgoing argument-home slots at the bottom
++  // of the new frame free for the callee, as mandated by the SPARC V9 ABI.
+   __ sub(SP, _frame_size, SP);
+ 
+   iterate_over_register_mask(ACTION_SAVE);
+@@ -174,7 +178,7 @@
+     }
+ 
+     const VMReg vm_reg = OptoReg::as_VMReg(opto_reg);
+-    const int offset = frame::register_save_words * BytesPerWord + STACK_BIAS +
++    const int offset = frame::memory_parameter_word_sp_offset * BytesPerWord + STACK_BIAS +
+                        reg_save_index * BytesPerWord;
+ 
+     if (vm_reg->is_Register()) {
 --- a/src/hotspot/cpu/sparc/interp_masm_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/interp_masm_sparc.cpp
 @@ -483,7 +483,7 @@

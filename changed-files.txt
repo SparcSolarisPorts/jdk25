@@ -3,6 +3,8 @@ src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
 src/hotspot/cpu/sparc/continuationHelper_sparc.inline.hpp
 src/hotspot/cpu/sparc/frame_sparc.inline.hpp
+src/hotspot/cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
+src/hotspot/cpu/sparc/gc/shared/barrierSetAssembler_sparc.cpp
 src/hotspot/cpu/sparc/globals_sparc.hpp
 src/hotspot/cpu/sparc/interp_masm_sparc.cpp
 src/hotspot/cpu/sparc/macroAssembler_sparc.cpp

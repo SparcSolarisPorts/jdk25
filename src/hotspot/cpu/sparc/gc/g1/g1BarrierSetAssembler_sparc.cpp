@@ -820,7 +820,12 @@ static void generate_post_barrier_slow_path(MacroAssembler* masm,
 
 static void generate_c2_barrier_runtime_call(MacroAssembler* masm, G1BarrierStubC2* stub, const Register arg, const address runtime_path) {
   SaveLiveRegisters save_registers(masm, stub);
-  __ call_VM_leaf(G2_thread, runtime_path, arg, G2_thread);
+  // SaveLiveRegisters also preserves G2. It cannot serve as its own thread
+  // cache in call_VM_leaf: a C call can overwrite this global register.
+  __ mov(arg, O0);
+  __ mov(G2_thread, O1);
+  __ call(runtime_path, relocInfo::runtime_call_type);
+  __ delayed()->nop();
 }
 
 void G1BarrierSetAssembler::g1_write_barrier_pre_c2(MacroAssembler* masm,

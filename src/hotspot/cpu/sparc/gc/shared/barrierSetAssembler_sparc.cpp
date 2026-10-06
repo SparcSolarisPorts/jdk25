@@ -143,13 +143,17 @@ OptoReg::Name BarrierSetAssembler::refine_register(const Node* node, OptoReg::Na
 SaveLiveRegisters::SaveLiveRegisters(MacroAssembler *masm, BarrierStubC2 *stub)
   : _masm(masm), _reg_mask(stub->preserve_set()) {
 
+  // G2 is the reserved JavaThread register, so liveness does not normally
+  // include it. The Solaris C ABI can clobber it in a barrier runtime call.
+  _reg_mask.Insert(OptoReg::as_OptoReg(G2_thread->as_VMReg()));
+
   const int register_save_size = iterate_over_register_mask(ACTION_COUNT_ONLY) * BytesPerWord;
-  _frame_size = align_up(frame::register_save_words * BytesPerWord + register_save_size,
+  _frame_size = align_up(frame::memory_parameter_word_sp_offset * BytesPerWord + register_save_size,
                          2 * BytesPerWord);
 
   // Push a frame without rotating the register windows; keep the register
-  // window spill area (frame::register_save_words) at the bottom of the new
-  // frame free for the callee, as mandated by the SPARC ABI.
+  // window spill area and six outgoing argument-home slots at the bottom
+  // of the new frame free for the callee, as mandated by the SPARC V9 ABI.
   __ sub(SP, _frame_size, SP);
 
   iterate_over_register_mask(ACTION_SAVE);
@@ -174,7 +178,7 @@ int SaveLiveRegisters::iterate_over_register_mask(IterationAction action) {
     }
 
     const VMReg vm_reg = OptoReg::as_VMReg(opto_reg);
-    const int offset = frame::register_save_words * BytesPerWord + STACK_BIAS +
+    const int offset = frame::memory_parameter_word_sp_offset * BytesPerWord + STACK_BIAS +
                        reg_save_index * BytesPerWord;
 
     if (vm_reg->is_Register()) {
