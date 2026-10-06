@@ -483,7 +483,7 @@ void TemplateInterpreterGenerator::generate_counter_incr(Label* overflow) {
 // ebx - Method*
 //
 void TemplateInterpreterGenerator::lock_method() {
-  __ ld(Lmethod, in_bytes(Method::access_flags_offset()), O0);  // Load access flags.
+  __ lduh(Lmethod, in_bytes(Method::access_flags_offset()), O0);  // Load access flags.
 
 #ifdef ASSERT
  { Label ok;
@@ -1149,7 +1149,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // make sure method is native & not abstract
   // rethink these assertions - they can be simplified and shared (gri 2/25/2000)
 #ifdef ASSERT
-  __ ld(G5_method, Method::access_flags_offset(), Gtmp1);
+  __ lduh(G5_method, Method::access_flags_offset(), Gtmp1);
   { Label L;
     __ btst(JVM_ACC_NATIVE, Gtmp1);
     __ br(Assembler::notZero, false, Assembler::pt, L);
@@ -1218,7 +1218,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   } else {
 #ifdef ASSERT
     { Label ok;
-      __ ld(Laccess_flags, O0);
+      __ lduh(Laccess_flags, O0);
       __ btst(JVM_ACC_SYNCHRONIZED, O0);
       __ br( Assembler::zero, false, Assembler::pt, ok);
       __ delayed()->nop();
@@ -1298,7 +1298,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
   { Label not_static;
 
-    __ ld(Laccess_flags, O0);
+    __ lduh(Laccess_flags, O0);
     __ btst(JVM_ACC_STATIC, O0);
     __ br( Assembler::zero, false, Assembler::pt, not_static);
     // get native function entry point(O0 is a good temp until the very end)
@@ -1534,7 +1534,7 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
   // make sure method is not native & not abstract
   // rethink these assertions - they can be simplified and shared (gri 2/25/2000)
 #ifdef ASSERT
-  __ ld(G5_method, Method::access_flags_offset(), Gtmp1);
+  __ lduh(G5_method, Method::access_flags_offset(), Gtmp1);
   { Label L;
     __ btst(JVM_ACC_NATIVE, Gtmp1);
     __ br(Assembler::zero, false, Assembler::pt, L);
@@ -1626,7 +1626,7 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
   } else {
 #ifdef ASSERT
     { Label ok;
-      __ ld(access_flags, O0);
+      __ lduh(access_flags, O0);
       __ btst(JVM_ACC_SYNCHRONIZED, O0);
       __ br( Assembler::zero, false, Assembler::pt, ok);
       __ delayed()->nop();

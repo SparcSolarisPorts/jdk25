@@ -483,7 +483,7 @@ void InterpreterMacroAssembler::empty_expression_stack() {
   assert(G4_scratch != Gframe_size, "Only you can prevent register aliasing!");
 
   // A native does not need to do this, since its callee does not change SP.
-  ld(Lmethod, Method::access_flags_offset(), Gframe_size);  // Load access flags.
+  lduh(Lmethod, Method::access_flags_offset(), Gframe_size);  // Load access flags.
   btst(JVM_ACC_NATIVE, Gframe_size);
   br(Assembler::notZero, false, Assembler::pt, done);
   delayed()->nop();
@@ -959,7 +959,7 @@ void InterpreterMacroAssembler::unlock_if_synchronized_method(TosState state,
   const Address access_flags(Lmethod, Method::access_flags_offset());
   interp_verify_oop(Otos_i, state, __FILE__, __LINE__);
   push(state); // save tos
-  ld(access_flags, G3_scratch); // Load access flags.
+  lduh(access_flags, G3_scratch); // Load access flags.
   btst(JVM_ACC_SYNCHRONIZED, G3_scratch);
   br(zero, false, pt, unlocked);
   delayed()->nop();
