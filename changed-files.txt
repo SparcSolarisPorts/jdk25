@@ -1,4 +1,5 @@
 src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
+src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
 src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
 src/hotspot/cpu/sparc/continuationHelper_sparc.inline.hpp

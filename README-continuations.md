@@ -1,8 +1,18 @@
-# JDK 25 Solaris/SPARC continuation candidate (v12)
+# JDK 25 Solaris/SPARC continuation candidate (v13)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v13 changes Solaris/SPARC compressed class-space placement to use the existing
+Metaspace OS-selected mapping fallback, keeping compressed class pointers enabled.
+The supplied javac failure reports a 166344-byte native malloc failure despite
+roughly 105 GiB of free physical RAM. Class space starts at 0x10c000000, just
+above native allocations near 0x10b9c5fe0. This suggests the low-address class
+mapping obstructs growth of the Solaris brk-based native heap. This patch avoids
+that explicit low-address probe; validation on Solaris is still needed to confirm
+the diagnosis. SPARC already implements nonzero-base class pointer encoding.
+No .gmk files are changed, and the continuation fast path remains included.
 
 v12 adds vmreg_sparc.inline.hpp to the C2 barrier register-save implementation,
 providing the inline definition of Register::as_VMReg() required by v11.
@@ -40,7 +50,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v12.zip
+unzip -o /path/to/jdk25-sparc-continuations-v13.zip
 gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version
