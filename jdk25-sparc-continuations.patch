@@ -1343,3 +1343,24 @@
  
    if (preempted && sp0 == cont.entrySP()) {
      // Still preempted (monitor not acquired) so no frames were thawed.
+--- a/make/modules/jdk.javadoc/Gendata.gmk
++++ b/make/modules/jdk.javadoc/Gendata.gmk
+@@ -47,6 +47,9 @@
+     --add-exports jdk.compiler.interim/com.sun.tools.javac.jvm=ALL-UNNAMED \
+     #
+ 
++# These tools target the boot JDK release. The interim compiler may require
++# --enable-preview as a JVM option, but javac cannot enable preview when
++# compiling for an older release. Keep the runtime options on launch commands.
+ $(eval $(call SetupJavaCompilation, COMPILE_CREATE_SYMBOLS, \
+     TARGET_RELEASE := $(TARGET_RELEASE_BOOTJDK), \
+     SRC := $(TOPDIR)/make/langtools/src/classes \
+@@ -55,7 +58,7 @@
+     BIN := $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc, \
+     DISABLED_WARNINGS := options, \
+     JAVAC_FLAGS := \
+-        $(INTERIM_LANGTOOLS_ARGS) \
++        $(filter-out --enable-preview, $(INTERIM_LANGTOOLS_ARGS)) \
+         $(COMPILECREATESYMBOLS_ADD_EXPORTS), \
+ ))
+ 

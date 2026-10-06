@@ -1,8 +1,19 @@
-# JDK 25 Solaris/SPARC continuation candidate (v14)
+# JDK 25 Solaris/SPARC continuation candidate (v15)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v15 fixes the javadoc helper compilation when using boot JDK 21 and interim
+javac 25. Gendata.gmk filters --enable-preview from this rule's JAVAC_FLAGS,
+while preserving TARGET_RELEASE_BOOTJDK, exports, module options, and the runtime
+INTERIM_LANGTOOLS_ARGS on compiler/generator launches. Preview compiler options
+cannot target an older release. The helper classes remain compatible with boot 21.
+The full replacement makefile is based on the file supplied in this conversation;
+make/common/JavaCompilation.gmk is unchanged. A GNU make expansion harness confirms
+that the compiler flag is removed while the target and runtime flags are retained.
+Actual Solaris compilation/generation remains to be verified. All v14 HotSpot files
+are included byte-for-byte.
 
 v14 implements SPARC lightweight locking (LockingMode=2) in the interpreter,
 C1, C2, and synchronized JNI wrapper paths. VM initialization now accepts mode 2
@@ -51,10 +62,7 @@ The only added HotSpot files relative to v10 are:
 
 This corrects concrete source defects and matches the crash evidence; SPARC
 compilation/runtime validation is still required. All continuation fast-path
-changes remain included. Separately, the image build fails because javadoc
-uses source 21 with Java 25 preview mode. The provided archives contain only
-HotSpot sources, so this candidate does not change the missing build makefiles.
-The javadoc makefile issue is deferred at the user's request.
+changes remain included. The javadoc source/preview mismatch is addressed by v15.
 
 ## Apply and build
 
@@ -65,8 +73,8 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v14.zip
-gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
+unzip -o /path/to/jdk25-sparc-continuations-v15.zip
+gmake images 2>&1 | tee /tmp/build25.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version
 ```

@@ -19,3 +19,4 @@ src/hotspot/cpu/sparc/templateInterpreterGenerator_sparc.cpp
 src/hotspot/cpu/sparc/templateTable_sparc.cpp
 src/hotspot/cpu/sparc/vm_version_sparc.cpp
 src/hotspot/share/runtime/continuationFreezeThaw.cpp
+make/modules/jdk.javadoc/Gendata.gmk
