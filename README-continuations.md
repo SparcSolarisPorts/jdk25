@@ -1,8 +1,12 @@
-# JDK 25 Solaris/SPARC continuation candidate (v11)
+# JDK 25 Solaris/SPARC continuation candidate (v12)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v12 adds vmreg_sparc.inline.hpp to the C2 barrier register-save implementation,
+providing the inline definition of Register::as_VMReg() required by v11.
+No .gmk files are changed.
 
 v11 fixes the C2 G1 barrier runtime-call register preservation implicated by
 the attached HashMap.putVal crash. Normal -version startup now succeeded on
@@ -25,8 +29,7 @@ compilation/runtime validation is still required. All continuation fast-path
 changes remain included. Separately, the image build fails because javadoc
 uses source 21 with Java 25 preview mode. The provided archives contain only
 HotSpot sources, so this candidate does not change the missing build makefiles.
-Please supply make/modules/jdk.javadoc/Gendata.gmk and, if necessary, its Java
-compilation setup/configuration so that mismatch can be corrected separately.
+The javadoc makefile issue is deferred at the user's request.
 
 ## Apply and build
 
@@ -37,7 +40,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v11.zip
+unzip -o /path/to/jdk25-sparc-continuations-v12.zip
 gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version

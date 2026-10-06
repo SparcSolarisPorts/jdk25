@@ -320,7 +320,15 @@
  void G1BarrierSetAssembler::g1_write_barrier_pre_c2(MacroAssembler* masm,
 --- a/src/hotspot/cpu/sparc/gc/shared/barrierSetAssembler_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/gc/shared/barrierSetAssembler_sparc.cpp
-@@ -143,13 +143,17 @@
+@@ -30,6 +30,7 @@
+ #ifdef COMPILER2
+ #include "gc/shared/c2/barrierSetC2.hpp"
+ #include "runtime/frame.hpp"
++#include "vmreg_sparc.inline.hpp"
+ #endif // COMPILER2
+ 
+ #define __ masm->
+@@ -143,13 +144,17 @@
  SaveLiveRegisters::SaveLiveRegisters(MacroAssembler *masm, BarrierStubC2 *stub)
    : _masm(masm), _reg_mask(stub->preserve_set()) {
  
@@ -341,7 +349,7 @@
    __ sub(SP, _frame_size, SP);
  
    iterate_over_register_mask(ACTION_SAVE);
-@@ -174,7 +178,7 @@
+@@ -174,7 +179,7 @@
      }
  
      const VMReg vm_reg = OptoReg::as_VMReg(opto_reg);

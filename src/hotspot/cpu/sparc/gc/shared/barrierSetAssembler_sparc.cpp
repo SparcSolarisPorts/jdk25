@@ -30,6 +30,7 @@
 #ifdef COMPILER2
 #include "gc/shared/c2/barrierSetC2.hpp"
 #include "runtime/frame.hpp"
+#include "vmreg_sparc.inline.hpp"
 #endif // COMPILER2
 
 #define __ masm->
