@@ -1,21 +1,20 @@
-# JDK 25 Solaris/SPARC continuation candidate (v9)
+# JDK 25 Solaris/SPARC continuation candidate (v10)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
 
-v9 addresses the attached normal-startup SIGILL in RuntimeStub::C1 Runtime
-is_instance_of_blob. SPARC's C1 generator had no case for is_instance_of_id,
-so it generated an explicit unimplemented-entry trap. The new assembly leaf
-stub implements Class.isInstance using the existing SPARC fast and secondary
-subtype checks, handles null objects and primitive mirrors, and returns the
-boolean through the SPARC C calling convention. It does not call C++ or
-safepoint. This is the only added/changed HotSpot source relative to v8:
-cpu/sparc/c1_Runtime1_sparc.cpp.
+v10 fixes v9's reversed load_klass operands in the C1 Class.isInstance stub.
+SPARC's API is load_klass(source_oop, destination_klass). The corrected call
+loads the object in I1 into L1. The attached faulting instruction instead
+loaded from L1+8 into I1; its address exactly matches the reported unaligned
+SIGBUS address. This operand correction is the only HotSpot change from v9.
+All earlier continuation/fast-path fixes remain included.
 
-The supplied v8 log shows interpreter-only version startup reached the version
-output; normal startup still failed in C1. Neither establishes continuation
-freeze/thaw correctness. All earlier continuation/fast-path fixes are included.
+The reported JVM crashed after 0.724 seconds. The lengthy crash output includes
+compiled machine code; core-dump writing can add further delay. For quick
+startup diagnosis, use -XX:-CreateCoredumpOnCrash; hs_err reporting remains.
+The fix has not yet been compiled or executed on SPARC locally.
 
 ## Apply and build
 
@@ -26,7 +25,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v9.zip
+unzip -o /path/to/jdk25-sparc-continuations-v10.zip
 gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version

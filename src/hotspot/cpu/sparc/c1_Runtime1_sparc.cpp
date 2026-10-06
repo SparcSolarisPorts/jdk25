@@ -637,7 +637,7 @@ OopMapSet* Runtime1::generate_code_for(C1StubId id, StubAssembler* sasm) {
         __ delayed()->nop();
         __ br_null(I1, false, Assembler::pn, failure);
         __ delayed()->nop();
-        __ load_klass(sub_klass, I1);
+        __ load_klass(I1, sub_klass); // SPARC: source oop first, destination second
         __ check_klass_subtype_fast_path(sub_klass, super_klass, L2, L3,
                                          &success, &failure, &slow);
         __ bind(slow);
