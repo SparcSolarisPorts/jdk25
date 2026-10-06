@@ -25,8 +25,11 @@
 #ifndef CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
 #define CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
 
-// No SPARC-specific data.
+// ContinuationEntry starts at the unbiased stack pointer. Keep the V9
+// register-window spill area and the six outgoing argument home slots free.
+// A flushw or an ABI callee must never overwrite continuation metadata.
 class ContinuationEntryPD {
+  intptr_t _abi_save_area[22];
 };
 
 #endif // CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP

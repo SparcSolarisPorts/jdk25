@@ -53,7 +53,7 @@ static inline intptr_t* freeze_sparc_decode_link(const frame& f) {
 static inline void freeze_sparc_patch_link(const frame& f,
                                             intptr_t* target) {
   if (f.is_heap_frame()) {
-    const intptr_t delta = (intptr_t)target - (intptr_t)f.sp();
+    const intptr_t delta = target - f.sp();
     f.sp()[freeze_sparc_fp_slot] = delta > -max_jint && delta < max_jint
         ? delta : (intptr_t)target;
   } else {
@@ -62,9 +62,13 @@ static inline void freeze_sparc_patch_link(const frame& f,
 }
 
 static inline void freeze_sparc_patch_pc(const frame& f, address pc) {
-  f.sp()[freeze_sparc_i7_slot] = (intptr_t)(f.is_heap_frame()
-      ? pc
-      : pc - frame::pc_return_offset);
+  if (f.is_heap_frame()) {
+    // The saved I7 is the sender PC on SPARC, not this frame's own PC.
+    // Java frames do not use the outgoing argument home slot at word 16.
+    f.sp()[16] = (intptr_t)pc;
+  } else {
+    f.younger_sp()[freeze_sparc_i7_slot] = (intptr_t)(pc - frame::pc_return_offset);
+  }
 }
 
 static inline intptr_t* freeze_sparc_translate_pointer(
@@ -80,7 +84,9 @@ static inline void freeze_sparc_relativize_slot(
   // Pointers into this copied frame must follow the copy.  A saved link in
   // the bottom frame can point outside the chunk; keep that pointer absolute
   // until the thaw path reconnects it to the carrier stack.
-  if (value >= source.sp() && value <= source.fp()) {
+  intptr_t* bottom = source.is_interpreted_frame()
+      ? ContinuationHelper::InterpretedFrame::frame_bottom(source) : source.fp();
+  if (value >= source.unextended_sp() && value < bottom) {
     intptr_t* translated = freeze_sparc_translate_pointer(source, heap, value);
     heap.sp()[slot] = translated - heap.fp();
   } else {
@@ -93,7 +99,9 @@ static inline void freeze_sparc_derelativize_slot(
   intptr_t raw = heap.sp()[slot];
   intptr_t* heap_value = raw > -max_jint && raw < max_jint
       ? heap.fp() + raw : (intptr_t*)raw;
-  intptr_t* stack_value = (heap_value >= heap.sp() && heap_value <= heap.fp())
+  intptr_t* bottom = heap.is_interpreted_frame()
+      ? ContinuationHelper::InterpretedFrame::frame_bottom(heap) : heap.fp();
+  intptr_t* stack_value = (heap_value >= heap.unextended_sp() && heap_value < bottom)
       ? freeze_sparc_translate_pointer(heap, stack, heap_value) : heap_value;
   stack.sp()[slot] = biased ? (intptr_t)stack_value - STACK_BIAS
                             : (intptr_t)stack_value;
@@ -142,17 +150,28 @@ frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
   assert(FKind::is_instance(f), "wrong frame kind");
 
   const int fsize = FKind::size(f);
-  intptr_t* heap_sp = caller.unextended_sp() - fsize;
+  intptr_t* heap_sp;
+  if (FKind::interpreted) {
+    const intptr_t locals_offset = (intptr_t*)f.sp()[freeze_sparc_llocals_slot] - f.fp();
+    const bool overlap = caller.is_interpreted_frame() || caller.is_empty();
+    intptr_t* fp = caller.unextended_sp() - 1 - locals_offset
+        + (overlap ? FKind::stack_argsize(f) : 0);
+    heap_sp = fp - (f.fp() - f.unextended_sp());
+  } else {
+    heap_sp = caller.unextended_sp() - fsize;
+  }
   if (!FKind::interpreted && caller.is_interpreted_frame()) {
     heap_sp -= FKind::stack_argsize(f);
   }
 
   intptr_t* heap_fp = heap_sp + (f.fp() - f.unextended_sp());
-  caller.set_sp(heap_sp + fsize);
+  intptr_t* extended_sp = heap_sp + (f.sp() - f.unextended_sp());
+  caller.set_sp(heap_fp);
 
-  frame heap_frame(heap_sp, heap_sp, heap_fp, f.pc(), nullptr, nullptr,
+  frame heap_frame(extended_sp, heap_sp, heap_fp, f.pc(), nullptr, nullptr,
                    true /* on_heap */);
   heap_frame.set_younger_sp(nullptr);
+  caller.set_younger_sp(extended_sp);
   return heap_frame;
 }
 
@@ -180,7 +199,7 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(
   freeze_sparc_relativize_slot(f, hf, freeze_sparc_i5_slot, true);
 
   freeze_sparc_patch_link(hf, hf.fp());
-  freeze_sparc_patch_pc(hf, f.sender_pc());
+  freeze_sparc_patch_pc(hf, f.pc());
 }
 
 inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
@@ -189,8 +208,8 @@ inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
 }
 
 inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
-  (void)hf;
-  freeze_sparc_patch_link(caller, caller.fp());
+  freeze_sparc_patch_link(hf, caller.sp());
+  freeze_sparc_patch_pc(hf, hf.pc());
 }
 
 //// Thaw fast path
@@ -203,11 +222,16 @@ inline void ThawBase::prefetch_chunk_pd(void* start, int size) {
 
 template <typename ConfigT>
 inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
-  // Fast path depends on !PreserveFramePointer. See can_thaw_fast().
-  // On SPARC, intra-chunk frame links are stored as self-relative deltas
-  // (see freeze_sparc_patch_link), so they stay valid after the fast-path
-  // memcpy of the frames back onto the stack.
-  assert(!PreserveFramePointer, "Frame pointers need to be fixed");
+  // Relative chunk links cannot be loaded directly into architectural I6.
+  // Rebase every copied window, including the bottom link into enterSpecial.
+  while (sp < bottom) {
+    const intptr_t delta = sp[freeze_sparc_fp_slot];
+    assert(delta > 0 && sp + delta <= bottom, "invalid fast-thaw link");
+    intptr_t* caller = sp + delta;
+    sp[freeze_sparc_fp_slot] = (intptr_t)caller - STACK_BIAS;
+    sp = caller;
+  }
+  assert(sp == bottom, "fast thaw must end at the entry extension");
 }
 
 
@@ -226,7 +250,13 @@ frame ThawBase::new_stack_frame(const frame& hf, frame& caller,
   assert(FKind::is_instance(hf), "wrong frame kind");
 
   int fsize = FKind::size(hf);
+  if (FKind::interpreted && caller.is_interpreted_frame()) {
+    fsize -= FKind::stack_argsize(hf);
+  }
   intptr_t* frame_sp = caller.unextended_sp() - fsize;
+  if (FKind::interpreted && !is_aligned(frame_sp, frame::frame_alignment)) {
+    --frame_sp;
+  }
 
   if (!FKind::interpreted &&
       (bottom || caller.is_interpreted_frame())) {
@@ -237,9 +267,12 @@ frame ThawBase::new_stack_frame(const frame& hf, frame& caller,
   }
 
   intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp());
-  frame result(frame_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
+  intptr_t* extended_sp = frame_sp + (hf.sp() - hf.unextended_sp());
+  caller.set_sp(frame_fp);
+  frame result(extended_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
                false /* on_heap */);
   result.set_younger_sp(nullptr);
+  caller.set_younger_sp(extended_sp);
   return result;
 }
 
@@ -257,8 +290,7 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp,
 }
 
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {
-  (void)f;
-  freeze_sparc_patch_link(caller, caller.fp());
+  freeze_sparc_patch_link(f, caller.sp());
 }
 
 inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
@@ -299,7 +331,8 @@ inline void ThawBase::derelativize_interpreted_frame_metadata(
   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_i5_slot, true);
 
   freeze_sparc_patch_link(f, f.fp());
-  freeze_sparc_patch_pc(f, hf.pc());
+  // The caller PC is patched through caller.younger_sp() after copying.
+  // Keep the copied saved I7 here; hf.pc() is this frame's own PC.
 }
 // ThawBase::set_interpreter_frame_bottom was removed from the share code in
 // JDK 21 (the "copy overwrites the metadata" fix moved into the share thaw

@@ -278,22 +278,22 @@ void MacroAssembler::pop_cont_fastpath(Register java_thread) {
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {
   if (!Continuations::enabled()) return;
   assert(java_thread != G1_scratch, "thread must not be scratch");
-  ld(Address(java_thread, JavaThread::held_monitor_count_offset()), G1_scratch);
+  ld_ptr(Address(java_thread, JavaThread::held_monitor_count_offset()), G1_scratch);
   inc(G1_scratch);
-  st(G1_scratch, Address(java_thread, JavaThread::held_monitor_count_offset()));
+  st_ptr(G1_scratch, Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::dec_held_monitor_count(Register java_thread) {
   if (!Continuations::enabled()) return;
   assert(java_thread != G1_scratch, "thread must not be scratch");
-  ld(Address(java_thread, JavaThread::held_monitor_count_offset()), G1_scratch);
+  ld_ptr(Address(java_thread, JavaThread::held_monitor_count_offset()), G1_scratch);
   dec(G1_scratch);
-  st(G1_scratch, Address(java_thread, JavaThread::held_monitor_count_offset()));
+  st_ptr(G1_scratch, Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::reset_held_monitor_count(Register java_thread) {
   if (!Continuations::enabled()) return;
-  st(G0, Address(java_thread, JavaThread::held_monitor_count_offset()));
+  st_ptr(G0, Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::post_call_nop() {

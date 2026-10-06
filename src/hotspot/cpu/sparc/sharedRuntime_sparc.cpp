@@ -35,6 +35,8 @@
 #include "oops/klass.inline.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/jniHandles.hpp"
+#include "runtime/continuation.hpp"
+#include "runtime/continuationEntry.hpp"
 #if INCLUDE_JFR
 #include "jfr/support/jfrIntrinsics.hpp"
 #endif
@@ -1567,12 +1569,191 @@ static void gen_special_dispatch(MacroAssembler* masm,
 //    transition back to thread_in_Java
 //    return to caller
 //
+// These helpers are also used by the thaw return barriers.
+void fill_continuation_entry(MacroAssembler* masm);
+void continuation_enter_cleanup(MacroAssembler* masm);
+
+static OopMap* sparc_continuation_enter_setup(MacroAssembler* masm) {
+  const int bytes = (int)ContinuationEntry::size();
+  assert(is_aligned(bytes, 16), "V9 stack alignment");
+  assert(in_bytes(ContinuationEntry::parent_offset()) >=
+         frame::memory_parameter_word_sp_offset * wordSize,
+         "metadata must follow the ABI save area");
+  __ save(SP, -bytes, SP);
+  __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+  __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_offset()));
+  __ add(SP, STACK_BIAS, G1);
+  __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_entry_offset()));
+  fill_continuation_entry(masm);
+
+  OopMap* map = new OopMap(bytes / VMRegImpl::stack_slot_size, 0);
+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset()) /
+                                 VMRegImpl::stack_slot_size));
+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) /
+                                 VMRegImpl::stack_slot_size));
+  return map;
+}
+
+static void sparc_continuation_enter(MacroAssembler* masm,
+                                    OopMapSet* maps,
+                                    int& interp_entry, int& verified_entry,
+                                    int& frame_complete, int& exception_entry) {
+  address start = __ pc();
+  Label thaw, cleanup;
+
+  // Interpreter-only calls bypass the ordinary i2c adapter. Read the three
+  // arguments from the interpreter expression stack before rotating windows.
+  interp_entry = __ pc() - start;
+  __ ld_ptr(Lesp, Interpreter::expr_offset_in_bytes(2), O0);
+  __ ld(Lesp, Interpreter::expr_offset_in_bytes(1), O1);
+  __ ld(Lesp, Interpreter::expr_offset_in_bytes(0), O2);
+  OopMap* interp_map = sparc_continuation_enter_setup(masm);
+  __ br_notnull_short(I1, Assembler::pt, thaw);
+  __ mov(I0, O0);
+  __ mov(I1, O1); // Continuation.enter(c, isContinue)
+  address interp_call = __ pc();
+  __ call(SharedRuntime::get_resolve_static_call_stub(), relocInfo::static_call_type);
+  __ delayed()->nop();
+  maps->add_gc_map(__ pc() - start, interp_map);
+  __ ba(cleanup);
+  __ delayed()->nop();
+  guarantee(CompiledDirectCall::emit_to_interp_stub(masm, interp_call) != nullptr,
+            "CodeCache is full at continuation interpreter call");
+
+  __ align(CodeEntryAlignment);
+  verified_entry = __ pc() - start;
+  OopMap* map = sparc_continuation_enter_setup(masm);
+  frame_complete = __ pc() - start;
+  __ br_notnull_short(I1, Assembler::pt, thaw);
+  __ mov(I0, O0);
+  __ mov(I1, O1);
+  address compiled_call = __ pc();
+  __ call(SharedRuntime::get_resolve_static_call_stub(), relocInfo::static_call_type);
+  __ delayed()->nop();
+  maps->add_gc_map(__ pc() - start, map);
+  __ ba(cleanup);
+  __ delayed()->nop();
+  guarantee(CompiledDirectCall::emit_to_interp_stub(masm, compiled_call) != nullptr,
+            "CodeCache is full at continuation compiled call");
+
+  __ bind(thaw);
+  ContinuationEntry::_thaw_call_pc_offset = __ pc() - start;
+  __ call(StubRoutines::cont_thaw());
+  __ delayed()->nop();
+  ContinuationEntry::_return_pc_offset = __ pc() - start;
+  maps->add_gc_map(__ pc() - start, map->deep_copy());
+  __ nop();
+
+  __ bind(cleanup);
+  ContinuationEntry::_cleanup_offset = __ pc() - start;
+  continuation_enter_cleanup(masm);
+  __ ret();
+  __ delayed()->restore();
+
+  exception_entry = __ pc() - start;
+  __ mov(O0, L0); // exception survives the leaf runtime lookup
+  continuation_enter_cleanup(masm);
+  __ add(I7, frame::pc_return_offset, L1);
+  __ call_VM_leaf(L7_thread_cache,
+                  CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address),
+                  G2_thread, L1);
+  __ mov(O0, G1);
+  __ mov(L0, I0);
+  __ mov(L1, I1);
+  __ jmp(G1, 0);
+  __ delayed()->restore();
+}
+
+static void sparc_continuation_yield(MacroAssembler* masm,
+                                    OopMapSet* maps, int& frame_complete) {
+  address start = __ pc();
+  const int bytes = masm->total_frame_size_in_bytes(0);
+  __ save_frame(0);
+  frame_complete = __ pc() - start;
+
+  // Freeze must see every Java register window in its stack save area.
+  __ flushw();
+  address anchor_pc = __ pc();
+  __ nop();
+  __ set((intptr_t)anchor_pc, L0);
+  __ set_last_Java_frame(SP, L0);
+  __ set(JavaFrameAnchor::flushed, G1);
+  __ st(G1, G2_thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::flags_offset());
+  __ add(SP, STACK_BIAS, L1);
+  __ call_VM_leaf(L7_thread_cache, Continuation::freeze_entry(), G2_thread, L1);
+  __ mov(O0, L2);
+  __ reset_last_Java_frame();
+  __ reinit_heapbase();
+
+  Label pinned, entry_window, unwind;
+  __ br_notnull_short(L2, Assembler::pn, pinned);
+  // Successful freeze discards the mounted Java frames. Unwind their real
+  // windows, rather than changing SP while retaining an unrelated live window.
+  __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+  __ sub(G1, STACK_BIAS, G1);
+  __ bind(unwind);
+  __ cmp_and_brx_short(SP, G1, Assembler::equal, Assembler::pt, entry_window);
+  __ restore();
+  __ ba(unwind);
+  __ delayed()->nop();
+  __ bind(entry_window);
+  continuation_enter_cleanup(masm);
+  __ ret();
+  __ delayed()->restore();
+
+  __ bind(pinned);
+  __ mov(L2, I0); // freeze_result becomes the caller's O0
+  Label no_exception;
+  __ ld_ptr(G2_thread, in_bytes(Thread::pending_exception_offset()), G1);
+  __ br_null_short(G1, Assembler::pt, no_exception);
+  __ restore();
+  __ jump_to(AddressLiteral(StubRoutines::forward_exception_entry()), G1);
+  __ delayed()->nop();
+  __ bind(no_exception);
+  __ ret();
+  __ delayed()->restore();
+
+  maps->add_gc_map(anchor_pc - start,
+                   new OopMap(bytes / VMRegImpl::stack_slot_size, 0));
+}
+
+void SharedRuntime::continuation_enter_cleanup(MacroAssembler* masm) {
+  ::continuation_enter_cleanup(masm);
+}
+
 nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                                 const methodHandle& method,
                                                 int compile_id,
                                                 BasicType* in_sig_bt,
                                                 VMRegPair* in_regs,
                                                 BasicType ret_type) {
+  if (method->is_continuation_native_intrinsic()) {
+    OopMapSet* maps = new OopMapSet();
+    int interpreted_entry = -1, verified_entry = 0;
+    int frame_complete = -1, exception_entry = -1;
+    int frame_bytes;
+    if (method->is_continuation_enter_intrinsic()) {
+      sparc_continuation_enter(masm, maps, interpreted_entry, verified_entry,
+                               frame_complete, exception_entry);
+      frame_bytes = (int)ContinuationEntry::size();
+    } else {
+      guarantee(method->is_continuation_yield_intrinsic(), "unknown continuation intrinsic");
+      sparc_continuation_yield(masm, maps, frame_complete);
+      frame_bytes = masm->total_frame_size_in_bytes(0);
+    }
+    __ flush();
+    nmethod* nm = nmethod::new_native_nmethod(method, compile_id, masm->code(),
+        verified_entry, frame_complete, frame_bytes / wordSize,
+        in_ByteSize(-1), in_ByteSize(-1), maps, exception_entry);
+    if (nm != nullptr) {
+      if (method->is_continuation_enter_intrinsic()) {
+        ContinuationEntry::set_enter_code(nm, interpreted_entry);
+      } else {
+        _cont_doYield_stub = nm;
+      }
+    }
+    return nm;
+  }
   if (method->is_method_handle_intrinsic()) {
     vmIntrinsics::ID iid = method->intrinsic_id();
     intptr_t start = (intptr_t)__ pc();

@@ -5639,27 +5639,71 @@ class StubGenerator: public StubCodeGenerator {
       __ clr(O0); // doYield returns zero on successful thaw
     }
 
-    // Switch to the restored yielding frame.  A SPARC saved register window
-    // contains %i7 at slot 15; its architectural return address is %i7+8.
-    __ sub(L1, STACK_BIAS, SP);
+    // Rebuild the hardware window chain from the entry frame to the restored
+    // top frame. Merely assigning SP leaves the carrier's live L/I registers
+    // in place and a subsequent restore would return through the wrong window.
+    // The slow thaw path has already converted the frame links to biased SPs.
+    __ mov(O0, G5); // integer/oop result; no safepoints while rebuilding
+    __ mov(L1, G4_scratch); // unbiased top frame SP
+    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+    __ sub(G1, STACK_BIAS, SP);
+    // Match ContinuationEntry::bottom_sender_sp(), including stack arguments
+    // and alignment introduced by a partial thaw.
+    __ ld(G1, in_bytes(ContinuationEntry::argsize_offset()), G3_scratch);
+    __ sll_ptr(G3_scratch, LogBytesPerWord, G3_scratch);
+    __ sub(G1, G3_scratch, G1);
+    __ and3(G1, -16, G1);
+    __ sub(G1, STACK_BIAS, SP);
+
+    // Build reverse links in an unused Java argument-home slot. This makes
+    // window reconstruction linear, even for a deep compiled continuation.
+    Label reverse_links, rebuild, windows_ready;
+    __ mov(G4_scratch, G1);
+    __ bind(reverse_links);
+    __ ld_ptr(G1, 14 * wordSize, G3_scratch);
+    __ add(G3_scratch, STACK_BIAS, G3_scratch);
+    __ st_ptr(G1, G3_scratch, 17 * wordSize);
+    __ sub(G3_scratch, STACK_BIAS, G1);
+    __ cmp_and_brx_short(G1, SP, Assembler::equal,
+                         Assembler::pt, rebuild);
+    __ mov(G3_scratch, G1);
+    __ ba(reverse_links);
+    __ delayed()->nop();
+    __ bind(rebuild);
+    __ add(SP, STACK_BIAS, G3_scratch);
+    __ cmp_and_brx_short(G3_scratch, G4_scratch, Assembler::equal,
+                         Assembler::pt, windows_ready);
+    __ ld_ptr(SP, STACK_BIAS + 17 * wordSize, G1);
+    __ sub(G1, STACK_BIAS, G3_scratch);
+    __ sub(G3_scratch, SP, G3_scratch);
+    __ save(SP, G3_scratch, SP);
+    for (int reg = 0; reg < 8; reg++) {
+      __ ld_ptr(SP, STACK_BIAS + reg * wordSize, as_lRegister(reg));
+      __ ld_ptr(SP, STACK_BIAS + (8 + reg) * wordSize, as_iRegister(reg));
+    }
+    __ ba(rebuild);
+    __ delayed()->nop();
+    __ bind(windows_ready);
+    __ mov(G5, O0);
 
     if (return_barrier_exception) {
       __ mov(O0, L3); // exception oop
-      __ ld_ptr(SP, STACK_BIAS + 15 * wordSize, L2);
-      __ add(L2, frame::pc_return_offset, L2);
+      __ ld_ptr(SP, STACK_BIAS + 16 * wordSize, L2);
       __ call_VM_leaf(L7_thread_cache,
                       CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address),
                       G2_thread, L2);
       __ mov(O0, G5_method); // exception handler
-      __ mov(L3, I0);        // exception oop becomes caller's O0 after restore
-      __ mov(L2, I1);        // throwing pc becomes caller's O1 after restore
+      __ mov(L3, O0);
+      __ mov(L2, O1);
       __ jmp(G5_method, 0);
-      __ delayed()->restore();
+      __ delayed()->nop();
     }
 
-    __ ld_ptr(SP, STACK_BIAS + 15 * wordSize, L2);
-    __ jmp(L2, frame::pc_return_offset);
-    __ delayed()->restore();
+    // The top frame is the caller of doYield. Resume after that call in
+    // this window; I7 is its sender PC and would skip the suspended frame.
+    __ ld_ptr(SP, STACK_BIAS + 16 * wordSize, G1);
+    __ jmp(G1, 0);
+    __ delayed()->nop();
 
     return start;
   }
@@ -5875,8 +5919,8 @@ void fill_continuation_entry(MacroAssembler* masm) {
 
   __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_fastpath_offset()), G1);
   __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()));
-  __ ld(G2_thread, in_bytes(JavaThread::held_monitor_count_offset()), G1);
-  __ st(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_held_monitor_count_offset()));
+  __ ld_ptr(G2_thread, in_bytes(JavaThread::held_monitor_count_offset()), G1);
+  __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_held_monitor_count_offset()));
 
   __ st_ptr(G0, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));
   __ reset_held_monitor_count(G2_thread);
@@ -5894,11 +5938,11 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
 
   __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()), G1);
   __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));
-  __ ld(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_held_monitor_count_offset()), G1);
-  __ st(G1, G2_thread, in_bytes(JavaThread::held_monitor_count_offset()));
+  __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_held_monitor_count_offset()), G1);
+  __ st_ptr(G1, G2_thread, in_bytes(JavaThread::held_monitor_count_offset()));
   __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_offset()), G1);
   __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_entry_offset()));
-  __ add(SP, (int)ContinuationEntry::size(), SP);
+  // The entry is a real V9 window frame. Its ret/restore restores SP.
 }
 
 

@@ -326,8 +326,9 @@ static void set_anchor(JavaThread* thread, intptr_t* sp, address pc) {
 }
 
 static void set_anchor(JavaThread* thread, intptr_t* sp) {
-  address pc = ContinuationHelper::return_address_at(
-           sp - frame::sender_sp_ret_address_offset());
+  address pc = SPARC_ONLY((address)sp[16])
+      NOT_SPARC(ContinuationHelper::return_address_at(
+           sp - frame::sender_sp_ret_address_offset()));
   set_anchor(thread, sp, pc);
 }
 
@@ -414,7 +415,7 @@ public:
 
   inline frame& last_frame() { return _last_frame; }
 
-#ifdef ASSERT
+#if defined(ASSERT) || defined(SPARC)
   bool check_valid_fast_path();
 #endif
 
@@ -511,7 +512,9 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, intptr_t* 
 
   assert(_cont.chunk_invariant(), "");
   assert(!Interpreter::contains(_cont.entryPC()), "");
-#if !defined(PPC64) || defined(ZERO)
+#if defined(SPARC)
+  const int doYield_stub_frame_size = SharedRuntime::cont_doYield_stub()->frame_size();
+#elif !defined(PPC64) || defined(ZERO)
   static const int doYield_stub_frame_size = frame::metadata_words;
 #else
   static const int doYield_stub_frame_size = frame::native_abi_reg_args_size >> LogBytesPerWord;
@@ -633,7 +636,7 @@ freeze_result Freeze<ConfigT>::try_freeze_fast() {
   }
 
   // TODO R REMOVE when deopt change is fixed
-  assert(!_thread->cont_fastpath() || _barriers, "");
+  assert(!_thread->cont_fastpath() || _barriers SPARC_ONLY(|| !check_valid_fast_path()), "");
   log_develop_trace(continuations)("-- RETRYING SLOW --");
   return freeze_slow();
 }
@@ -641,6 +644,7 @@ freeze_result Freeze<ConfigT>::try_freeze_fast() {
 // Returns size needed if the continuation fits, otherwise 0.
 int FreezeBase::size_if_fast_freeze_available() {
   stackChunkOop chunk = _cont.tail();
+  SPARC_ONLY(if (chunk != nullptr && !chunk->is_empty()) return 0;)
   if (chunk == nullptr || chunk->is_gc_mode() || chunk->requires_barriers() || chunk->has_mixed_frames()) {
     log_develop_trace(continuations)("chunk available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
     return 0;
@@ -731,7 +735,8 @@ bool FreezeBase::freeze_fast_new_chunk(stackChunkOop chunk) {
   // Install new chunk
   _cont.set_tail(chunk);
 
-  if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers)) { // OOME/probably humongous
+  if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers
+      SPARC_ONLY(|| !check_valid_fast_path()))) { // OOME/probably humongous
     log_develop_trace(continuations)("Retrying slow. Barriers: %d", _barriers);
     return false;
   }
@@ -758,6 +763,31 @@ void FreezeBase::freeze_fast_copy(stackChunkOop chunk, int chunk_start_sp CONT_J
   assert(!chunk->requires_barriers(), "");
   assert(chunk == _cont.tail(), "");
 
+#ifdef SPARC
+  // Each saved I7 belongs to the sender, so copy own PCs separately. All
+  // windows have been flushed by doYield, and eligibility checked their size.
+  const address top_pc = freeze_start_frame().pc();
+  unwind_frames();
+  const int chunk_new_sp = chunk_start_sp - cont_size();
+  intptr_t* chunk_top = chunk->start_address() + chunk_new_sp;
+  copy_to_chunk(_cont_stack_top, chunk_top, cont_size());
+  intptr_t* source = _cont_stack_top;
+  intptr_t* target = chunk_top;
+  address pc = top_pc;
+  const intptr_t* bottom = _cont.entry()->bottom_sender_sp();
+  while (source < bottom) {
+    intptr_t* next = (intptr_t*)(source[14] + STACK_BIAS);
+    assert(next > source && next <= bottom, "invalid saved window link");
+    target[14] = next - source;
+    target[16] = (intptr_t)pc;
+    pc = (address)source[15] + frame::pc_return_offset;
+    target += next - source;
+    source = next;
+  }
+  chunk->set_sp(chunk_new_sp);
+  chunk->set_pc(top_pc);
+  log_develop_trace(continuations)("freeze_fast SPARC size: %d", cont_size());
+#else
   // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
   // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
   // will either see no continuation on the stack, or a consistent chunk.
@@ -820,6 +850,8 @@ void FreezeBase::freeze_fast_copy(stackChunkOop chunk, int chunk_start_sp CONT_J
     chunk->set_pc(ContinuationHelper::return_address_at(
                   _cont_stack_top - frame::sender_sp_ret_address_offset()));
   }
+
+#endif
 
   if (_monitors_in_lockstack > 0) {
     freeze_lockstack(chunk);
@@ -1663,19 +1695,31 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
 }
 #endif // INCLUDE_JVMTI
 
-#ifdef ASSERT
+#if defined(ASSERT) || defined(SPARC)
 // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c
 // adapter or called Deoptimization::unpack_frames. As for native frames, upcalls from JNI also go through the
 // interpreter (see JavaCalls::call_helper), while the UpcallLinker explicitly sets cont_fastpath.
 bool FreezeBase::check_valid_fast_path() {
   ContinuationEntry* ce = _thread->last_continuation();
   RegisterMap map(_thread,
-                  RegisterMap::UpdateMap::skip,
+                  RegisterMap::UpdateMap::include,
                   RegisterMap::ProcessFrames::skip,
                   RegisterMap::WalkContinuation::skip);
   map.set_include_argument_oops(false);
+  SPARC_ONLY(if (_preempt || _cont.argsize() != 0) return false;)
   bool is_top_frame = true;
   for (frame f = freeze_start_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map), is_top_frame = false) {
+#ifdef SPARC
+    // The SPARC assembler does not yet maintain fastpath markers at every
+    // interpreter/adapter boundary. Check the actual flushed windows instead.
+    if (_preempt || f.sp() != f.unextended_sp() || !f.is_compiled_frame() ||
+        f.is_deoptimized_frame() || f.cb() == nullptr ||
+        f.fp() != f.sp() + f.cb()->frame_size() ||
+        f.fp() > _cont.entry()->bottom_sender_sp() ||
+        ContinuationHelper::CompiledFrame::is_owning_locks(_thread, &map, f)) {
+      return false;
+    }
+#endif
     if (!((f.is_compiled_frame() && !f.is_deoptimized_frame()) || (is_top_frame && (f.is_runtime_frame() || f.is_native_frame())))) {
       return false;
     }
@@ -1761,8 +1805,9 @@ static inline freeze_result freeze_internal(JavaThread* current, intptr_t* const
 
   Freeze<ConfigT> freeze(current, cont, sp, preempt);
 
-  assert(!current->cont_fastpath() || freeze.check_valid_fast_path(), "");
-  bool fast = UseContinuationFastPath && current->cont_fastpath();
+  NOT_SPARC(assert(!current->cont_fastpath() || freeze.check_valid_fast_path(), "");)
+  bool fast = UseContinuationFastPath && current->cont_fastpath()
+      SPARC_ONLY(&& freeze.check_valid_fast_path());
   if (fast && freeze.size_if_fast_freeze_available() > 0) {
     freeze.freeze_fast_existing_chunk();
     CONT_JFR_ONLY(freeze.jfr_info().post_jfr_event(&event, oopCont, current);)
@@ -1994,7 +2039,19 @@ public:
   Thaw(JavaThread* thread, ContinuationWrapper& cont) : ThawBase(thread, cont) {}
 
   inline bool can_thaw_fast(stackChunkOop chunk) {
-    return    !_barriers
+#ifdef SPARC
+    // Slow freeze may produce compiled chunks too. Only use the bulk thaw
+    // layout when every window link agrees with its compiled frame size.
+    if (chunk->has_thaw_slowpath_condition() || chunk->argsize() != 0) return false;
+    StackChunkFrameStream<ChunkFrames::CompiledOnly> stream(chunk);
+    while (!stream.is_done()) {
+      if (stream.cb() == nullptr || !stream.is_compiled() ||
+          stream.sp()[14] != stream.cb()->frame_size()) return false;
+      stream.next(SmallRegisterMap::instance(), false /* stop */);
+    }
+#endif
+    return    UseContinuationFastPath
+           && !_barriers
            &&  _thread->cont_fastpath_thread_state()
            && !chunk->has_thaw_slowpath_condition()
            && !PreserveFramePointer;
@@ -2100,7 +2157,8 @@ int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &arg
       intptr_t* retaddr_slot = (chunk_sp
                                 + frame_size
                                 - frame::sender_sp_ret_address_offset());
-      assert(f.pc() == ContinuationHelper::return_address_at(retaddr_slot),
+      assert(f.pc() == SPARC_ONLY((address)retaddr_slot[1])
+             NOT_SPARC(ContinuationHelper::return_address_at(retaddr_slot)),
              "unexpected pc");
     }
 #endif
@@ -2196,11 +2254,20 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   log_develop_trace(continuations)("setting entry argsize: %d", _cont.argsize());
   assert(rs.bottom_sp() == _cont.entry()->bottom_sender_sp(), "");
 
-  // install the return barrier if not last frame, or the entry's pc if last
+  // Restore architectural (biased) I6 links before returning to Java.
+#ifdef SPARC
+  patch_caller_links(rs.top(), rs.bottom_sp());
+  intptr_t* last = rs.top();
+  while ((intptr_t*)(last[14] + STACK_BIAS) < rs.bottom_sp()) {
+    last = (intptr_t*)(last[14] + STACK_BIAS);
+  }
+  last[15] = (intptr_t)(is_last ? _cont.entryPC()
+                                      : StubRoutines::cont_returnBarrier())
+             - frame::pc_return_offset;
+#else
   patch_return(rs.bottom_sp(), is_last);
-
-  // insert the back links from callee to caller frames
   patch_caller_links(rs.top(), rs.top() + rs.total_size());
+#endif
 
   assert(is_last == _cont.is_empty(), "");
   assert(_cont.chunk_invariant(), "");
@@ -2469,7 +2536,8 @@ void ThawBase::clear_bitmap_bits(address start, address end) {
 intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::preempt_kind preempt_kind, bool fast_case) {
   assert(preempt_kind == Continuation::freeze_on_wait || preempt_kind == Continuation::freeze_on_monitorenter, "");
   frame top(sp);
-  assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
+  assert(top.pc() == SPARC_ONLY((address)sp[16])
+      NOT_SPARC(*(address*)(sp - frame::sender_sp_ret_address_offset())), "");
 
 #if INCLUDE_JVMTI
   // Finish the VTMS transition.
@@ -2985,7 +3053,8 @@ static void log_frames(JavaThread* thread) {
 
 static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
   intptr_t* sp0 = sp;
-  address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
+  address pc0 = SPARC_ONLY((address)sp[16])
+      NOT_SPARC(*(address*)(sp - frame::sender_sp_ret_address_offset()));
 
   if (preempted && sp0 == cont.entrySP()) {
     // Still preempted (monitor not acquired) so no frames were thawed.

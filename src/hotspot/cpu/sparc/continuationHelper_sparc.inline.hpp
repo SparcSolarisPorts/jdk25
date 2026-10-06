@@ -129,7 +129,9 @@ inline intptr_t** ContinuationHelper::Frame::callee_link_address(
 
 inline address* ContinuationHelper::InterpretedFrame::return_pc_address(
     const frame& f) {
-  return (address*)&f.sp()[sparc_i7_slot];
+  return f.is_heap_frame() || f.younger_sp_or_null() == nullptr
+      ? (address*)&f.sp()[16]
+      : (address*)&f.younger_sp()[sparc_i7_slot];
 }
 
 inline void ContinuationHelper::InterpretedFrame::patch_sender_sp(
@@ -142,16 +144,21 @@ inline void ContinuationHelper::InterpretedFrame::patch_sender_sp(
 }
 
 inline address* ContinuationHelper::Frame::return_pc_address(const frame& f) {
-  return (address*)&f.sp()[sparc_i7_slot];
+  return f.is_heap_frame() || f.younger_sp_or_null() == nullptr
+      ? (address*)&f.sp()[16]
+      : (address*)&f.younger_sp()[sparc_i7_slot];
 }
 
 inline address ContinuationHelper::Frame::real_pc(const frame& f) {
   // Always used in assertions. Just strip it.
-  return sparc_decode_saved_pc(f, *return_pc_address(f));
+  return f.is_heap_frame() || f.younger_sp_or_null() == nullptr
+      ? *return_pc_address(f) : *return_pc_address(f) + frame::pc_return_offset;
 }
 
 inline void ContinuationHelper::Frame::patch_pc(const frame& f, address pc) {
-  *return_pc_address(f) = sparc_encode_saved_pc(f, pc);
+  if (f.is_heap_frame() && f.is_empty()) return; // empty chunk has no frame home area
+  *return_pc_address(f) = f.is_heap_frame() || f.younger_sp_or_null() == nullptr
+      ? pc : pc - frame::pc_return_offset;
 }
 
 static inline void patch_return_pc_with_preempt_stub(frame& f) {
@@ -179,11 +186,11 @@ inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(
 
 inline intptr_t* ContinuationHelper::InterpretedFrame::frame_bottom(
     const frame& f) {
-  Method* method = f.interpreter_frame_method();
   intptr_t raw_locals = f.sp()[sparc_l0_slot + 3];
   intptr_t* locals = f.is_heap_frame() ? f.fp() + raw_locals
                                         : (intptr_t*)raw_locals;
-  return locals + method->max_locals() * Interpreter::stackElementWords;
+  // Llocals points to local zero, the highest-address local. Locals grow down.
+  return locals + 1;
 }
 
 inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(

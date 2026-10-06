@@ -66,7 +66,7 @@ inline frame StackChunkFrameStream<frame_kind>::to_frame() const {
 template <ChunkFrames frame_kind>
 inline address StackChunkFrameStream<frame_kind>::get_pc() const {
   assert(!is_done(), "stream is done");
-  return (address)_sp[stack_chunk_sparc_i7_slot];
+  return (address)_sp[16]; // synthetic own-PC slot in the unused Java argument home area
 }
 
 template <ChunkFrames frame_kind>
