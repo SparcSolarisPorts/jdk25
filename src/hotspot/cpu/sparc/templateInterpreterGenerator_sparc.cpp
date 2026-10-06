@@ -1149,7 +1149,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // make sure method is native & not abstract
   // rethink these assertions - they can be simplified and shared (gri 2/25/2000)
 #ifdef ASSERT
-  __ lduh(G5_method, Method::access_flags_offset(), Gtmp1);
+  __ lduh(G5_method, in_bytes(Method::access_flags_offset()), Gtmp1);
   { Label L;
     __ btst(JVM_ACC_NATIVE, Gtmp1);
     __ br(Assembler::notZero, false, Assembler::pt, L);
@@ -1534,7 +1534,7 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
   // make sure method is not native & not abstract
   // rethink these assertions - they can be simplified and shared (gri 2/25/2000)
 #ifdef ASSERT
-  __ lduh(G5_method, Method::access_flags_offset(), Gtmp1);
+  __ lduh(G5_method, in_bytes(Method::access_flags_offset()), Gtmp1);
   { Label L;
     __ btst(JVM_ACC_NATIVE, Gtmp1);
     __ br(Assembler::zero, false, Assembler::pt, L);

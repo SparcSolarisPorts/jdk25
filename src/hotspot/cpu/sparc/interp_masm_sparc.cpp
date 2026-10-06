@@ -483,7 +483,7 @@ void InterpreterMacroAssembler::empty_expression_stack() {
   assert(G4_scratch != Gframe_size, "Only you can prevent register aliasing!");
 
   // A native does not need to do this, since its callee does not change SP.
-  lduh(Lmethod, Method::access_flags_offset(), Gframe_size);  // Load access flags.
+  lduh(Lmethod, in_bytes(Method::access_flags_offset()), Gframe_size);  // Load access flags.
   btst(JVM_ACC_NATIVE, Gframe_size);
   br(Assembler::notZero, false, Assembler::pt, done);
   delayed()->nop();
