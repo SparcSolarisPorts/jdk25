@@ -2326,7 +2326,9 @@ void TemplateTable::getfield_or_static(int byte_no, bool is_static, RewriteContr
   Register Rclass = Rcache;
   Register Roffset= G4_scratch;
   Register Rflags = G1_scratch;
-  Register Rtos_state = Lbyte_code;
+  // Lbyte_code and Lscratch both alias L5. Keep the field type
+  // separate from the volatile flag held in Lscratch.
+  Register Rtos_state = O2;
 
   resolve_cache_and_index_for_field(byte_no, Rcache, index);
   jvmti_post_field_access(Rcache, index, is_static, false);
@@ -2694,7 +2696,9 @@ void TemplateTable::putfield_or_static(int byte_no, bool is_static, RewriteContr
   Register Rclass = Rcache;
   Register Roffset= G4_scratch;
   Register Rflags = G1_scratch;
-  Register Rtos_state = Lbyte_code;
+  // Lbyte_code and Lscratch both alias L5. Keep the field type
+  // separate from the volatile flag held in Lscratch.
+  Register Rtos_state = O2;
 
   resolve_cache_and_index_for_field(byte_no, Rcache, index);
   jvmti_post_field_mod(Rcache, index, is_static);
