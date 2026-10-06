@@ -1,8 +1,26 @@
-# JDK 25 Solaris/SPARC continuation candidate (v19)
+# JDK 25 Solaris/SPARC continuation candidate (v20)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v20 fixes an out-of-range C2 G1 pre-barrier branch in the supplied javac
+ClassReader.classSigToType crash. At 0xffffffff5f87a3a0, CBCOND word 32d50940
+branches to 0xffffffff5f879cc8. The intended pre-barrier stub begins at
+0xffffffff5f87acc8 with the old-reference load, null check and SATB enqueue.
+The required displacement is +2344 bytes, beyond CBCOND's +2044-byte limit;
+its 10-bit word displacement wraps by 4096 bytes into unrelated method code.
+That explains reaching the byte-array store with pointer-valued index registers.
+
+C2 pre-barriers now emit CMP, a 19-bit-displacement conditional branch, and a
+NOP delay slot to their deferred stub entry. Other short branches remain enabled.
+The archive retains v19's CAS constraint fix and all earlier changes. Only
+cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp changes relative to v19.
+The supplied instruction was decoded locally and branch-range boundaries checked;
+Solaris/SPARC build and execution still need validation on the target machine.
+
+Rebuild images and test-image, then repeat the java_naming jtreg test with C2
+and G1 enabled. Do not disable UseCBCond or tiered compilation for that check.
 
 v19 fixes the supplied C2 ConcurrentHashMap.transfer SIGSEGV. The G1 reference
 CAS rules wrote the Boolean result before the post-write barrier, while their

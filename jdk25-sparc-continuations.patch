@@ -376,6 +376,19 @@
  }
  
  void G1BarrierSetAssembler::g1_write_barrier_pre_c2(MacroAssembler* masm,
+@@ -836,7 +841,11 @@
+ 
+   generate_pre_barrier_fast_path(masm, G2_thread, tmp1);
+   // If marking is active (*(mark queue active address) != 0), jump to stub (slow path).
+-  __ cmp_and_br_short(tmp1, G0, Assembler::notZero, Assembler::pn, *stub->entry());
++  // C2 emits the stub after the method body. Its unbound entry can be
++  // outside CBCOND's signed 10-bit word displacement range.
++  __ cmp(tmp1, G0);
++  __ br(Assembler::notZero, false, Assembler::pn, *stub->entry());
++  __ delayed()->nop();
+ 
+   __ bind(*stub->continuation());
+ }
 --- a/src/hotspot/cpu/sparc/gc/g1/g1_sparc.ad
 +++ b/src/hotspot/cpu/sparc/gc/g1/g1_sparc.ad
 @@ -172,7 +172,9 @@
