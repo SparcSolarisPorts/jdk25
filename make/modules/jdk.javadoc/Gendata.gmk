@@ -52,9 +52,16 @@ COMPILECREATESYMBOLS_ADD_EXPORTS := \
 # generation must use the new JDK release on that build path.
 JAVADOC_TOOL_TARGET_RELEASE := $(TARGET_RELEASE_BOOTJDK)
 JAVADOC_TOOL_JAVA := $(JAVA_SMALL)
+JAVADOC_GENERATOR_ARGS := $(INTERIM_LANGTOOLS_ARGS) $(COMPILECREATESYMBOLS_ADD_EXPORTS)
 ifeq ($(OPENJDK_TARGET_OS), solaris)
   JAVADOC_TOOL_TARGET_RELEASE := $(TARGET_RELEASE_NEWJDK_UPGRADED)
   JAVADOC_TOOL_JAVA := $(JDK_OUTPUTDIR)/bin/java $(JAVA_FLAGS_SMALL)
+  # The interim modules may contain boot-JDK preview class files. The new JDK
+  # cannot load preview classes from an older release, so generation uses its
+  # normal modules and corresponding exports instead of the interim modules.
+  JAVADOC_GENERATOR_ARGS := --enable-preview \
+      --add-modules jdk.compiler,jdk.jdeps,jdk.javadoc \
+      $(subst .interim,,$(COMPILECREATESYMBOLS_ADD_EXPORTS))
 endif
 
 $(eval $(call SetupJavaCompilation, COMPILE_CREATE_SYMBOLS, \
@@ -85,8 +92,7 @@ $(JDK_JAVADOC_DIR)/_element_lists.marker: \
 	                         $(JDK_SOURCE_TARGET_VERSION)))}.txt
 	# Generate element-list files for JDK 11 to current-1
 	$(call ExecuteWithLog, $@_historic, \
-	    $(JAVADOC_TOOL_JAVA) $(INTERIM_LANGTOOLS_ARGS) \
-	        $(COMPILECREATESYMBOLS_ADD_EXPORTS) \
+	    $(JAVADOC_TOOL_JAVA) $(JAVADOC_GENERATOR_ARGS) \
 	        -classpath $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc \
 	        build.tools.symbolgenerator.CreateSymbols \
 	        build-javadoc-data \
@@ -96,8 +102,7 @@ $(JDK_JAVADOC_DIR)/_element_lists.marker: \
 	)
 	# Generate element-list file for the current JDK version
 	$(call ExecuteWithLog, $@_current, \
-	    $(JAVADOC_TOOL_JAVA) $(INTERIM_LANGTOOLS_ARGS) \
-	        $(COMPILECREATESYMBOLS_ADD_EXPORTS) \
+	    $(JAVADOC_TOOL_JAVA) $(JAVADOC_GENERATOR_ARGS) \
 	        -classpath $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc \
 	        build.tools.symbolgenerator.JavadocElementList \
 	        $(ELEMENT_LISTS_DIR)/element-list-$(JDK_SOURCE_TARGET_VERSION).txt \

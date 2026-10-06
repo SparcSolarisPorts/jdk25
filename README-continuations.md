@@ -1,25 +1,23 @@
-# JDK 25 Solaris/SPARC continuation candidate (v17)
+# JDK 25 Solaris/SPARC continuation candidate (v18)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
 
-v17 corrects the Solaris javadoc helper compilation's platform-class selection.
-The v16 source/target change removed the unnamed-variable error, but CreateSymbols
-then could not find java.lang.classfile. Source/target 25 alone does not select
-Java 25 platform APIs when the interim compiler runs against the boot JDK image.
-This rule now uses TARGET_RELEASE_NEWJDK_UPGRADED, which JavaCompilation.gmk defines
-as source/target 25 plus --upgrade-module-path $(JDK_OUTPUTDIR)/modules --system none.
-The generated helpers continue to run with the already-built JDK 25 executable.
-The existing interim compiler flags and exports remain, and JavaCompilation.gmk
-itself is unchanged. All HotSpot files are byte-for-byte unchanged from v16.
+v18 fixes generation after the helper compilation succeeded with v17. The Java 25
+runtime rejected Check$CheckContext from the interim compiler because it was built
+as Java 21 preview bytecode (65.65535). Java 25 accepts preview bytecode only for
+its own release (69.65535). Solaris generators now run the normal JDK 25 compiler,
+jdeps, and javadoc modules, with exports translated to their normal module names.
+They no longer receive INTERIM_LANGTOOLS_ARGS or interim-module paths. Runtime
+--enable-preview remains for current-release preview classes. Helper compilation
+continues using the working interim compiler with Java 25 source/platform modules.
+Non-Solaris generator arguments retain their original interim module selection.
 
-GNU make expansion checks passed for the Solaris target/module selection and the
-unchanged non-Solaris path. Actual Java 25 compilation and Solaris execution are
-not available on this host. The current build must contain the compiled Java 25
-platform modules, including java.base/java/lang/classfile. If the next build still
-reports missing packages, retain the failing javac command/argument files as well
-as its log so the final module search path can be inspected.
+GNU make expansion checks passed: correct target/platform/runtime, no interim
+module references on Solaris generator launches, normal javac exports, and retained
+preview support. All HotSpot files are unchanged from v17. Java 25 generation and
+Solaris execution are not available on this host and require the next build check.
 
 v14 implements SPARC lightweight locking (LockingMode=2) in the interpreter,
 C1, C2, and synchronized JNI wrapper paths. VM initialization now accepts mode 2
@@ -68,7 +66,7 @@ The only added HotSpot files relative to v10 are:
 
 This corrects concrete source defects and matches the crash evidence; SPARC
 compilation/runtime validation is still required. All continuation fast-path
-changes remain included. The javadoc source/preview mismatch is addressed by v17.
+changes remain included. The javadoc source/preview mismatch is addressed by v18.
 
 ## Apply and build
 
@@ -79,7 +77,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v17.zip
+unzip -o /path/to/jdk25-sparc-continuations-v18.zip
 gmake images 2>&1 | tee /tmp/build25.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version
