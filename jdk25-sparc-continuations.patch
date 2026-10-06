@@ -952,7 +952,29 @@
  template <ChunkFrames frame_kind>
 --- a/src/hotspot/cpu/sparc/stubGenerator_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/stubGenerator_sparc.cpp
-@@ -5639,27 +5639,71 @@
+@@ -4805,7 +4805,6 @@
+    *   I2   - int* y-addr
+    *   I3   - int  y-len
+    *   I4   - int* z-addr   (output vector)
+-   *   I5   - int  z-len
+    */
+   address generate_multiplyToLen() {
+     assert(UseMultiplyToLenIntrinsic, "need VIS3 instructions");
+@@ -4821,7 +4820,12 @@
+     const Register yptr = I2; //
+     const Register ylen = I3; //
+     const Register zptr = I4; // output address
+-    const Register zlen = I5; // ...and length in 32b-words
++    const Register zlen = I5; // product length in 32b-words (not an argument)
++
++    // The JDK 25 intrinsic passes five arguments. The multiplication kernels
++    // still need the product length, so derive it instead of reading I5 as
++    // the sixth argument used by older JDKs.
++    __ add(xlen, ylen, zlen);
+ 
+     /* The minimal "limb" representation suggest that odd length vectors are as
+      * likely as even length dittos. This in turn suggests that we need to cope
+@@ -5639,27 +5643,71 @@
        __ clr(O0); // doYield returns zero on successful thaw
      }
  
@@ -1037,7 +1059,7 @@
  
      return start;
    }
-@@ -5875,8 +5919,8 @@
+@@ -5875,8 +5923,8 @@
  
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_fastpath_offset()), G1);
    __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()));
@@ -1048,7 +1070,7 @@
  
    __ st_ptr(G0, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));
    __ reset_held_monitor_count(G2_thread);
-@@ -5894,11 +5938,11 @@
+@@ -5894,11 +5942,11 @@
  
    __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()), G1);
    __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));

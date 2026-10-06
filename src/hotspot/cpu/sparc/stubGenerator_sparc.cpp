@@ -4805,7 +4805,6 @@ class StubGenerator: public StubCodeGenerator {
    *   I2   - int* y-addr
    *   I3   - int  y-len
    *   I4   - int* z-addr   (output vector)
-   *   I5   - int  z-len
    */
   address generate_multiplyToLen() {
     assert(UseMultiplyToLenIntrinsic, "need VIS3 instructions");
@@ -4821,7 +4820,12 @@ class StubGenerator: public StubCodeGenerator {
     const Register yptr = I2; //
     const Register ylen = I3; //
     const Register zptr = I4; // output address
-    const Register zlen = I5; // ...and length in 32b-words
+    const Register zlen = I5; // product length in 32b-words (not an argument)
+
+    // The JDK 25 intrinsic passes five arguments. The multiplication kernels
+    // still need the product length, so derive it instead of reading I5 as
+    // the sixth argument used by older JDKs.
+    __ add(xlen, ylen, zlen);
 
     /* The minimal "limb" representation suggest that odd length vectors are as
      * likely as even length dittos. This in turn suggests that we need to cope

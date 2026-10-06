@@ -1,8 +1,30 @@
-# JDK 25 Solaris/SPARC continuation candidate (v20)
+# JDK 25 Solaris/SPARC continuation candidate (v21)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v21 adapts SPARC multiplyToLen to the JDK 25 five-argument runtime ABI.
+The supplied crypto tests crash in StubRoutines::multiplyToLen. The shared C2
+caller and OptoRuntime signature now pass x, xlen, y, ylen and z; the old SPARC
+stub still consumed I5 as a sixth zlen argument. The stub now initializes I5
+with xlen + ylen before selecting any multiplication kernel. VIS3/MPMUL and the
+other optimized paths remain enabled. Only cpu/sparc/stubGenerator_sparc.cpp
+changes relative to v20; all earlier fixes are retained.
+
+BigIntegerMultiplySmoke independently checks 2700 products with base-256
+schoolbook arithmetic, including odd/even, unequal and MPMUL-sized operands.
+It passed on Linux/x86 JDK 17 with C2 enabled. Solaris/SPARC build and runtime
+validation remain required. Run it with the newly built JDK:
+
+```bash
+build/solaris-sparcv9-server-release/images/jdk/bin/java \
+  -Xbatch -XX:-TieredCompilation tests/BigIntegerMultiplySmoke.java
+```
+
+The broader 32-job run also exhausted Solaris swap/tmpfs capacity. Diagnose
+with swap -s, swap -l and df -h /tmp, preserve crash logs before cleanup, and
+repeat the crypto reproducer at one job before returning to the full suites.
 
 v20 fixes an out-of-range C2 G1 pre-barrier branch in the supplied javac
 ClassReader.classSigToType crash. At 0xffffffff5f87a3a0, CBCOND word 32d50940
