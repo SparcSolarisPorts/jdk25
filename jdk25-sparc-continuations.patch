@@ -1,3 +1,54 @@
+--- a/src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
++++ b/src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
+@@ -27,6 +27,7 @@
+ #include "c1/c1_MacroAssembler.hpp"
+ #include "c1/c1_Runtime1.hpp"
+ #include "ci/ciUtilities.hpp"
++#include "classfile/javaClasses.hpp"
+ #include "compiler/oopMap.hpp"
+ #include "gc/shared/cardTable.hpp"
+ #include "gc/shared/cardTableBarrierSet.hpp"
+@@ -619,6 +620,40 @@
+         __ delayed()->restore();        // free copy or add can go here
+       }
+ 
++    case C1StubId::is_instance_of_id:
++      {
++        // C calling convention: O0 = Class mirror, O1 = object, O0 = boolean.
++        // The caller has already null-checked the mirror. A window preserves
++        // its L/I registers; this leaf stub does not safepoint or call C++.
++        __ set_info("is_instance_of", dont_gc_arguments);
++        sasm->set_frame_size(sasm->total_frame_size_in_bytes(0) / wordSize);
++        __ save_frame(0);
++        Register super_klass = L0;
++        Register sub_klass = L1;
++        Label failure, success, slow;
++
++        __ ld_ptr(I0, java_lang_Class::klass_offset(), super_klass);
++        __ br_null(super_klass, false, Assembler::pn, failure); // primitive Class
++        __ delayed()->nop();
++        __ br_null(I1, false, Assembler::pn, failure);
++        __ delayed()->nop();
++        __ load_klass(sub_klass, I1);
++        __ check_klass_subtype_fast_path(sub_klass, super_klass, L2, L3,
++                                         &success, &failure, &slow);
++        __ bind(slow);
++        __ check_klass_subtype_slow_path(sub_klass, super_klass,
++                                         L2, L3, L4, L5, &success, &failure);
++        __ bind(failure);
++        __ clr(I0);
++        __ ret();
++        __ delayed()->restore();
++        __ bind(success);
++        __ mov(1, I0);
++        __ ret();
++        __ delayed()->restore();
++      }
++      break;
++
+     case C1StubId::monitorenter_nofpu_id:
+     case C1StubId::monitorenter_id:
+       { // G4: object
 --- a/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 +++ b/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 @@ -25,8 +25,11 @@

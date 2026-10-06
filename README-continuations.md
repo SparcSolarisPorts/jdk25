@@ -1,13 +1,21 @@
-# JDK 25 Solaris/SPARC continuation candidate (v8)
+# JDK 25 Solaris/SPARC continuation candidate (v9)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
 
-v8 fixes the unresolved Method::is_continuation_*_intrinsic symbols from v7
-by including oops/method.inline.hpp in sharedRuntime_sparc.cpp. All three helper
-bodies are defined inline in that header. This is the only HotSpot source
-change from v7. The fast paths and the v7 release-build fix remain included.
+v9 addresses the attached normal-startup SIGILL in RuntimeStub::C1 Runtime
+is_instance_of_blob. SPARC's C1 generator had no case for is_instance_of_id,
+so it generated an explicit unimplemented-entry trap. The new assembly leaf
+stub implements Class.isInstance using the existing SPARC fast and secondary
+subtype checks, handles null objects and primitive mirrors, and returns the
+boolean through the SPARC C calling convention. It does not call C++ or
+safepoint. This is the only added/changed HotSpot source relative to v8:
+cpu/sparc/c1_Runtime1_sparc.cpp.
+
+The supplied v8 log shows interpreter-only version startup reached the version
+output; normal startup still failed in C1. Neither establishes continuation
+freeze/thaw correctness. All earlier continuation/fast-path fixes are included.
 
 ## Apply and build
 
@@ -18,7 +26,7 @@ continuation default. Save any independent local edits before overwriting.
 From the JDK 25 repository:
 
 ```bash
-unzip -o /path/to/jdk25-sparc-continuations-v8.zip
+unzip -o /path/to/jdk25-sparc-continuations-v9.zip
 gmake hotspot 2>&1 | tee /tmp/build25-hotspot.log
 build/solaris-sparcv9-server-release/jdk/bin/java -Xint -version
 build/solaris-sparcv9-server-release/jdk/bin/java -version
@@ -60,6 +68,24 @@ version alone does not establish that C1 and C2 are working.
 
 The included patch is cumulative relative to the original attached jdk25.zip;
 use the full files when your tree already has v2/v3/v4.
+
+## C1 Class.isInstance regression test
+
+Once normal startup succeeds:
+
+```bash
+/usr/jdk/jdk-21/bin/javac -d continuation-test-classes tests/C1InstanceOfSmoke.java
+build/solaris-sparcv9-server-release/jdk/bin/java \
+  -XX:TieredStopAtLevel=1 -Xbatch \
+  -XX:CompileCommand=dontinline,C1InstanceOfSmoke::test \
+  -cp continuation-test-classes C1InstanceOfSmoke
+```
+
+Require PASS. Repeat with TieredStopAtLevel=3 and normal tiered compilation.
+The test covers concrete/inherited classes, interfaces, reference/primitive
+arrays, primitive Class mirrors, null objects and null-mirror exceptions.
+It passed locally on the x86 host JDK 17 C1 JVM. That validates the test's
+expected results, not the new SPARC instructions.
 
 ## Staged runtime tests
 
