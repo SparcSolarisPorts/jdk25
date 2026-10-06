@@ -985,6 +985,10 @@ public:
   void access_load_at(BasicType type, DecoratorSet decorators,
                       Address src, Register dst, Register tmp);
 
+  // Resolve a JNI global handle in value through the GC barrier, leaving the
+  // oop in value.  Null is passed through unchanged.
+  void resolve_global_jobject(Register value, Register tmp);
+
   void load_heap_oop(const Address& s, Register d,
                      Register tmp = noreg, DecoratorSet decorators = 0);
   void load_heap_oop(Register s1, Register s2, Register d,

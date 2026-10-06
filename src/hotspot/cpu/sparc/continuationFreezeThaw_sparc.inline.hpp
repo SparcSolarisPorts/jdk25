@@ -27,6 +27,7 @@
 #define CPU_SPARC_CONTINUATIONFREEZETHAW_SPARC_INLINE_HPP
 
 #include "code/codeBlob.inline.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "oops/stackChunkOop.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
@@ -155,6 +156,13 @@ frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
   return heap_frame;
 }
 
+inline void FreezeBase::prepare_freeze_interpreted_top_frame(frame& f) {
+  // On SPARC the interpreter keeps last_sp in the Llast_sp register, whose
+  // value is spilled into the register window save area as part of the frame,
+  // so it is always available when the top frame is frozen -- unlike x86,
+  // nothing needs to be fixed up here.
+}
+
 inline void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
   intptr_t raw = f.sp()[freeze_sparc_i5_slot];
   if (raw != 0) {
@@ -251,6 +259,35 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp,
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   (void)f;
   freeze_sparc_patch_link(caller, caller.fp());
+}
+
+inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
+  // On SPARC a frame's link slot (the saved %i6 in its register window save
+  // area) holds the caller's sp, so the frame is reconnected to the caller
+  // frame that starts at caller_sp by storing it (biased) in that slot.
+  freeze_sparc_patch_link(f, caller_sp);
+}
+
+inline intptr_t* ThawBase::push_cleanup_continuation() {
+  // Fabricate a minimal SPARC frame below the continuation entry frame whose
+  // saved %i7 makes the register-window restore chain "return" into the
+  // cleanup stub, and whose saved %i6 restores the entry frame's sp.
+  frame enterSpecial = new_entry_frame();
+  intptr_t* entry_sp = enterSpecial.sp();
+
+  const int fsize = frame::register_save_words;
+  intptr_t* sp = entry_sp - fsize;
+  assert(is_aligned(sp, frame::frame_alignment), "SPARC stack must remain 16-byte aligned");
+  for (int i = 0; i < fsize; i++) {
+    sp[i] = 0;
+  }
+  // Saved %i6: becomes %sp after the restore that consumes this frame.
+  sp[freeze_sparc_fp_slot] = (intptr_t)entry_sp - STACK_BIAS;
+  // Saved %i7: the stub switch jumps to saved %i7 + pc_return_offset.
+  sp[freeze_sparc_i7_slot] = (intptr_t)ContinuationEntry::cleanup_pc() - frame::pc_return_offset;
+
+  log_develop_trace(continuations, preempt)("push_cleanup_continuation initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(entry_sp), p2i(sp));
+  return sp;
 }
 
 inline void ThawBase::derelativize_interpreted_frame_metadata(

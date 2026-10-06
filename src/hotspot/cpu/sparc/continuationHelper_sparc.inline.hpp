@@ -106,12 +106,13 @@ inline void ContinuationHelper::set_anchor_to_entry_pd(
   anchor->set_flags(JavaFrameAnchor::flushed);
 }
 
-#ifdef ASSERT
 inline void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor,
                                                intptr_t* sp) {
   (void)sp;
   anchor->set_flags(JavaFrameAnchor::flushed);
 }
+
+#ifdef ASSERT
 
 inline bool ContinuationHelper::Frame::assert_frame_laid_out(frame f) {
   const intptr_t* slot = &f.sp()[sparc_fp_slot];

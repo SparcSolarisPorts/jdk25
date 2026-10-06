@@ -39,3 +39,10 @@ RuntimeStub* DowncallLinker::make_downcall_stub(BasicType* signature,
   Unimplemented();
   return nullptr;
 }
+
+// The Foreign Function & Memory API is not supported on SPARC
+// (make_downcall_stub is Unimplemented), so this is never reached.
+void DowncallLinker::StubGenerator::pd_add_offset_to_oop(VMStorage reg_oop, VMStorage reg_offset,
+                                                         VMStorage tmp1, VMStorage tmp2) const {
+  Unimplemented();
+}

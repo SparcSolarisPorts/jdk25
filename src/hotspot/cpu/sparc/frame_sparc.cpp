@@ -448,6 +448,16 @@ void frame::set_interpreter_frame_sender_sp(intptr_t* sender_sp) {
   _unextended_sp = sender_sp;
 }
 
+JavaThread** frame::saved_thread_address(const frame& f) {
+  CodeBlob* cb = f.cb();
+  assert(cb != nullptr && cb->is_runtime_stub(), "invalid frame");
+  // The thread register (G2_thread) is a dedicated global register on SPARC.
+  // Global registers are not part of the register window, so they are never
+  // saved in stub frames and there is no saved copy that needs patching when
+  // a continuation thaws on a different carrier thread.
+  return nullptr;
+}
+
 frame frame::sender_for_entry_frame(RegisterMap *map) const {
   assert(map != NULL, "map must be set");
   // Java frame called from C; skip all C frames and return top C

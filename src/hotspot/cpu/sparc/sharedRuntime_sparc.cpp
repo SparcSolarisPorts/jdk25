@@ -35,6 +35,9 @@
 #include "oops/klass.inline.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/jniHandles.hpp"
+#if INCLUDE_JFR
+#include "jfr/support/jfrIntrinsics.hpp"
+#endif
 #include "runtime/safepointMechanism.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
@@ -3011,3 +3014,66 @@ RuntimeStub* SharedRuntime::generate_throw_exception(SharedStubId id, address ru
   return RuntimeStub::new_runtime_stub(name, &code, frame_complete, masm->total_frame_size_in_bytes(0), nullptr, false);
 }
 
+
+
+#if INCLUDE_JFR
+
+// For c2: the call site passes no meaningful arguments; the stub calls the
+// runtime to write a checkpoint and returns the event writer oop in O0.
+// The runtime hands back a jobject handle, which is resolved through the
+// GC barrier before returning.
+RuntimeStub* SharedRuntime::generate_jfr_write_checkpoint() {
+  const char* name = SharedRuntime::stub_name(SharedStubId::jfr_write_checkpoint_id);
+  ResourceMark rm;
+  CodeBuffer code(name, 1024, 64);
+  MacroAssembler* masm = new MacroAssembler(&code);
+
+  __ save_frame(0);
+
+  int frame_complete = __ offset();
+
+  __ set_last_Java_frame(SP, G0);
+  __ call_VM_leaf(L7_thread_cache,
+                  CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::write_checkpoint),
+                  G2_thread);
+  __ reset_last_Java_frame();
+
+  // O0 is the jobject handle result; resolve it through the barrier.
+  __ resolve_global_jobject(O0, O1);
+
+  __ ret();
+  __ delayed()->restore();
+
+  masm->flush();
+  return RuntimeStub::new_runtime_stub(name, &code, frame_complete,
+                                       masm->total_frame_size_in_bytes(0),
+                                       nullptr, false);
+}
+
+// For c2: call to return a leased buffer.
+RuntimeStub* SharedRuntime::generate_jfr_return_lease() {
+  const char* name = SharedRuntime::stub_name(SharedStubId::jfr_return_lease_id);
+  ResourceMark rm;
+  CodeBuffer code(name, 1024, 64);
+  MacroAssembler* masm = new MacroAssembler(&code);
+
+  __ save_frame(0);
+
+  int frame_complete = __ offset();
+
+  __ set_last_Java_frame(SP, G0);
+  __ call_VM_leaf(L7_thread_cache,
+                  CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::return_lease),
+                  G2_thread);
+  __ reset_last_Java_frame();
+
+  __ ret();
+  __ delayed()->restore();
+
+  masm->flush();
+  return RuntimeStub::new_runtime_stub(name, &code, frame_complete,
+                                       masm->total_frame_size_in_bytes(0),
+                                       nullptr, false);
+}
+
+#endif // INCLUDE_JFR

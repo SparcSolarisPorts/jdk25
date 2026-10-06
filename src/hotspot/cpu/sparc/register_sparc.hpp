@@ -25,6 +25,8 @@
 #define CPU_SPARC_REGISTER_SPARC_HPP
 
 #include "asm/register.hpp"
+#include "utilities/count_leading_zeros.hpp"
+#include "utilities/count_trailing_zeros.hpp"
 
 // forward declaration
 #define NOREG_ENCODING -1
@@ -358,5 +360,31 @@ class QuadFloatRegisterImpl {
 
 typedef AbstractRegSet<Register> RegSet;
 typedef AbstractRegSet<FloatRegister> FloatRegSet;
+
+template <>
+inline Register AbstractRegSet<Register>::first() {
+  if (_bitset == 0) { return noreg; }
+  return as_Register(count_trailing_zeros(_bitset));
+}
+
+template <>
+inline Register AbstractRegSet<Register>::last() {
+  if (_bitset == 0) { return noreg; }
+  int last = max_size() - 1 - count_leading_zeros(_bitset);
+  return as_Register(last);
+}
+
+template <>
+inline FloatRegister AbstractRegSet<FloatRegister>::first() {
+  if (_bitset == 0) { return fnoreg; }
+  return as_FloatRegister(count_trailing_zeros(_bitset));
+}
+
+template <>
+inline FloatRegister AbstractRegSet<FloatRegister>::last() {
+  if (_bitset == 0) { return fnoreg; }
+  int last = max_size() - 1 - count_leading_zeros(_bitset);
+  return as_FloatRegister(last);
+}
 
 #endif // CPU_SPARC_REGISTER_SPARC_HPP

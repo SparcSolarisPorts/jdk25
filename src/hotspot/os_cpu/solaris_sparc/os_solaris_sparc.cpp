@@ -199,13 +199,28 @@ address os::fetch_frame_from_context(const void* ucVoid,
   if (uc != NULL) {
     epc = os::Posix::ucontext_get_pc(uc);
     if (ret_sp) *ret_sp = os::Solaris::ucontext_get_sp(uc);
+    // On SPARC a frame's base and its sp are the same address (frame::fp()
+    // is the identity mapping), so the sp from the context doubles as fp.
+    if (ret_fp) *ret_fp = os::Solaris::ucontext_get_sp(uc);
   } else {
     epc = NULL;
     if (ret_sp) *ret_sp = (intptr_t *)NULL;
+    if (ret_fp) *ret_fp = (intptr_t *)NULL;
   }
 
   return epc;
 }
+
+#if INCLUDE_JFR
+// The bcp of an interpreted frame lives in the register window save area
+// (Lbcp slot) at the frame base, which on SPARC is the sp from the context.
+intptr_t* os::fetch_bcp_from_context(const void* ucVoid) {
+  assert(ucVoid != nullptr, "invariant");
+  const ucontext_t* uc = (const ucontext_t*)ucVoid;
+  assert(os::Posix::ucontext_is_interpreter(uc), "invariant");
+  return reinterpret_cast<intptr_t*>(frame::interpreter_bcp(os::Solaris::ucontext_get_sp(uc)));
+}
+#endif // INCLUDE_JFR
 
 frame os::fetch_frame_from_context(const void* ucVoid) {
   intptr_t* sp;

@@ -3227,6 +3227,30 @@ void  MacroAssembler::decode_klass_not_null(Register src, Register dst) {
   }
 }
 
+void MacroAssembler::resolve_global_jobject(Register value, Register tmp) {
+  assert_different_registers(value, tmp);
+  Label done;
+
+  br_null_short(value, Assembler::pn, done);  // Use null as-is.
+
+#ifdef ASSERT
+  {
+    Label valid_global_tag;
+    andcc(value, JNIHandles::TypeTag::global, G0);  // Test for global tag.
+    br(Assembler::notZero, false, Assembler::pt, valid_global_tag);
+    delayed()->nop();
+    stop("non global jobject using resolve_global_jobject");
+    bind(valid_global_tag);
+  }
+#endif
+
+  // Resolve global handle
+  access_load_at(T_OBJECT, IN_NATIVE, Address(value, -JNIHandles::TypeTag::global), value, tmp);
+  verify_oop(value);
+
+  bind(done);
+}
+
 void MacroAssembler::reinit_heapbase() {
   if (UseCompressedOops || UseCompressedClassPointers) {
     if (Universe::heap() != NULL) {

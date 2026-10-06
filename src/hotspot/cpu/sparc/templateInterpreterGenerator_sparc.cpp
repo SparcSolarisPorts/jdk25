@@ -404,6 +404,24 @@ address TemplateInterpreterGenerator::generate_result_handler_for(BasicType type
   return entry;
 }
 
+// Adapter for resuming an interpreted frame after a virtual thread that was
+// preempted inside a monitor operation is mounted again.  On SPARC the
+// interpreter state (bcp, locals, expression stack) lives in the register
+// window, which is restored through the window save/restore chain when the
+// thawed frames are resumed, so there is nothing to reconstruct here.
+// Moreover LockingMode is forced to LM_LEGACY on SPARC, which disables
+// virtual-thread preemption (Continuation::try_preempt returns
+// freeze_unsupported), so this adapter is never actually called.
+address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter() {
+  if (!Continuations::enabled()) return nullptr;
+  address start = __ pc();
+
+  __ retl();
+  __ delayed()->nop();
+
+  return start;
+}
+
 address TemplateInterpreterGenerator::generate_safept_entry_for(TosState state, address runtime_entry) {
   address entry = __ pc();
   __ push(state);
