@@ -285,7 +285,7 @@ void PatchingStub::emit_code(LIR_Assembler* ce) {
 #ifdef ASSERT
     address start = __ pc();
 #endif
-    AddressLiteral addrlit(nullptr, metadata_Relocation::spec(_index));
+    AddressLiteral addrlit((address)nullptr, metadata_Relocation::spec(_index));
     __ patchable_set(addrlit, _obj);
 
 #ifdef ASSERT
@@ -300,7 +300,7 @@ void PatchingStub::emit_code(LIR_Assembler* ce) {
 #ifdef ASSERT
     address start = __ pc();
 #endif
-    AddressLiteral addrlit(nullptr, oop_Relocation::spec(_index));
+    AddressLiteral addrlit((address)nullptr, oop_Relocation::spec(_index));
     __ patchable_set(addrlit, _obj);
 
 #ifdef ASSERT

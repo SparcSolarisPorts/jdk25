@@ -1,8 +1,18 @@
-# JDK 25 Solaris/SPARC continuation candidate (v23)
+# JDK 25 Solaris/SPARC continuation candidate (v24)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v24 fixes a build regression introduced by the v22 NULL cleanup. Four C1
+patchable AddressLiteral placeholders now explicitly use (address)nullptr;
+untyped nullptr is ambiguous between the address and jobject constructors.
+The latest build output contains two such errors in c1_CodeStubs_sparc.cpp;
+the audit found two more calls in c1_LIRAssembler_sparc.cpp. This version keeps
+the v23 continuation changes. The failed rebuild provided no runtime results.
+Validation: checked all AddressLiteral null placeholders, compiled the extracted
+constructor overloads on the host, and verified the cumulative patch and ZIP.
+A Solaris/SPARC rebuild is still required.
 
 v23 uses the supplied pre-rebuild evidence archive (105 crash reports) to repair
 additional SPARC continuation defects. These reports came from older binaries
@@ -31,7 +41,7 @@ compiled the reflection-based ContinuationSmoke on host JDK 17; checked shell
 syntax. Native SPARC execution and actual continuation tests remain required.
 The host model does not validate OS register-window traps or freeze/thaw GC.
 
-Use v23 instead of v22 for the next rebuild. From the repository after extraction:
+Use v24 instead of v23 for the next rebuild. From the repository after extraction:
 
 ```bash
 gmake images test-image JOBS=8 && bash tests/run-continuation-repro.sh
