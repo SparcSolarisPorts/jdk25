@@ -1,8 +1,35 @@
-# JDK 25 Solaris/SPARC continuation candidate (v28)
+# JDK 25 Solaris/SPARC continuation candidate (v29)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v29 responds to continuation-test-results-20261007-024031. All four modes
+still aborted on v28. Interpreter/mixed reached Boolean.equals with corrupt
+metadata, compiled crashed in Continuation.enter with its receiver equal to
+one, and compiled-GC crashed in the return-barrier stub. In the latter report,
+G2_thread contained an oop and the attempted entry pointer contained the test's
+0x1020304050607080 sentinel. The top Java frame began only 16 bytes above the
+stub's SP, inside its 128-byte L/I save area.
+
+The thaw stub now rotates to a separate native window for prepare_thaw and
+thaw_entry. The second native window has a full ABI save/home area plus result
+storage BELOW the whole reserved Java-frame region. C call spills/refills can
+therefore no longer overwrite restored Java frames or read Java spills as the
+stub's cached thread pointer. Integer/oop return values stay in the native
+window's I0; F0 has a dedicated slot above the ABI argument-home area.
+Return barriers recover the actual entry register window before assigning its
+canonical SP. After slow thaw, the native window's I6 is patched to the entry's
+relocated physical SP before RESTORE, so a window underflow reads the relocated
+entry save area. Exception-handler lookup also gets its own native window.
+
+Validation: 64 sequences extracted from the changed emitter passed a host
+model that forces window spills/refills, clobbers C-call volatile registers,
+relocates the entry save area, copies Java frames and checks integer/FP results.
+The v28 relocation, PC and window-chain checks also passed. These models do not
+execute SPARC instructions or Solaris trap handlers. Patch dry-run and ZIP CRC /
+source SHA-256 checks passed. Native build and all four reproduction modes are
+still required; this is another unverified runtime candidate, not a passing port.
 
 v28 responds to continuation-test-results-20261007-021251:
 interpreter and mixed crashed in Cont thaw, compiled reported lost/duplicated

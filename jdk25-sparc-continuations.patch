@@ -3071,19 +3071,135 @@
  
      /* The minimal "limb" representation suggest that odd length vectors are as
       * likely as even length dittos. This in turn suggests that we need to cope
-@@ -5639,27 +5643,67 @@
-       __ clr(O0); // doYield returns zero on successful thaw
+@@ -5570,8 +5574,23 @@
+     address start = __ pc();
+ 
+     if (return_barrier) {
++      // A barrier runs in the caller of the frame that just returned. Recover
++      // the actual entry window before assigning its canonical SP. Preserve
++      // the Java result across RESTOREs; floating registers are not windowed.
++      __ mov(O0, G5);
+       __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+-      __ sub(G1, STACK_BIAS, SP);
++      __ sub(G1, STACK_BIAS, G1);
++      __ add(G1, (int)ContinuationEntry::size(), G3_scratch);
++      Label unwind, entry_window;
++      __ bind(unwind);
++      __ cmp_and_brx_short(FP, G3_scratch, Assembler::equal,
++                           Assembler::pt, entry_window);
++      __ restore();
++      __ ba(unwind);
++      __ delayed()->nop();
++      __ bind(entry_window);
++      __ mov(G1, SP);
++      __ mov(G5, O0);
      }
  
+ #ifdef ASSERT
+@@ -5585,25 +5604,28 @@
+     }
+ #endif
+ 
+-    // A return barrier may carry either an integer/oop result in O0 or an FP
+-    // result in F0.  Preserve both; restoring both is harmless and avoids
+-    // having type-specific return barriers.
++    // PREPARE uses a separate native window. Changing SP in the live entry
++    // window shifts its spill area and corrupts the entry's saved I registers.
++    // Two extra words, above the 22-word ABI area, hold the floating result.
++    const int result_offset = 22 * wordSize;
++    const int scratch_bytes = __ total_frame_size_in_bytes(2);
++    __ save_frame(2);
+     if (return_barrier) {
+-      __ sub(SP, 2 * wordSize, SP);
+-      __ st_ptr(O0, SP, STACK_BIAS + wordSize);
+-      __ stf(FloatRegisterImpl::D, F0, SP, STACK_BIAS);
+-    }
+-
++      __ stf(FloatRegisterImpl::D, F0, SP, STACK_BIAS + result_offset);
++    }
+     __ set(return_barrier ? 1 : 0, L0);
+     __ call_VM_leaf(L7_thread_cache,
+                     CAST_FROM_FN_PTR(address, Continuation::prepare_thaw),
+                     G2_thread, L0);
+-    __ mov(O0, L2); // bytes required for thawed frames; zero means overflow
+-
++    __ mov(O0, G3_scratch);
+     if (return_barrier) {
+-      __ ldf(FloatRegisterImpl::D, SP, STACK_BIAS, F0);
+-      __ ld_ptr(SP, STACK_BIAS + wordSize, O0);
+-      __ add(SP, 2 * wordSize, SP);
++      __ ldf(FloatRegisterImpl::D, SP, STACK_BIAS + result_offset, F0);
++      __ mov(I0, G5);
++    }
++    __ restore();
++    __ mov(G3_scratch, L2); // bytes needed for Java frames; zero means overflow
++    if (return_barrier) {
++      __ mov(G5, O0);
+     }
+ 
+     Label thaw_success;
+@@ -5612,54 +5634,104 @@
+     __ delayed()->nop();
+     __ bind(thaw_success);
+ 
+-    // Continuation runtime APIs use unbiased stack pointers.  Allocate below
+-    // the ContinuationEntry and preserve the 16-byte SPARC ABI alignment.
++    // Materialize the entry window at its canonical SP before slow thaw can
++    // relocate it for interpreter locals or stack-passed arguments.
++    __ save_frame(0);
++    __ flushw();
++    __ restore();
++
++    // The runtime may restore Java frames anywhere in the reserved region.
++    // Give its caller a complete native save/home area BELOW that region so
++    // a window spill/refill cannot overwrite a restored frame (or vice versa).
+     __ add(SP, STACK_BIAS, L3);
+     __ sub(L3, L2, L3);
+     __ and3(L3, -16, L3);
+-    __ sub(L3, STACK_BIAS, SP);
+-
++    __ sub(L3, scratch_bytes + STACK_BIAS, L3);
++    __ sub(L3, SP, L3);
++    __ save(SP, L3, SP);
+     if (return_barrier) {
+-      __ sub(SP, 2 * wordSize, SP);
+-      __ st_ptr(O0, SP, STACK_BIAS + wordSize);
+-      __ stf(FloatRegisterImpl::D, F0, SP, STACK_BIAS);
+-    }
+-
++      __ stf(FloatRegisterImpl::D, F0, SP, STACK_BIAS + result_offset);
++    }
+     __ set((int)kind, L0);
+     __ call_VM_leaf(L7_thread_cache,
+                     Continuation::thaw_entry(),
+                     G2_thread, L0);
+-    __ mov(O0, L1); // unbiased SP of the yielding frame
+-
++    __ mov(O0, G4_scratch); // unbiased top Java frame SP
+     if (return_barrier) {
+-      __ ldf(FloatRegisterImpl::D, SP, STACK_BIAS, F0);
+-      __ ld_ptr(SP, STACK_BIAS + wordSize, O0);
+-      __ add(SP, 2 * wordSize, SP);
++      __ ldf(FloatRegisterImpl::D, SP, STACK_BIAS + result_offset, F0);
++      __ mov(I0, G5); // integer/oop result survives the runtime call
+     } else {
+-      __ clr(O0); // doYield returns zero on successful thaw
+-    }
+-
 -    // Switch to the restored yielding frame.  A SPARC saved register window
 -    // contains %i7 at slot 15; its architectural return address is %i7+8.
 -    __ sub(L1, STACK_BIAS, SP);
++      __ clr(G5); // doYield returns zero on successful thaw
++    }
++    // Slow thaw may have relocated the entry's saved window. RESTORE must
++    // use that physical SP if Solaris refills the caller window from memory.
++    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
++    __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_bottom_offset()), G1);
++    __ sub(G1, STACK_BIAS, FP);
++    __ restore(); // entry window; all thaw-stub scratch space is now discarded
++
 +    // Rebuild the hardware window chain from the entry frame to the restored
-+    // top frame. Merely assigning SP leaves the carrier's live L/I registers
-+    // in place and a subsequent restore would return through the wrong window.
-+    // The slow thaw path has already converted the frame links to biased SPs.
-+    __ mov(O0, G5); // integer/oop result; no safepoints while rebuilding
-+    __ mov(L1, G4_scratch); // unbiased top frame SP
++    // top frame. The runtime calls no longer borrow either frame's save area.
 +    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
 +    // An interpreted bottom frame can extend the entry window below its
 +    // canonical SP. The slow thaw records that physical boundary explicitly.
@@ -3120,19 +3236,26 @@
 +    __ mov(G5, O0);
  
      if (return_barrier_exception) {
-       __ mov(O0, L3); // exception oop
+-      __ mov(O0, L3); // exception oop
 -      __ ld_ptr(SP, STACK_BIAS + 15 * wordSize, L2);
 -      __ add(L2, frame::pc_return_offset, L2);
++      // The restored Java window can contain live L/I data. The exception
++      // lookup therefore also needs its own ABI window and stack save area.
++      __ save_frame(0);
 +      __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
 +      __ ld_ptr(G1, in_bytes(ContinuationEntry::resume_pc_offset()), L2);
        __ call_VM_leaf(L7_thread_cache,
                        CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address),
                        G2_thread, L2);
-       __ mov(O0, G5_method); // exception handler
+-      __ mov(O0, G5_method); // exception handler
 -      __ mov(L3, I0);        // exception oop becomes caller's O0 after restore
 -      __ mov(L2, I1);        // throwing pc becomes caller's O1 after restore
-+      __ mov(L3, O0);
-+      __ mov(L2, O1);
++      __ mov(O0, G5_method);
++      __ mov(I0, G1); // exception oop
++      __ mov(L2, G3_scratch); // issuing PC
++      __ restore();
++      __ mov(G1, O0);
++      __ mov(G3_scratch, O1);
        __ jmp(G5_method, 0);
 -      __ delayed()->restore();
 -    }
@@ -3152,7 +3275,7 @@
  
      return start;
    }
-@@ -5875,8 +5919,8 @@
+@@ -5875,8 +5947,8 @@
  
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_fastpath_offset()), G1);
    __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()));
@@ -3163,7 +3286,7 @@
  
    __ st_ptr(G0, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));
    __ reset_held_monitor_count(G2_thread);
-@@ -5894,11 +5938,11 @@
+@@ -5894,11 +5966,11 @@
  
    __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()), G1);
    __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));
