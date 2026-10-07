@@ -5,6 +5,7 @@ src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.cpp
 src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.hpp
 src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
 src/hotspot/cpu/sparc/c1_sparcTrace.hpp
+src/hotspot/cpu/sparc/c2_MacroAssembler_sparc.cpp
 src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
 src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp

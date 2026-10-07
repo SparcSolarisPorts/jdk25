@@ -1,8 +1,37 @@
-# JDK 25 Solaris/SPARC continuation candidate (v31)
+# JDK 25 Solaris/SPARC continuation candidate (v32)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v32 addresses the Forge crash in C2 String.equals with compact headers enabled.
+The SPARC array_equals emitter assumed every byte/char array data address was
+8-byte aligned. Compact headers can make that address 4 mod 8. It now peels a
+4-byte prefix if both addresses have that alignment and at least four bytes
+remain, then retains the existing 8-byte bulk loop and tail comparison.
+Short or differently aligned inputs use a bounded byte loop. This applies to
+C2 String.equals (Latin1 and UTF16) and byte/char Arrays.equals.
+The exact crash instruction still needs hs_err_pid29035.log to confirm that
+this defect caused the supplied SIGBUS; the source defect is independently
+reproducible in an emitted-instruction host model.
+
+After extraction and rebuild, run:
+
+```sh
+python3 tests/configure-release-version.py
+gmake images test-image JOBS=8
+bash tests/run-compact-string-repro.sh
+bash tests/run-forge-with-jdk25.sh "$HOME/Downloads/forge26.3servertest/forge26.3servertest"
+```
+
+Validation: the regression checks Latin1/UTF16 String.equals and byte/char
+Arrays.equals for lengths 0 through 129 and every mismatch position, with
+2,554,500 checks passing on host JDK17. An interpreter of the actual changed
+emitter checks all address alignments, prefix/bulk/tail mismatches and delay
+slots; it also verifies compact aligned inputs retain doubleword loads.
+Neither check executes the rebuilt Solaris/SPARC VM; native validation remains
+required. The EULA message is independent and should be handled by reading
+eula.txt and accepting only if you agree to its terms.
 
 v31 adds a launcher that selects this JDK image explicitly and checks
 -XX:+UseCompactObjectHeaders before starting Forge. This option already exists

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -324,12 +324,12 @@ void C2_MacroAssembler::string_compare(Register str1, Register str2,
 
 void C2_MacroAssembler::array_equals(bool is_array_equ, Register ary1, Register ary2,
                                      Register limit, Register tmp, Register result, bool is_byte) {
-  Label Ldone, Lloop, Lremaining;
+  Label Ldone, Lloop, Lremaining, Laligned, Lbytes, Lbyte_loop;
   assert_different_registers(ary1, ary2, limit, tmp, result);
 
   int length_offset  = arrayOopDesc::length_offset_in_bytes();
   int base_offset    = arrayOopDesc::base_offset_in_bytes(is_byte ? T_BYTE : T_CHAR);
-  assert(base_offset % 8 == 0, "Base offset must be 8-byte aligned");
+  assert(base_offset % 4 == 0, "Base offset must be word aligned");
 
   if (is_array_equ) {
     // return true if the same array
@@ -369,17 +369,35 @@ void C2_MacroAssembler::array_equals(bool is_array_equ, Register ary1, Register 
     signx(limit);
   }
 
-#ifdef ASSERT
-  // Sanity check for doubleword (8-byte) alignment of ary1 and ary2.
-  // Guaranteed on 64-bit systems (see arrayOopDesc::header_size_in_bytes()).
-  Label Laligned;
+  // Compact headers can place byte/char array data at offset 12. Peel a
+  // four-byte prefix when both addresses are 4 mod 8, then retain the
+  // doubleword loop. Other alignments and short prefixes use bounded bytes.
   or3(ary1, ary2, tmp);
-  andcc(tmp, 7, tmp);
-  br_null_short(tmp, Assembler::pn, Laligned);
-  STOP("First array element is not 8-byte aligned.");
-  should_not_reach_here();
+  andcc(tmp, 7, G0);
+  br(Assembler::zero, false, Assembler::pt, Laligned);
+  delayed()->nop();
+  and3(ary1, 7, tmp);
+  cmp(tmp, 4);
+  br(Assembler::notEqual, false, Assembler::pn, Lbytes);
+  delayed()->nop();
+  and3(ary2, 7, tmp);
+  cmp(tmp, 4);
+  br(Assembler::notEqual, false, Assembler::pn, Lbytes);
+  delayed()->nop();
+  cmp(limit, 4);
+  br(Assembler::less, false, Assembler::pn, Lbytes);
+  delayed()->nop();
+  lduw(ary1, 0, result);
+  lduw(ary2, 0, tmp);
+  cmp(result, tmp);
+  brx(Assembler::notEqual, true, Assembler::pn, Ldone);
+  delayed()->clr(result);
+  add(ary1, 4, ary1);
+  add(ary2, 4, ary2);
+  sub(limit, 4, limit);
+  cmp_zero_and_br(Assembler::zero, limit, Ldone, true, Assembler::pn);
+  delayed()->mov(1, result);
   bind(Laligned);
-#endif
 
   // Shift ary1 and ary2 to the end of the arrays, negate limit
   add(ary1, limit, ary1);
@@ -420,6 +438,22 @@ void C2_MacroAssembler::array_equals(bool is_array_equ, Register ary1, Register 
   cmp(result, tmp);
   clr(result);
   movcc(Assembler::equal, false, xcc, 1, result);
+
+  ba(Ldone);
+  delayed()->nop();
+
+  bind(Lbytes);
+  bind(Lbyte_loop);
+  ldub(ary1, 0, result);
+  ldub(ary2, 0, tmp);
+  cmp(result, tmp);
+  br(Assembler::notEqual, true, Assembler::pn, Ldone);
+  delayed()->clr(result);
+  add(ary1, 1, ary1);
+  add(ary2, 1, ary2);
+  deccc(limit);
+  br(Assembler::notZero, false, Assembler::pt, Lbyte_loop);
+  delayed()->mov(1, result);
 
   bind(Ldone);
 }
