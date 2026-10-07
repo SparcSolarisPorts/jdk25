@@ -36,6 +36,8 @@
 #include "runtime/javaCalls.hpp"
 #include "runtime/monitorChunk.hpp"
 #include "runtime/signature.hpp"
+#include "runtime/safefetch.hpp"
+#include "utilities/align.hpp"
 #include "runtime/stubCodeGenerator.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "vmreg_sparc.inline.hpp"
@@ -652,6 +654,25 @@ void JavaFrameAnchor::capture_last_Java_pc(intptr_t* sp) {
     intptr_t* _post_Java_sp = frame::next_younger_sp_or_null(last_Java_sp(), sp);
     // Really this should never fail otherwise VM call must have non-standard
     // frame linkage (bad) or stack is not properly flushed (worse).
+    if (_post_Java_sp == nullptr) {
+      // Keep the failure fatal, but preserve the anchor/link evidence before
+      // error reporting attempts the same failing stack walk again.
+      tty->print_cr("SPARC anchor failure: last_Java_sp=" INTPTR_FORMAT
+                    " flush_sp=" INTPTR_FORMAT,
+                    p2i(last_Java_sp()), p2i(sp));
+      intptr_t* cursor = sp;
+      for (int i = 0; i < 24 && cursor != nullptr; ++i) {
+        if (!JavaThread::current()->is_in_full_stack((address)cursor) ||
+            !is_aligned(cursor, 2 * wordSize)) break;
+        intptr_t raw_fp = SafeFetchN(cursor + FP->sp_offset_in_saved_window(), 0);
+        intptr_t raw_pc = SafeFetchN(cursor + I7->sp_offset_in_saved_window(), 0);
+        tty->print_cr("  window %d sp=" INTPTR_FORMAT " i6=" INTPTR_FORMAT
+                      " i7=" INTPTR_FORMAT, i, p2i(cursor), raw_fp, raw_pc);
+        intptr_t* next = (intptr_t*)(raw_fp + STACK_BIAS);
+        if (next <= cursor) break;
+        cursor = next;
+      }
+    }
     guarantee(_post_Java_sp != nullptr, "bad stack!");
     _last_Java_pc = (address) _post_Java_sp[ I7->sp_offset_in_saved_window()] + frame::pc_return_offset;
 

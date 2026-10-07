@@ -2548,6 +2548,14 @@ inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
 
   if (f.is_interpreted_frame()) {
     ContinuationHelper::InterpretedFrame::patch_sender_sp(f, caller);
+#ifdef SPARC
+    if (bottom) {
+      // The entry window was relocated for this interpreter frame's locals.
+      // RESTORE(I5, 0, SP) must refill that physical window, not the stale
+      // canonical save area. Entry cleanup resets SP after the refill.
+      f.set_interpreter_frame_sender_sp(caller.sp());
+    }
+#endif
   }
 
   assert(!bottom || !_cont.is_empty() || Continuation::is_continuation_entry_frame(f, nullptr), "");

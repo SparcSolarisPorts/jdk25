@@ -50,6 +50,7 @@ public class ContinuationSmoke {
         Object cont = contClass.getConstructor(scopeClass, Runnable.class)
                 .newInstance(scope, (Runnable) () -> body(12));
         for (int pass = 0; pass < 9; pass++) {
+            System.out.println("ContinuationSmoke: starting pass " + pass);
             if (migrate) {
                 AtomicReference<Throwable> failure = new AtomicReference<>();
                 Thread carrier = new Thread(() -> {
@@ -70,6 +71,8 @@ public class ContinuationSmoke {
             if (Boolean.TRUE.equals(invoke(done, cont)) != (pass == 8)) {
                 throw new AssertionError("Wrong completion state at pass " + pass);
             }
+            System.out.println("ContinuationSmoke: returned pass " + pass
+                    + ", checkpoints=" + checkpoints);
             System.gc(); // suspended frame oops must survive relocation
         }
         System.out.println("PASS: " + (migrate ? "carrier migration" : "yield/resume")

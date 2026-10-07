@@ -5955,6 +5955,11 @@ void fill_continuation_entry(MacroAssembler* masm) {
 }
 
 void continuation_enter_cleanup(MacroAssembler* masm) {
+  // A bottom interpreted frame returns to the relocated entry save area so
+  // a window underflow reloads the right I/L registers. Metadata stays at the
+  // canonical entry address; reset SP only after that window is restored.
+  __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+  __ sub(G1, STACK_BIAS, SP);
 #ifndef PRODUCT
   Label ok;
   __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);

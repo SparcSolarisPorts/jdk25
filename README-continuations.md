@@ -1,8 +1,37 @@
-# JDK 25 Solaris/SPARC continuation candidate (v29)
+# JDK 25 Solaris/SPARC continuation candidate (v30)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v30 responds to continuation-test-results-20261007-033608. On native v29,
+compiled and compiled-GC both passed the full supplied reproduction test.
+Interpreter and mixed aborted in JavaFrameAnchor::capture_last_Java_pc with
+"bad stack!"; both reports contain eight completed System.gc cycles before
+the abort. This suggests repeated yield/resume progressed and the remaining
+failure is near final completion. The reports could not print a usable stack
+trace, so that timing interpretation is not a confirmed call-site diagnosis.
+
+The bottom interpreted frame now returns with I5 pointing to the relocated
+physical entry window. Its RESTORE(I5, 0, SP) must refill the same save area
+that slow thaw moved below the canonical entry SP. Returning with the original
+SP could refill stale entry I/L registers. Entry cleanup explicitly resets SP
+to the canonical continuation-entry address after the window has been restored,
+then accesses metadata and returns to the carrier. Ordinary interpreted-frame
+sender-SP behavior and compiled freeze/thaw eligibility are unchanged.
+
+If the anchor still fails, it prints the anchor SP, current flushed SP and up
+to 24 bounded window links using SafeFetch before retaining the fatal guarantee.
+ContinuationSmoke prints the starting/returned pass numbers to distinguish
+resume, completion and subsequent-GC failures in the next evidence archive.
+
+Validation: eight cases using extracted bottom-frame patch and cleanup code
+passed a host model that refills the relocated entry window and verifies stale
+canonical data would fail. All earlier relocation, window-chain, PC and native
+call/refill checks passed; ContinuationSmoke compiles with the host JDK 17.
+Cumulative patch dry-run and ZIP CRC / source SHA-256 checks passed. These checks
+do not execute Solaris/SPARC code. v30 still needs native build and all four
+reproduction modes; the interpreter fix remains a candidate.
 
 v29 responds to continuation-test-results-20261007-024031. All four modes
 still aborted on v28. Interpreter/mixed reached Boolean.equals with corrupt
