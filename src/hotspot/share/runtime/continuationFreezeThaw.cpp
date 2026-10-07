@@ -1254,6 +1254,17 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, is_bottom_frame);)
 
   frame hf = new_heap_frame<ContinuationHelper::InterpretedFrame>(f, caller);
+#ifdef SPARC
+  // SPARC interpreter locals live in its caller's frame. Copying the whole
+  // span also crosses the caller's save area; retain the already relocated
+  // caller window instead of replacing it with raw source-frame metadata.
+  intptr_t caller_window[17];
+  const bool preserve_caller_window = !caller.is_empty();
+  if (preserve_caller_window) {
+    Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window, 17);
+  }
+#endif
+
   _total_align_size += frame::align_wiggle; // add alignment room for internal interpreted frame alignment on AArch64/PPC64
 
   intptr_t* heap_frame_top = ContinuationHelper::InterpretedFrame::frame_top(hf, callee_argsize, callee_interpreted);
@@ -1263,6 +1274,12 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   // Some architectures (like AArch64/PPC64/RISC-V) add padding between the locals and the fixed_frame to keep the fp 16-byte-aligned.
   // On those architectures we freeze the padding in order to keep the same fp-relative offsets in the fixed_frame.
   copy_to_chunk(stack_frame_top, heap_frame_top, fsize);
+#ifdef SPARC
+  if (preserve_caller_window) {
+    Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 17);
+  }
+#endif
+
   assert(!is_bottom_frame || !caller.is_interpreted_frame() || (heap_frame_top + fsize) == (caller.unextended_sp() + argsize), "");
 
   relativize_interpreted_frame_metadata(f, hf);
@@ -1309,10 +1326,27 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, argsize, is_bottom_frame);)
 
   frame hf = new_heap_frame<ContinuationHelper::CompiledFrame>(f, caller);
+#ifdef SPARC
+  // SPARC interpreter locals live in its caller's frame. Copying the whole
+  // span also crosses the caller's save area; retain the already relocated
+  // caller window instead of replacing it with raw source-frame metadata.
+  intptr_t caller_window[17];
+  const bool preserve_caller_window = !caller.is_empty();
+  if (preserve_caller_window) {
+    Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window, 17);
+  }
+#endif
+
 
   intptr_t* heap_frame_top = ContinuationHelper::CompiledFrame::frame_top(hf, callee_argsize, callee_interpreted);
 
   copy_to_chunk(stack_frame_top, heap_frame_top, fsize);
+#ifdef SPARC
+  if (preserve_caller_window) {
+    Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 17);
+  }
+#endif
+
   assert(!is_bottom_frame || !caller.is_compiled_frame() || (heap_frame_top + fsize) == (caller.unextended_sp() + argsize), "");
 
   if (caller.is_interpreted_frame()) {
@@ -2603,6 +2637,17 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   _align_size += frame::align_wiggle; // possible added alignment for internal interpreted frame alignment om AArch64
 
   frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, is_bottom_frame);
+#ifdef SPARC
+  // SPARC interpreter locals live in its caller's frame. Copying the whole
+  // span also crosses the caller's save area; retain the already relocated
+  // caller window instead of replacing it with raw source-frame metadata.
+  intptr_t caller_window[17];
+  const bool preserve_caller_window = !caller.is_empty();
+  if (preserve_caller_window) {
+    Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window, 17);
+  }
+#endif
+
 
   intptr_t* const stack_frame_top = f.sp() + frame::metadata_words_at_top;
   intptr_t* const stack_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
@@ -2618,6 +2663,12 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   // Some architectures (like AArch64/PPC64/RISC-V) add padding between the locals and the fixed_frame to keep the fp 16-byte-aligned.
   // On those architectures we freeze the padding in order to keep the same fp-relative offsets in the fixed_frame.
   copy_from_chunk(heap_frame_top, stack_frame_top, fsize);
+#ifdef SPARC
+  if (preserve_caller_window) {
+    Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 17);
+  }
+#endif
+
 
   // Make sure the relativized locals is already set.
   assert(f.interpreter_frame_local_at(0) == stack_frame_bottom - 1, "invalid frame bottom");

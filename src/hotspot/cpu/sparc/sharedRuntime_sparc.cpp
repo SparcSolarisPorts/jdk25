@@ -1672,11 +1672,15 @@ static void sparc_continuation_yield(MacroAssembler* masm,
   __ save_frame(0);
   frame_complete = __ pc() - start;
 
-  // Freeze must see every Java register window in its stack save area.
+  // FLUSHW does not spill the current window. Rotate once so the yield
+  // window itself (including I6/I7) is stack-resident before publishing it.
+  __ save_frame(0);
   __ flushw();
+  __ restore();
   address anchor_pc = __ pc();
-  __ nop();
-  __ set((intptr_t)anchor_pc, L0);
+  // CodeBuffer addresses become invalid when the native nmethod is installed.
+  // Read the executing PC rather than embedding the temporary buffer address.
+  __ rdpc(L0);
   __ set_last_Java_frame(SP, L0);
   __ set(JavaFrameAnchor::flushed, G1);
   __ st(G1, G2_thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::flags_offset());

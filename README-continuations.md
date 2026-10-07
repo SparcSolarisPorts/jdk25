@@ -1,8 +1,36 @@
-# JDK 25 Solaris/SPARC continuation candidate (v24)
+# JDK 25 Solaris/SPARC continuation candidate (v25)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v25 responds to the four v24 continuation crash reports. The rebuild succeeded,
+but interpreter/mixed runs crashed on a GC worker in handle_deopted() with a
+null CodeBlob (load at offset 0xb0). Both compiled runs crashed in slow freeze
+reading the saved I6 at offset 0x70 from a frame SP of 0x7fe.
+
+The yield stub previously embedded an absolute PC from its temporary CodeBuffer.
+That address does not track installation of the native nmethod; the compiled
+report even classified its anchor PC as adapter code. v25 uses RDPC at runtime.
+FLUSHW alone also excludes the currently executing window. A temporary SAVE,
+FLUSHW, RESTORE now spills the yield window itself before publishing its anchor.
+
+Interpreted packing changed caller.sp() without moving the caller register save
+area or its synthetic own-PC slot. The source interpreter layout also places
+locals in the caller frame: copying an interpreted frame crosses the caller's
+save area and can overwrite already relativized metadata. v25 relocates the
+17-word save/PC region and snapshots/restores it across these overlapping copies
+in freeze and interpreted thaw. It preserves the caller's pre-extension SP for
+I5, uses the normal SPARC sender constructor for adapter/deopt handling, and
+stops interpreted chunk iteration at the bottom frame's local-data boundary.
+
+These are source-backed candidate repairs, not verified Solaris runtime fixes.
+The actual relocation helper passed 516 overlapping heap/native and
+interpreted/compiled cases with host address/undefined-behavior sanitizers.
+Leak detection was disabled because the host sandbox prevents its /proc scan.
+The cumulative patch dry-run and ZIP CRC/content hashes passed. Native SPARC
+compilation, GC, register-window traps, continuation resumption and fast-path
+execution still require the following rebuild and reproducer.
 
 v24 fixes a build regression introduced by the v22 NULL cleanup. Four C1
 patchable AddressLiteral placeholders now explicitly use (address)nullptr;
@@ -41,7 +69,7 @@ compiled the reflection-based ContinuationSmoke on host JDK 17; checked shell
 syntax. Native SPARC execution and actual continuation tests remain required.
 The host model does not validate OS register-window traps or freeze/thaw GC.
 
-Use v24 instead of v23 for the next rebuild. From the repository after extraction:
+Use v25 instead of v24 for the next rebuild. From the repository after extraction:
 
 ```bash
 gmake images test-image JOBS=8 && bash tests/run-continuation-repro.sh

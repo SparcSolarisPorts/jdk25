@@ -32,6 +32,7 @@
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/prefetch.inline.hpp"
+#include "utilities/copy.hpp"
 
 static constexpr int freeze_sparc_lesp_slot = 0;
 static constexpr int freeze_sparc_llocals_slot = 3;
@@ -129,20 +130,39 @@ template<typename FKind>
 inline frame FreezeBase::sender(const frame& f) {
   assert(FKind::is_instance(f), "wrong frame kind");
 
-  intptr_t* sender_sp = f.fp();
-  address sender_pc = f.sender_pc();
-  intptr_t raw_sender_fp = sender_sp[freeze_sparc_fp_slot];
-  intptr_t* sender_fp = (intptr_t*)(raw_sender_fp + STACK_BIAS);
-
+  // The normal SPARC constructor also recovers the sender's unextended SP
+  // from an interpreted callee's I5 and handles method-handle/deopt PCs.
+  frame walked(f.fp(), f.sp(), FKind::interpreted);
   int slot = 0;
-  CodeBlob* sender_cb = CodeCache::find_blob_and_oopmap(sender_pc, slot);
-  frame result(sender_sp, sender_sp, sender_fp, sender_pc, sender_cb,
-               slot == -1 || sender_cb == nullptr
-                   ? nullptr
-                   : sender_cb->oop_map_for_slot(slot, sender_pc),
+  CodeBlob* sender_cb = CodeCache::find_blob_and_oopmap(walked.pc(), slot);
+  frame result(walked.sp(), walked.unextended_sp(), walked.fp(), walked.pc(),
+               sender_cb, slot == -1 || sender_cb == nullptr
+                   ? nullptr : sender_cb->oop_map_for_slot(slot, walked.pc()),
                false /* on_heap */);
   result.set_younger_sp(f.sp());
   return result;
+}
+
+// Packing an interpreted callee can extend its caller below the previously
+// copied SP. The caller's saved window must follow that SP: only its locals,
+// expression stack and FP-relative metadata may stay at their old addresses.
+static inline void freeze_sparc_move_caller_window(frame& caller,
+                                                  intptr_t* new_sp) {
+  if (caller.is_empty() || new_sp == caller.sp()) {
+    caller.set_sp(new_sp);
+    return;
+  }
+  const bool interpreted = caller.is_interpreted_frame();
+  // Include the synthetic own-PC slot used by the chunk walker.
+  intptr_t* original_sp = interpreted
+      ? caller.sp() + caller.callee_sp_adjustment() : caller.unextended_sp();
+  Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)new_sp, 17);
+  caller.set_sp(new_sp);
+  if (interpreted) {
+    caller.set_sp_adjustment_by_callee(pointer_delta_as_int(original_sp, new_sp));
+    caller.set_unextended_sp(new_sp);
+  }
+  freeze_sparc_patch_link(caller, caller.fp());
 }
 
 template<typename FKind>
@@ -166,11 +186,14 @@ frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
 
   intptr_t* heap_fp = heap_sp + (f.fp() - f.unextended_sp());
   intptr_t* extended_sp = heap_sp + (f.sp() - f.unextended_sp());
-  caller.set_sp(heap_fp);
+  freeze_sparc_move_caller_window(caller, heap_fp);
 
   frame heap_frame(extended_sp, heap_sp, heap_fp, f.pc(), nullptr, nullptr,
                    true /* on_heap */);
   heap_frame.set_younger_sp(nullptr);
+  if (FKind::interpreted) {
+    heap_frame.set_sp_adjustment_by_callee(f.callee_sp_adjustment());
+  }
   caller.set_younger_sp(extended_sp);
   return heap_frame;
 }
@@ -266,7 +289,7 @@ frame ThawBase::new_stack_frame(const frame& hf, frame& caller,
 
   intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp());
   intptr_t* extended_sp = frame_sp + (hf.sp() - hf.unextended_sp());
-  caller.set_sp(frame_fp);
+  freeze_sparc_move_caller_window(caller, frame_fp);
   frame result(extended_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
                false /* on_heap */);
   result.set_younger_sp(nullptr);

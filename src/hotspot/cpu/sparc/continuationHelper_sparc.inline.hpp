@@ -136,7 +136,10 @@ inline address* ContinuationHelper::InterpretedFrame::return_pc_address(
 
 inline void ContinuationHelper::InterpretedFrame::patch_sender_sp(
     frame& f, const frame& caller) {
-  intptr_t* sp = caller.sp();
+  // I5 restores the caller's SP before this interpreted callee extended it.
+  // I6 remains the physical caller window address used while the callee runs.
+  intptr_t* sp = caller.is_interpreted_frame()
+      ? caller.sp() + caller.callee_sp_adjustment() : caller.unextended_sp();
   f.sp()[sparc_i5_saved_sp_slot] = f.is_heap_frame()
       ? (intptr_t)(sp - f.fp())
       : (intptr_t)sp - STACK_BIAS;

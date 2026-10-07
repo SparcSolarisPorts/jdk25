@@ -97,7 +97,10 @@ template <ChunkFrames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
   assert_is_interpreted_and_frame_type_mixed();
   intptr_t* next = fp();
-  if (next >= _end) {
+  // Bottom-frame locals can extend above its FP into the entry's argument
+  // area. That area has no Java register window for the stream to visit.
+  if (ContinuationHelper::InterpretedFrame::frame_bottom(to_frame()) >= _end ||
+      next >= _end) {
     _unextended_sp = _end;
     _sp = _end;
   } else {

@@ -715,7 +715,15 @@
  #endif // CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
 --- a/src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
-@@ -53,7 +53,7 @@
+@@ -32,6 +32,7 @@
+ #include "runtime/frame.hpp"
+ #include "runtime/frame.inline.hpp"
+ #include "runtime/prefetch.inline.hpp"
++#include "utilities/copy.hpp"
+ 
+ static constexpr int freeze_sparc_lesp_slot = 0;
+ static constexpr int freeze_sparc_llocals_slot = 3;
+@@ -53,7 +54,7 @@
  static inline void freeze_sparc_patch_link(const frame& f,
                                              intptr_t* target) {
    if (f.is_heap_frame()) {
@@ -724,7 +732,7 @@
      f.sp()[freeze_sparc_fp_slot] = delta > -max_jint && delta < max_jint
          ? delta : (intptr_t)target;
    } else {
-@@ -62,9 +62,13 @@
+@@ -62,9 +63,13 @@
  }
  
  static inline void freeze_sparc_patch_pc(const frame& f, address pc) {
@@ -741,7 +749,7 @@
  }
  
  static inline intptr_t* freeze_sparc_translate_pointer(
-@@ -80,7 +84,9 @@
+@@ -80,7 +85,9 @@
    // Pointers into this copied frame must follow the copy.  A saved link in
    // the bottom frame can point outside the chunk; keep that pointer absolute
    // until the thaw path reconnects it to the carrier stack.
@@ -752,7 +760,7 @@
      intptr_t* translated = freeze_sparc_translate_pointer(source, heap, value);
      heap.sp()[slot] = translated - heap.fp();
    } else {
-@@ -93,7 +99,9 @@
+@@ -93,7 +100,9 @@
    intptr_t raw = heap.sp()[slot];
    intptr_t* heap_value = raw > -max_jint && raw < max_jint
        ? heap.fp() + raw : (intptr_t*)raw;
@@ -763,7 +771,57 @@
        ? freeze_sparc_translate_pointer(heap, stack, heap_value) : heap_value;
    stack.sp()[slot] = biased ? (intptr_t)stack_value - STACK_BIAS
                              : (intptr_t)stack_value;
-@@ -142,17 +150,28 @@
+@@ -121,38 +130,71 @@
+ inline frame FreezeBase::sender(const frame& f) {
+   assert(FKind::is_instance(f), "wrong frame kind");
+ 
+-  intptr_t* sender_sp = f.fp();
+-  address sender_pc = f.sender_pc();
+-  intptr_t raw_sender_fp = sender_sp[freeze_sparc_fp_slot];
+-  intptr_t* sender_fp = (intptr_t*)(raw_sender_fp + STACK_BIAS);
+-
++  // The normal SPARC constructor also recovers the sender's unextended SP
++  // from an interpreted callee's I5 and handles method-handle/deopt PCs.
++  frame walked(f.fp(), f.sp(), FKind::interpreted);
+   int slot = 0;
+-  CodeBlob* sender_cb = CodeCache::find_blob_and_oopmap(sender_pc, slot);
+-  frame result(sender_sp, sender_sp, sender_fp, sender_pc, sender_cb,
+-               slot == -1 || sender_cb == nullptr
+-                   ? nullptr
+-                   : sender_cb->oop_map_for_slot(slot, sender_pc),
++  CodeBlob* sender_cb = CodeCache::find_blob_and_oopmap(walked.pc(), slot);
++  frame result(walked.sp(), walked.unextended_sp(), walked.fp(), walked.pc(),
++               sender_cb, slot == -1 || sender_cb == nullptr
++                   ? nullptr : sender_cb->oop_map_for_slot(slot, walked.pc()),
+                false /* on_heap */);
+   result.set_younger_sp(f.sp());
+   return result;
+ }
+ 
++// Packing an interpreted callee can extend its caller below the previously
++// copied SP. The caller's saved window must follow that SP: only its locals,
++// expression stack and FP-relative metadata may stay at their old addresses.
++static inline void freeze_sparc_move_caller_window(frame& caller,
++                                                  intptr_t* new_sp) {
++  if (caller.is_empty() || new_sp == caller.sp()) {
++    caller.set_sp(new_sp);
++    return;
++  }
++  const bool interpreted = caller.is_interpreted_frame();
++  // Include the synthetic own-PC slot used by the chunk walker.
++  intptr_t* original_sp = interpreted
++      ? caller.sp() + caller.callee_sp_adjustment() : caller.unextended_sp();
++  Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)new_sp, 17);
++  caller.set_sp(new_sp);
++  if (interpreted) {
++    caller.set_sp_adjustment_by_callee(pointer_delta_as_int(original_sp, new_sp));
++    caller.set_unextended_sp(new_sp);
++  }
++  freeze_sparc_patch_link(caller, caller.fp());
++}
++
+ template<typename FKind>
+ frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
    assert(FKind::is_instance(f), "wrong frame kind");
  
    const int fsize = FKind::size(f);
@@ -787,16 +845,19 @@
 -
 -  frame heap_frame(heap_sp, heap_sp, heap_fp, f.pc(), nullptr, nullptr,
 +  intptr_t* extended_sp = heap_sp + (f.sp() - f.unextended_sp());
-+  caller.set_sp(heap_fp);
++  freeze_sparc_move_caller_window(caller, heap_fp);
 +
 +  frame heap_frame(extended_sp, heap_sp, heap_fp, f.pc(), nullptr, nullptr,
                     true /* on_heap */);
    heap_frame.set_younger_sp(nullptr);
++  if (FKind::interpreted) {
++    heap_frame.set_sp_adjustment_by_callee(f.callee_sp_adjustment());
++  }
 +  caller.set_younger_sp(extended_sp);
    return heap_frame;
  }
  
-@@ -164,11 +183,9 @@
+@@ -164,11 +206,9 @@
  }
  
  inline void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
@@ -811,7 +872,7 @@
  }
  
  inline void FreezeBase::relativize_interpreted_frame_metadata(
-@@ -180,7 +197,7 @@
+@@ -180,7 +220,7 @@
    freeze_sparc_relativize_slot(f, hf, freeze_sparc_i5_slot, true);
  
    freeze_sparc_patch_link(hf, hf.fp());
@@ -820,7 +881,7 @@
  }
  
  inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
-@@ -189,8 +206,8 @@
+@@ -189,8 +229,8 @@
  }
  
  inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
@@ -831,7 +892,7 @@
  }
  
  //// Thaw fast path
-@@ -203,11 +220,16 @@
+@@ -203,11 +243,16 @@
  
  template <typename ConfigT>
  inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
@@ -853,7 +914,7 @@
  }
  
  
-@@ -226,7 +248,13 @@
+@@ -226,7 +271,13 @@
    assert(FKind::is_instance(hf), "wrong frame kind");
  
    int fsize = FKind::size(hf);
@@ -867,13 +928,13 @@
  
    if (!FKind::interpreted &&
        (bottom || caller.is_interpreted_frame())) {
-@@ -237,9 +265,12 @@
+@@ -237,9 +288,12 @@
    }
  
    intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp());
 -  frame result(frame_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
 +  intptr_t* extended_sp = frame_sp + (hf.sp() - hf.unextended_sp());
-+  caller.set_sp(frame_fp);
++  freeze_sparc_move_caller_window(caller, frame_fp);
 +  frame result(extended_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
                 false /* on_heap */);
    result.set_younger_sp(nullptr);
@@ -881,7 +942,7 @@
    return result;
  }
  
-@@ -257,8 +288,7 @@
+@@ -257,8 +311,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, const frame& caller) {
@@ -891,7 +952,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-@@ -299,7 +329,8 @@
+@@ -299,7 +352,8 @@
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_i5_slot, true);
  
    freeze_sparc_patch_link(f, f.fp());
@@ -903,7 +964,7 @@
  // JDK 21 (the "copy overwrites the metadata" fix moved into the share thaw
 --- a/src/hotspot/cpu/sparc/continuationHelper_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/continuationHelper_sparc.inline.hpp
-@@ -129,7 +129,9 @@
+@@ -129,12 +129,17 @@
  
  inline address* ContinuationHelper::InterpretedFrame::return_pc_address(
      const frame& f) {
@@ -914,7 +975,16 @@
  }
  
  inline void ContinuationHelper::InterpretedFrame::patch_sender_sp(
-@@ -142,16 +144,21 @@
+     frame& f, const frame& caller) {
+-  intptr_t* sp = caller.sp();
++  // I5 restores the caller's SP before this interpreted callee extended it.
++  // I6 remains the physical caller window address used while the callee runs.
++  intptr_t* sp = caller.is_interpreted_frame()
++      ? caller.sp() + caller.callee_sp_adjustment() : caller.unextended_sp();
+   f.sp()[sparc_i5_saved_sp_slot] = f.is_heap_frame()
+       ? (intptr_t)(sp - f.fp())
+       : (intptr_t)sp - STACK_BIAS;
+@@ -142,16 +147,21 @@
  }
  
  inline address* ContinuationHelper::Frame::return_pc_address(const frame& f) {
@@ -939,7 +1009,7 @@
  }
  
  static inline void patch_return_pc_with_preempt_stub(frame& f) {
-@@ -171,24 +178,28 @@
+@@ -171,24 +181,28 @@
  inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(
      const frame& f, InterpreterOopMap* mask) {
    (void)mask;
@@ -2251,7 +2321,7 @@
  #if INCLUDE_JFR
  #include "jfr/support/jfrIntrinsics.hpp"
  #endif
-@@ -1567,12 +1570,195 @@
+@@ -1567,12 +1570,199 @@
  //    transition back to thread_in_Java
  //    return to caller
  //
@@ -2357,11 +2427,15 @@
 +  __ save_frame(0);
 +  frame_complete = __ pc() - start;
 +
-+  // Freeze must see every Java register window in its stack save area.
++  // FLUSHW does not spill the current window. Rotate once so the yield
++  // window itself (including I6/I7) is stack-resident before publishing it.
++  __ save_frame(0);
 +  __ flushw();
++  __ restore();
 +  address anchor_pc = __ pc();
-+  __ nop();
-+  __ set((intptr_t)anchor_pc, L0);
++  // CodeBuffer addresses become invalid when the native nmethod is installed.
++  // Read the executing PC rather than embedding the temporary buffer address.
++  __ rdpc(L0);
 +  __ set_last_Java_frame(SP, L0);
 +  __ set(JavaFrameAnchor::flushed, G1);
 +  __ st(G1, G2_thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::flags_offset());
@@ -2447,7 +2521,7 @@
    if (method->is_method_handle_intrinsic()) {
      vmIntrinsics::ID iid = method->intrinsic_id();
      intptr_t start = (intptr_t)__ pc();
-@@ -2438,7 +2624,7 @@
+@@ -2438,7 +2628,7 @@
    //   - Deoptimization::fetch_unroll_info
    //   - Deoptimization::unpack_frames
  
@@ -2456,7 +2530,7 @@
  
    int start = __ offset();
  
-@@ -2750,7 +2936,7 @@
+@@ -2750,7 +2940,7 @@
  // Tricky, tricky, tricky...
  
  SafepointBlob* SharedRuntime::generate_handler_blob(SharedStubId id, address call_ptr) {
@@ -2465,7 +2539,7 @@
  
    // allocate space for the code
    ResourceMark rm;
-@@ -2761,7 +2947,7 @@
+@@ -2761,7 +2951,7 @@
    MacroAssembler* masm                = new MacroAssembler(&buffer);
    int             frame_size_words;
    OopMapSet *oop_maps = new OopMapSet();
@@ -2474,7 +2548,7 @@
  
    int start = __ offset();
  
-@@ -2870,7 +3056,7 @@
+@@ -2870,7 +3060,7 @@
    MacroAssembler* masm                = new MacroAssembler(&buffer);
    int             frame_size_words;
    OopMapSet *oop_maps = new OopMapSet();
@@ -2718,7 +2792,16 @@
  }
  
  
-@@ -101,9 +102,7 @@
+@@ -96,14 +97,15 @@
+ inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
+   assert_is_interpreted_and_frame_type_mixed();
+   intptr_t* next = fp();
+-  if (next >= _end) {
++  // Bottom-frame locals can extend above its FP into the entry's argument
++  // area. That area has no Java register window for the stream to visit.
++  if (ContinuationHelper::InterpretedFrame::frame_bottom(to_frame()) >= _end ||
++      next >= _end) {
+     _unextended_sp = _end;
      _sp = _end;
    } else {
      _sp = next;
@@ -3864,7 +3947,66 @@
  
    if (_monitors_in_lockstack > 0) {
      freeze_lockstack(chunk);
-@@ -1663,19 +1695,33 @@
+@@ -1222,6 +1254,17 @@
+   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, is_bottom_frame);)
+ 
+   frame hf = new_heap_frame<ContinuationHelper::InterpretedFrame>(f, caller);
++#ifdef SPARC
++  // SPARC interpreter locals live in its caller's frame. Copying the whole
++  // span also crosses the caller's save area; retain the already relocated
++  // caller window instead of replacing it with raw source-frame metadata.
++  intptr_t caller_window[17];
++  const bool preserve_caller_window = !caller.is_empty();
++  if (preserve_caller_window) {
++    Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window, 17);
++  }
++#endif
++
+   _total_align_size += frame::align_wiggle; // add alignment room for internal interpreted frame alignment on AArch64/PPC64
+ 
+   intptr_t* heap_frame_top = ContinuationHelper::InterpretedFrame::frame_top(hf, callee_argsize, callee_interpreted);
+@@ -1231,6 +1274,12 @@
+   // Some architectures (like AArch64/PPC64/RISC-V) add padding between the locals and the fixed_frame to keep the fp 16-byte-aligned.
+   // On those architectures we freeze the padding in order to keep the same fp-relative offsets in the fixed_frame.
+   copy_to_chunk(stack_frame_top, heap_frame_top, fsize);
++#ifdef SPARC
++  if (preserve_caller_window) {
++    Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 17);
++  }
++#endif
++
+   assert(!is_bottom_frame || !caller.is_interpreted_frame() || (heap_frame_top + fsize) == (caller.unextended_sp() + argsize), "");
+ 
+   relativize_interpreted_frame_metadata(f, hf);
+@@ -1277,10 +1326,27 @@
+   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, argsize, is_bottom_frame);)
+ 
+   frame hf = new_heap_frame<ContinuationHelper::CompiledFrame>(f, caller);
++#ifdef SPARC
++  // SPARC interpreter locals live in its caller's frame. Copying the whole
++  // span also crosses the caller's save area; retain the already relocated
++  // caller window instead of replacing it with raw source-frame metadata.
++  intptr_t caller_window[17];
++  const bool preserve_caller_window = !caller.is_empty();
++  if (preserve_caller_window) {
++    Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window, 17);
++  }
++#endif
++
+ 
+   intptr_t* heap_frame_top = ContinuationHelper::CompiledFrame::frame_top(hf, callee_argsize, callee_interpreted);
+ 
+   copy_to_chunk(stack_frame_top, heap_frame_top, fsize);
++#ifdef SPARC
++  if (preserve_caller_window) {
++    Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 17);
++  }
++#endif
++
+   assert(!is_bottom_frame || !caller.is_compiled_frame() || (heap_frame_top + fsize) == (caller.unextended_sp() + argsize), "");
+ 
+   if (caller.is_interpreted_frame()) {
+@@ -1663,19 +1729,33 @@
  }
  #endif // INCLUDE_JVMTI
  
@@ -3900,7 +4042,7 @@
      if (!((f.is_compiled_frame() && !f.is_deoptimized_frame()) || (is_top_frame && (f.is_runtime_frame() || f.is_native_frame())))) {
        return false;
      }
-@@ -1761,8 +1807,9 @@
+@@ -1761,8 +1841,9 @@
  
    Freeze<ConfigT> freeze(current, cont, sp, preempt);
  
@@ -3912,7 +4054,7 @@
    if (fast && freeze.size_if_fast_freeze_available() > 0) {
      freeze.freeze_fast_existing_chunk();
      CONT_JFR_ONLY(freeze.jfr_info().post_jfr_event(&event, oopCont, current);)
-@@ -1994,7 +2041,19 @@
+@@ -1994,7 +2075,19 @@
    Thaw(JavaThread* thread, ContinuationWrapper& cont) : ThawBase(thread, cont) {}
  
    inline bool can_thaw_fast(stackChunkOop chunk) {
@@ -3933,7 +4075,7 @@
             &&  _thread->cont_fastpath_thread_state()
             && !chunk->has_thaw_slowpath_condition()
             && !PreserveFramePointer;
-@@ -2100,7 +2159,8 @@
+@@ -2100,7 +2193,8 @@
        intptr_t* retaddr_slot = (chunk_sp
                                  + frame_size
                                  - frame::sender_sp_ret_address_offset());
@@ -3943,7 +4085,7 @@
               "unexpected pc");
      }
  #endif
-@@ -2196,11 +2256,20 @@
+@@ -2196,11 +2290,20 @@
    log_develop_trace(continuations)("setting entry argsize: %d", _cont.argsize());
    assert(rs.bottom_sp() == _cont.entry()->bottom_sender_sp(), "");
  
@@ -3967,7 +4109,7 @@
  
    assert(is_last == _cont.is_empty(), "");
    assert(_cont.chunk_invariant(), "");
-@@ -2469,7 +2538,8 @@
+@@ -2469,7 +2572,8 @@
  intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::preempt_kind preempt_kind, bool fast_case) {
    assert(preempt_kind == Continuation::freeze_on_wait || preempt_kind == Continuation::freeze_on_monitorenter, "");
    frame top(sp);
@@ -3977,7 +4119,38 @@
  
  #if INCLUDE_JVMTI
    // Finish the VTMS transition.
-@@ -2985,7 +3055,8 @@
+@@ -2533,6 +2637,17 @@
+   _align_size += frame::align_wiggle; // possible added alignment for internal interpreted frame alignment om AArch64
+ 
+   frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, is_bottom_frame);
++#ifdef SPARC
++  // SPARC interpreter locals live in its caller's frame. Copying the whole
++  // span also crosses the caller's save area; retain the already relocated
++  // caller window instead of replacing it with raw source-frame metadata.
++  intptr_t caller_window[17];
++  const bool preserve_caller_window = !caller.is_empty();
++  if (preserve_caller_window) {
++    Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window, 17);
++  }
++#endif
++
+ 
+   intptr_t* const stack_frame_top = f.sp() + frame::metadata_words_at_top;
+   intptr_t* const stack_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
+@@ -2548,6 +2663,12 @@
+   // Some architectures (like AArch64/PPC64/RISC-V) add padding between the locals and the fixed_frame to keep the fp 16-byte-aligned.
+   // On those architectures we freeze the padding in order to keep the same fp-relative offsets in the fixed_frame.
+   copy_from_chunk(heap_frame_top, stack_frame_top, fsize);
++#ifdef SPARC
++  if (preserve_caller_window) {
++    Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 17);
++  }
++#endif
++
+ 
+   // Make sure the relativized locals is already set.
+   assert(f.interpreter_frame_local_at(0) == stack_frame_bottom - 1, "invalid frame bottom");
+@@ -2985,7 +3106,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;
