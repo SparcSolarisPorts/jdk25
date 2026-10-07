@@ -87,8 +87,9 @@ inline intptr_t* StackChunkFrameStream<frame_kind>::derelativize(int offset) con
 template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interpreter_frame() const {
   assert_is_interpreted_and_frame_type_mixed();
-  intptr_t raw = _sp[stack_chunk_sparc_i5_slot];
-  return raw > -max_jint && raw < max_jint ? fp() + raw : (intptr_t*)raw;
+  // The SPARC chunk representation includes this frame's complete window.
+  // Its saved I5 is the sender's original SP and cannot locate this frame.
+  return _sp;
 }
 
 
@@ -101,9 +102,7 @@ inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
     _sp = _end;
   } else {
     _sp = next;
-    intptr_t raw = _sp[stack_chunk_sparc_i5_slot];
-    _unextended_sp = raw > -max_jint && raw < max_jint
-        ? fp() + raw : (intptr_t*)raw;
+    _unextended_sp = _sp;
   }
 }
 

@@ -178,10 +178,10 @@ static inline void patch_return_pc_with_preempt_stub(frame& f) {
 inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(
     const frame& f, InterpreterOopMap* mask) {
   (void)mask;
-  // Copying from unextended_sp is conservative and preserves the complete
+  // Copying from physical SP is conservative and preserves the complete
   // SPARC register-save/outgoing-argument area.  Dead expression slots can
   // be optimized later without changing the representation.
-  return f.unextended_sp();
+  return f.sp();
 }
 
 inline intptr_t* ContinuationHelper::InterpretedFrame::frame_bottom(
@@ -195,7 +195,11 @@ inline intptr_t* ContinuationHelper::InterpretedFrame::frame_bottom(
 
 inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(
     const frame& f, int callee_argsize, bool callee_interpreted) {
-  return f.unextended_sp() + (callee_interpreted ? callee_argsize : 0);
+  // Outgoing arguments do not precede the register-window save area on
+  // SPARC. Skipping words here would omit live interpreter registers.
+  (void)callee_argsize;
+  (void)callee_interpreted;
+  return f.sp();
 }
 
 inline intptr_t* ContinuationHelper::InterpretedFrame::callers_sp(const frame& f) {

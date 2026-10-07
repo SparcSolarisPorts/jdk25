@@ -796,7 +796,22 @@
    return heap_frame;
  }
  
-@@ -180,7 +199,7 @@
+@@ -164,11 +183,9 @@
+ }
+ 
+ inline void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
+-  intptr_t raw = f.sp()[freeze_sparc_i5_slot];
+-  if (raw != 0) {
+-    f.set_unextended_sp(f.is_heap_frame() ? f.fp() + raw
+-                                          : (intptr_t*)(raw + STACK_BIAS));
+-  }
++  // I5_savedSP belongs to the sender, not this frame. Copy conservatively
++  // from this frame's physical SP, including its register-window save area.
++  f.set_unextended_sp(f.sp());
+ }
+ 
+ inline void FreezeBase::relativize_interpreted_frame_metadata(
+@@ -180,7 +197,7 @@
    freeze_sparc_relativize_slot(f, hf, freeze_sparc_i5_slot, true);
  
    freeze_sparc_patch_link(hf, hf.fp());
@@ -805,7 +820,7 @@
  }
  
  inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
-@@ -189,8 +208,8 @@
+@@ -189,8 +206,8 @@
  }
  
  inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
@@ -816,7 +831,7 @@
  }
  
  //// Thaw fast path
-@@ -203,11 +222,16 @@
+@@ -203,11 +220,16 @@
  
  template <typename ConfigT>
  inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
@@ -838,7 +853,7 @@
  }
  
  
-@@ -226,7 +250,13 @@
+@@ -226,7 +248,13 @@
    assert(FKind::is_instance(hf), "wrong frame kind");
  
    int fsize = FKind::size(hf);
@@ -852,7 +867,7 @@
  
    if (!FKind::interpreted &&
        (bottom || caller.is_interpreted_frame())) {
-@@ -237,9 +267,12 @@
+@@ -237,9 +265,12 @@
    }
  
    intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp());
@@ -866,7 +881,7 @@
    return result;
  }
  
-@@ -257,8 +290,7 @@
+@@ -257,8 +288,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, const frame& caller) {
@@ -876,7 +891,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-@@ -299,7 +331,8 @@
+@@ -299,7 +329,8 @@
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_i5_slot, true);
  
    freeze_sparc_patch_link(f, f.fp());
@@ -924,7 +939,17 @@
  }
  
  static inline void patch_return_pc_with_preempt_stub(frame& f) {
-@@ -179,11 +186,11 @@
+@@ -171,24 +178,28 @@
+ inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(
+     const frame& f, InterpreterOopMap* mask) {
+   (void)mask;
+-  // Copying from unextended_sp is conservative and preserves the complete
++  // Copying from physical SP is conservative and preserves the complete
+   // SPARC register-save/outgoing-argument area.  Dead expression slots can
+   // be optimized later without changing the representation.
+-  return f.unextended_sp();
++  return f.sp();
+ }
  
  inline intptr_t* ContinuationHelper::InterpretedFrame::frame_bottom(
      const frame& f) {
@@ -938,6 +963,16 @@
  }
  
  inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(
+     const frame& f, int callee_argsize, bool callee_interpreted) {
+-  return f.unextended_sp() + (callee_interpreted ? callee_argsize : 0);
++  // Outgoing arguments do not precede the register-window save area on
++  // SPARC. Skipping words here would omit live interpreter registers.
++  (void)callee_argsize;
++  (void)callee_interpreted;
++  return f.sp();
+ }
+ 
+ inline intptr_t* ContinuationHelper::InterpretedFrame::callers_sp(const frame& f) {
 --- a/src/hotspot/cpu/sparc/frame_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/frame_sparc.cpp
 @@ -49,9 +49,9 @@
@@ -1064,7 +1099,15 @@
  }
  
  extern "C" void findpc(intptr_t x);
-@@ -459,7 +459,7 @@
+@@ -445,7 +445,6 @@
+   sp()[I5_savedSP->sp_offset_in_saved_window()] = is_heap_frame()
+       ? (intptr_t)(sender_sp - fp())
+       : (intptr_t)sender_sp - STACK_BIAS;
+-  _unextended_sp = sender_sp;
+ }
+ 
+ JavaThread** frame::saved_thread_address(const frame& f) {
+@@ -459,7 +458,7 @@
  }
  
  frame frame::sender_for_entry_frame(RegisterMap *map) const {
@@ -1073,7 +1116,7 @@
    // Java frame called from C; skip all C frames and return top C
    // frame of that chunk as the sender
    JavaFrameAnchor* jfa = entry_frame_call_wrapper()->anchor();
-@@ -472,10 +472,10 @@
+@@ -472,10 +471,10 @@
      // Capture _last_Java_pc (if needed) and mark anchor walkable.
      jfa->capture_last_Java_pc(_sp);
    }
@@ -1086,7 +1129,7 @@
    assert(map->include_argument_oops(), "should be set by clear");
    return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
  }
-@@ -496,7 +496,7 @@
+@@ -496,7 +495,7 @@
  }
  
  frame frame::sender_for_upcall_stub_frame(RegisterMap* map) const {
@@ -1095,7 +1138,7 @@
    assert(is_upcall_stub_frame(), "must be upcall stub frame");
    UpcallStub* blob = _cb->as_upcall_stub();
    JavaFrameAnchor* jfa = blob->jfa_for_frame(*this);
-@@ -507,11 +507,11 @@
+@@ -507,11 +506,11 @@
      // SPARC needs the register-window state materialized before stack walking.
      jfa->capture_last_Java_pc(_sp);
    }
@@ -1109,7 +1152,7 @@
    return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
  }
  
-@@ -555,11 +555,11 @@
+@@ -555,11 +554,11 @@
  
  /*
    Find the (biased) sp that is just younger than old_sp starting at sp.
@@ -1123,7 +1166,7 @@
    intptr_t* orig_sp = sp;
  
    int max_frames = (old_sp - sp) / 16; // Minimum frame size is 16
-@@ -573,7 +573,7 @@
+@@ -573,7 +572,7 @@
      sp = (intptr_t*)((intptr_t)sp + STACK_BIAS);
    }
  
@@ -1132,7 +1175,7 @@
  }
  
  /*
-@@ -583,7 +583,7 @@
+@@ -583,7 +582,7 @@
    thread stack in question are flushed.
  */
  bool frame::is_valid_stack_pointer(intptr_t* valid_sp, intptr_t* sp) {
@@ -1141,7 +1184,7 @@
  }
  
  bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
-@@ -648,12 +648,12 @@
+@@ -648,12 +647,12 @@
  // in the bad old _post_Java_state days.
  //
  void JavaFrameAnchor::capture_last_Java_pc(intptr_t* sp) {
@@ -1156,7 +1199,7 @@
      _last_Java_pc = (address) _post_Java_sp[ I7->sp_offset_in_saved_window()] + frame::pc_return_offset;
  
    }
-@@ -668,7 +668,7 @@
+@@ -668,7 +667,7 @@
    // We always flush in case the profiler wants it but we won't mark
    // the windows as flushed unless we have a last_Java_frame
    intptr_t* sp = StubRoutines::Sparc::flush_callers_register_windows_func()();
@@ -2208,7 +2251,7 @@
  #if INCLUDE_JFR
  #include "jfr/support/jfrIntrinsics.hpp"
  #endif
-@@ -1567,12 +1570,191 @@
+@@ -1567,12 +1570,195 @@
  //    transition back to thread_in_Java
  //    return to caller
  //
@@ -2334,12 +2377,16 @@
 +  // windows, rather than changing SP while retaining an unrelated live window.
 +  __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
 +  __ sub(G1, STACK_BIAS, G1);
++  // A c2i adapter extends this entry frame's SP while its interpreter callee
++  // runs. FP remains the original caller SP, so identify the window by FP.
++  __ add(G1, (int)ContinuationEntry::size(), G3_scratch);
 +  __ bind(unwind);
-+  __ cmp_and_brx_short(SP, G1, Assembler::equal, Assembler::pt, entry_window);
++  __ cmp_and_brx_short(FP, G3_scratch, Assembler::equal, Assembler::pt, entry_window);
 +  __ restore();
 +  __ ba(unwind);
 +  __ delayed()->nop();
 +  __ bind(entry_window);
++  __ mov(G1, SP); // discard the adapter extension before reading entry metadata
 +  continuation_enter_cleanup(masm);
 +  __ ret();
 +  __ delayed()->restore();
@@ -2400,7 +2447,7 @@
    if (method->is_method_handle_intrinsic()) {
      vmIntrinsics::ID iid = method->intrinsic_id();
      intptr_t start = (intptr_t)__ pc();
-@@ -2438,7 +2620,7 @@
+@@ -2438,7 +2624,7 @@
    //   - Deoptimization::fetch_unroll_info
    //   - Deoptimization::unpack_frames
  
@@ -2409,7 +2456,7 @@
  
    int start = __ offset();
  
-@@ -2750,7 +2932,7 @@
+@@ -2750,7 +2936,7 @@
  // Tricky, tricky, tricky...
  
  SafepointBlob* SharedRuntime::generate_handler_blob(SharedStubId id, address call_ptr) {
@@ -2418,7 +2465,7 @@
  
    // allocate space for the code
    ResourceMark rm;
-@@ -2761,7 +2943,7 @@
+@@ -2761,7 +2947,7 @@
    MacroAssembler* masm                = new MacroAssembler(&buffer);
    int             frame_size_words;
    OopMapSet *oop_maps = new OopMapSet();
@@ -2427,7 +2474,7 @@
  
    int start = __ offset();
  
-@@ -2870,7 +3052,7 @@
+@@ -2870,7 +3056,7 @@
    MacroAssembler* masm                = new MacroAssembler(&buffer);
    int             frame_size_words;
    OopMapSet *oop_maps = new OopMapSet();
@@ -2659,6 +2706,29 @@
  }
  
  template <ChunkFrames frame_kind>
+@@ -87,8 +87,9 @@
+ template <ChunkFrames frame_kind>
+ inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interpreter_frame() const {
+   assert_is_interpreted_and_frame_type_mixed();
+-  intptr_t raw = _sp[stack_chunk_sparc_i5_slot];
+-  return raw > -max_jint && raw < max_jint ? fp() + raw : (intptr_t*)raw;
++  // The SPARC chunk representation includes this frame's complete window.
++  // Its saved I5 is the sender's original SP and cannot locate this frame.
++  return _sp;
+ }
+ 
+ 
+@@ -101,9 +102,7 @@
+     _sp = _end;
+   } else {
+     _sp = next;
+-    intptr_t raw = _sp[stack_chunk_sparc_i5_slot];
+-    _unextended_sp = raw > -max_jint && raw < max_jint
+-        ? fp() + raw : (intptr_t*)raw;
++    _unextended_sp = _sp;
+   }
+ }
+ 
 --- a/src/hotspot/cpu/sparc/stubGenerator_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/stubGenerator_sparc.cpp
 @@ -633,7 +633,7 @@

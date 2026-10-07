@@ -1,8 +1,50 @@
-# JDK 25 Solaris/SPARC continuation candidate (v22)
+# JDK 25 Solaris/SPARC continuation candidate (v23)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v23 uses the supplied pre-rebuild evidence archive (105 crash reports) to repair
+additional SPARC continuation defects. These reports came from older binaries
+and do not verify either v22 or v23.
+
+44 reports identify Continuation.doYield; 28 directly show instruction 81e80000
+(RESTORE) at the faulting PC. The unwind loop compared live SP to the canonical
+entry SP. SPARC c2i adapters explicitly extend SP without adding a register
+window. The loop can therefore miss the entry window and restore through the
+carrier stack. v23 identifies the entry by its stable FP (canonical entry SP
+plus ContinuationEntry::size()), then resets SP to the canonical entry SP before
+cleanup. This retains the real register-window restore chain.
+
+The interpreted freeze code also mistook its own I5_savedSP for its own SP.
+The interpreter and frame.cpp show that I5_savedSP belongs to the sender.
+Using it as the copy boundary skips this frame's save area, including live
+interpreter registers and the synthetic own-PC slot. v23 copies from physical
+SP, uses that convention in the chunk iterator, and stops the sender-SP setter
+from replacing the frame's own unextended SP. The two stackChunk frame-count
+crashes in the archive are consistent with invalid frozen frame metadata;
+this is a candidate explanation, not a verified diagnosis of both crashes.
+
+Validation: audited against SPARC c2i frame extension and interpreter saved-SP
+code; checked a 512-case register-window/adapter-extension semantic model;
+compiled the reflection-based ContinuationSmoke on host JDK 17; checked shell
+syntax. Native SPARC execution and actual continuation tests remain required.
+The host model does not validate OS register-window traps or freeze/thaw GC.
+
+Use v23 instead of v22 for the next rebuild. From the repository after extraction:
+
+```bash
+gmake images test-image JOBS=8 && bash tests/run-continuation-repro.sh
+bash tests/run-header-matrix.sh
+bash tests/rerun-failed-233.sh
+bash tests/collect-failure-evidence.sh
+```
+
+The continuation reproducer covers interpreter/mixed execution and compiled
+full/partial thaw, with an additional suspended-stack GC run. Product execution
+alone does not prove fast-path entry; use the existing fastdebug trace guidance
+in tests/ContinuationFastPath.java to confirm that separately.
+
 
 v22 fixes defects identified while reviewing the 233 unsuccessful jtreg cases.
 It is cumulative over v21 and preserves continuation fast paths, lightweight

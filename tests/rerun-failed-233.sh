@@ -10,5 +10,5 @@ if [[ -n ${JCSTRESS_JAR:-} ]]; then
 fi
 gmake test-only JOBS="$jobs" TEST_JOBS="$jobs" \
   TEST="$(cat "$root/jdk25-failed-233.txt")" JTREG="$jtreg" \
-  2>&1 | tee /tmp/jdk25-failed-233-v22.log
+  2>&1 | tee /tmp/jdk25-failed-233-v23.log
 exit "${PIPESTATUS[0]}"

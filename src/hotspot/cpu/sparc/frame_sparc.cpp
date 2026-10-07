@@ -445,7 +445,6 @@ void frame::set_interpreter_frame_sender_sp(intptr_t* sender_sp) {
   sp()[I5_savedSP->sp_offset_in_saved_window()] = is_heap_frame()
       ? (intptr_t)(sender_sp - fp())
       : (intptr_t)sender_sp - STACK_BIAS;
-  _unextended_sp = sender_sp;
 }
 
 JavaThread** frame::saved_thread_address(const frame& f) {

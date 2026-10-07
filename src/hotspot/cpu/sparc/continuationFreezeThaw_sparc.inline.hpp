@@ -183,11 +183,9 @@ inline void FreezeBase::prepare_freeze_interpreted_top_frame(frame& f) {
 }
 
 inline void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
-  intptr_t raw = f.sp()[freeze_sparc_i5_slot];
-  if (raw != 0) {
-    f.set_unextended_sp(f.is_heap_frame() ? f.fp() + raw
-                                          : (intptr_t*)(raw + STACK_BIAS));
-  }
+  // I5_savedSP belongs to the sender, not this frame. Copy conservatively
+  // from this frame's physical SP, including its register-window save area.
+  f.set_unextended_sp(f.sp());
 }
 
 inline void FreezeBase::relativize_interpreted_frame_metadata(

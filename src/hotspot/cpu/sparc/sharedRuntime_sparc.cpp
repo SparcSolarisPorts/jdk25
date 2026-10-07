@@ -1692,12 +1692,16 @@ static void sparc_continuation_yield(MacroAssembler* masm,
   // windows, rather than changing SP while retaining an unrelated live window.
   __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
   __ sub(G1, STACK_BIAS, G1);
+  // A c2i adapter extends this entry frame's SP while its interpreter callee
+  // runs. FP remains the original caller SP, so identify the window by FP.
+  __ add(G1, (int)ContinuationEntry::size(), G3_scratch);
   __ bind(unwind);
-  __ cmp_and_brx_short(SP, G1, Assembler::equal, Assembler::pt, entry_window);
+  __ cmp_and_brx_short(FP, G3_scratch, Assembler::equal, Assembler::pt, entry_window);
   __ restore();
   __ ba(unwind);
   __ delayed()->nop();
   __ bind(entry_window);
+  __ mov(G1, SP); // discard the adapter extension before reading entry metadata
   continuation_enter_cleanup(masm);
   __ ret();
   __ delayed()->restore();

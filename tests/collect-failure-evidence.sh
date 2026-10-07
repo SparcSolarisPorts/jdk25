@@ -17,13 +17,13 @@ while IFS= read -r name; do
     printf '%s\n' "$name" >> "$list"
   fi
 done < <(find build/solaris-sparcv9-server-release/test-support -type f -name '*.jtr')
-for name in /tmp/build25.log /tmp/jdk25-failed-233-v22.log /tmp/jdk25-jtreg-all.log; do
+for name in /tmp/build25.log /tmp/jdk25-failed-233-v22.log /tmp/jdk25-failed-233-v23.log /tmp/jdk25-jtreg-all.log; do
   if [[ -f "$name" ]]; then
     cp "$name" "$root/jdk25-evidence-$stamp-$(basename "$name")"
     printf 'jdk25-evidence-%s-%s\n' "$stamp" "$(basename "$name")" >> "$list"
   fi
 done
 while IFS= read -r name; do printf '%s\n' "$name" >> "$list"; done \
-  < <(find . -path './header-test-results-*/*' -type f)
+  < <(find . -type f \( -path './header-test-results-*/*' -o -path './continuation-test-results-*/*' \))
 "$tar_cmd" -czf "$archive" -T "$list"
 printf '%s\n' "$archive"
