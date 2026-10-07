@@ -855,18 +855,29 @@
      intptr_t* translated = freeze_sparc_translate_pointer(source, heap, value);
      heap.sp()[slot] = translated - heap.fp();
    } else {
-@@ -93,7 +96,9 @@
+@@ -93,8 +96,19 @@
    intptr_t raw = heap.sp()[slot];
    intptr_t* heap_value = raw > -max_jint && raw < max_jint
        ? heap.fp() + raw : (intptr_t*)raw;
 -  intptr_t* stack_value = (heap_value >= heap.sp() && heap_value <= heap.fp())
+-      ? freeze_sparc_translate_pointer(heap, stack, heap_value) : heap_value;
 +  intptr_t* bottom = heap.is_interpreted_frame()
 +      ? ContinuationHelper::InterpretedFrame::frame_bottom(heap) : heap.fp();
-+  intptr_t* stack_value = (heap_value >= heap.unextended_sp() && heap_value < bottom)
-       ? freeze_sparc_translate_pointer(heap, stack, heap_value) : heap_value;
++  intptr_t* stack_value = heap_value;
++  if (heap_value >= heap.unextended_sp() && heap_value < bottom) {
++    if (heap.is_interpreted_frame() &&
++        heap_value >= heap.unextended_sp() + frame::register_save_words) {
++      // Thaw may insert a word above the register-save area to align FP.
++      // Payload pointers must follow FP, not the physical SP displacement.
++      stack_value = stack.fp() + (heap_value - heap.fp());
++    } else {
++      stack_value = freeze_sparc_translate_pointer(heap, stack, heap_value);
++    }
++  }
    stack.sp()[slot] = biased ? (intptr_t)stack_value - STACK_BIAS
                              : (intptr_t)stack_value;
-@@ -121,38 +126,71 @@
+ }
+@@ -121,38 +135,71 @@
  inline frame FreezeBase::sender(const frame& f) {
    assert(FKind::is_instance(f), "wrong frame kind");
  
@@ -952,7 +963,7 @@
    return heap_frame;
  }
  
-@@ -164,11 +202,9 @@
+@@ -164,11 +211,9 @@
  }
  
  inline void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
@@ -967,7 +978,7 @@
  }
  
  inline void FreezeBase::relativize_interpreted_frame_metadata(
-@@ -180,7 +216,7 @@
+@@ -180,7 +225,7 @@
    freeze_sparc_relativize_slot(f, hf, freeze_sparc_i5_slot, true);
  
    freeze_sparc_patch_link(hf, hf.fp());
@@ -976,7 +987,7 @@
  }
  
  inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
-@@ -189,8 +225,8 @@
+@@ -189,8 +234,8 @@
  }
  
  inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
@@ -987,7 +998,7 @@
  }
  
  //// Thaw fast path
-@@ -203,11 +239,16 @@
+@@ -203,11 +248,16 @@
  
  template <typename ConfigT>
  inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
@@ -1009,7 +1020,7 @@
  }
  
  
-@@ -226,7 +267,19 @@
+@@ -226,7 +276,19 @@
    assert(FKind::is_instance(hf), "wrong frame kind");
  
    int fsize = FKind::size(hf);
@@ -1030,7 +1041,7 @@
  
    if (!FKind::interpreted &&
        (bottom || caller.is_interpreted_frame())) {
-@@ -236,10 +289,15 @@
+@@ -236,10 +298,15 @@
      frame_sp = align(hf, frame_sp, caller, bottom);
    }
  
@@ -1048,7 +1059,7 @@
    return result;
  }
  
-@@ -257,8 +315,7 @@
+@@ -257,8 +324,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, const frame& caller) {
@@ -1058,7 +1069,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-@@ -296,10 +353,18 @@
+@@ -296,10 +362,18 @@
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llocals_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_lmonitors_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llast_sp_slot, true);
@@ -3099,7 +3110,7 @@
        *entry = __ pc();
        // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
        BLOCK_COMMENT("Entry:");
-@@ -1924,7 +1924,7 @@
+@@ -1924,11 +1924,15 @@
  
      assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
  
@@ -3108,7 +3119,15 @@
        *entry = __ pc();
        // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
        BLOCK_COMMENT("Entry:");
-@@ -2077,7 +2077,7 @@
+     }
++
++    // A backward copy is required only when the destination overlaps above
++    // the source. Lower/equal destinations and disjoint spans copy forward.
++    array_overlap_test(nooverlap_target, LogBytesPerInt);
+ 
+     {
+       // UnsafeMemoryAccess page error: continue at UnsafeMemoryAccess common_error_exit
+@@ -2077,7 +2081,7 @@
  
      assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
  
@@ -3117,7 +3136,7 @@
        *entry = __ pc();
        // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
        BLOCK_COMMENT("Entry:");
-@@ -2155,7 +2155,7 @@
+@@ -2155,11 +2159,15 @@
  
      assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
  
@@ -3126,7 +3145,15 @@
        *entry = __ pc();
        // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
        BLOCK_COMMENT("Entry:");
-@@ -2194,7 +2194,7 @@
+     }
++
++    // A backward copy is required only when the destination overlaps above
++    // the source. Lower/equal destinations and disjoint spans copy forward.
++    array_overlap_test(nooverlap_target, LogBytesPerLong);
+ 
+     {
+       // UnsafeMemoryAccess page error: continue at UnsafeMemoryAccess common_error_exit
+@@ -2194,7 +2202,7 @@
  
      assert_clean_int(count, O3);     // Make sure 'count' is clean int.
  
@@ -3135,7 +3162,7 @@
        *entry = __ pc();
        // caller can pass a 64-bit byte count here
        BLOCK_COMMENT("Entry:");
-@@ -2249,7 +2249,7 @@
+@@ -2249,7 +2257,7 @@
  
      assert_clean_int(count, O3);     // Make sure 'count' is clean int.
  
@@ -3144,7 +3171,7 @@
        *entry = __ pc();
        // caller can pass a 64-bit byte count here
        BLOCK_COMMENT("Entry:");
-@@ -2300,7 +2300,7 @@
+@@ -2300,7 +2308,7 @@
      assert_clean_int(super_check_offset, temp);
  
      __ check_klass_subtype_fast_path(sub_klass, super_klass, temp, noreg,
@@ -3153,7 +3180,7 @@
                                       super_check_offset);
  
      BLOCK_COMMENT("type_check_slow_path:");
-@@ -2308,7 +2308,7 @@
+@@ -2308,7 +2316,7 @@
      __ check_klass_subtype_slow_path(sub_klass->after_save(),
                                       super_klass->after_save(),
                                       L0, L1, L2, L4,
@@ -3162,7 +3189,7 @@
      __ ba(L_success);
      __ delayed()->restore();
  
-@@ -2371,7 +2371,7 @@
+@@ -2371,7 +2379,7 @@
      }
  #endif //ASSERT
  
@@ -3171,7 +3198,7 @@
        *entry = __ pc();
        // caller can pass a 64-bit byte count here (from generic stub)
        BLOCK_COMMENT("Entry:");
-@@ -2635,7 +2635,7 @@
+@@ -2635,7 +2643,7 @@
      //  assert(src->klass() != nullptr);
      BLOCK_COMMENT("assert klasses not null");
      { Label L_a, L_b;
@@ -3180,7 +3207,7 @@
        __ bind(L_a);
        __ stop("broken null klass");
        __ bind(L_b);
-@@ -2893,7 +2893,7 @@
+@@ -2893,7 +2901,7 @@
      StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit = generate_disjoint_oop_copy(true, &entry,
                                                                                        "arrayof_oop_disjoint_arraycopy_uninit",
                                                                                        /*dest_uninitialized*/true);
@@ -3189,7 +3216,7 @@
                                                                                        "arrayof_oop_arraycopy_uninit",
                                                                                        /*dest_uninitialized*/true);
      if (UseCompressedOops) {
-@@ -2906,7 +2906,7 @@
+@@ -2906,7 +2914,7 @@
        StubRoutines::_oop_disjoint_arraycopy_uninit     = generate_disjoint_oop_copy(false, &entry,
                                                                                      "oop_disjoint_arraycopy_uninit",
                                                                                      /*dest_uninitialized*/true);
@@ -3198,7 +3225,7 @@
                                                                                      "oop_arraycopy_uninit",
                                                                                      /*dest_uninitialized*/true);
      } else {
-@@ -4805,7 +4805,6 @@
+@@ -4805,7 +4813,6 @@
     *   I2   - int* y-addr
     *   I3   - int  y-len
     *   I4   - int* z-addr   (output vector)
@@ -3206,7 +3233,7 @@
     */
    address generate_multiplyToLen() {
      assert(UseMultiplyToLenIntrinsic, "need VIS3 instructions");
-@@ -4821,7 +4820,12 @@
+@@ -4821,7 +4828,12 @@
      const Register yptr = I2; //
      const Register ylen = I3; //
      const Register zptr = I4; // output address
@@ -3220,7 +3247,7 @@
  
      /* The minimal "limb" representation suggest that odd length vectors are as
       * likely as even length dittos. This in turn suggests that we need to cope
-@@ -5570,8 +5574,23 @@
+@@ -5570,8 +5582,23 @@
      address start = __ pc();
  
      if (return_barrier) {
@@ -3245,7 +3272,7 @@
      }
  
  #ifdef ASSERT
-@@ -5585,25 +5604,28 @@
+@@ -5585,25 +5612,28 @@
      }
  #endif
  
@@ -3287,7 +3314,7 @@
      }
  
      Label thaw_success;
-@@ -5612,54 +5634,104 @@
+@@ -5612,54 +5642,104 @@
      __ delayed()->nop();
      __ bind(thaw_success);
  
@@ -3424,7 +3451,7 @@
  
      return start;
    }
-@@ -5875,14 +5947,19 @@
+@@ -5875,14 +5955,19 @@
  
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_fastpath_offset()), G1);
    __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()));
@@ -3446,7 +3473,7 @@
  #ifndef PRODUCT
    Label ok;
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
-@@ -5894,11 +5971,11 @@
+@@ -5894,11 +5979,11 @@
  
    __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()), G1);
    __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));

@@ -1,8 +1,57 @@
-# JDK 25 Solaris/SPARC continuation candidate (v32)
+# JDK 25 Solaris/SPARC continuation candidate (v33)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v33 responds to the native output from 20261007-232916 and the full
+continuation-test-results-20261007-231504 archive. All nine string-equality
+modes now pass (2,554,500 checks each). Compiled continuation and compiled-GC
+still pass. The five interpreted array-header modes pass. C1 and C2 modes
+fail overlapping int arraycopy, independently of header configuration.
+Interpreter/mixed continuations fail after pass 0, in monitor unlock after GC.
+
+Two source corrections:
+* The conjoint int and long arraycopy stubs omitted array_overlap_test.
+  They now redirect lower/equal destinations and non-overlapping ranges to
+  the existing forward copy entry. Reverse bulk copying remains enabled for
+  upward overlap. This fixes the reproducible int copy (source=1, dest=0,
+  count=2), which backward copying turns into two copies of the last element.
+* Interpreter thaw payload padding was not reflected in metadata relocation.
+  Saved pointers into the payload (locals, expression stack, monitors) now
+  follow the FP-relative displacement. Pointers into the register save area
+  retain SP-relative relocation. The previous code pointed one word too low
+  when the source FP/SP displacement was odd. This is a definite mismatch in
+  the v31 alignment change; native validation is still required to establish
+  whether it resolves the supplied unlock crash. No locking option is disabled.
+
+The native report shows BUS_ADRALN at address 0x71d during monitor unlock;
+its invalid mark value is consistent with corrupted state, not a reason to
+turn off lightweight locking. v33 leaves the compiled continuation fast path
+and the proven string-equality correction in place. Forge now reaches its
+EULA check without the old String.equals crash, but its process-reaper thread
+reports StackOverflowError on shutdown. Server runtime is not yet validated.
+
+Validation: 180,960 cases using extracted metadata relocation code pass under
+ASan/UBSan, including odd/even frame layout, payload/window pointers and stack
+bias. The new int/long arraycopy regression passes on host JDK17 with C1 and
+C2, and checks all source/destination positions 0 through 11 and lengths 0
+through 24, both overlap directions and distinct arrays. These tests do not
+execute a rebuilt Solaris/SPARC VM. Native build and repro runs are required.
+
+After extracting in the source root:
+
+```sh
+python3 tests/configure-release-version.py
+gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1
+bash tests/run-arraycopy-repro.sh
+bash tests/run-header-matrix.sh
+bash tests/run-continuation-repro.sh
+```
+
+The uploaded native log still says -internal because the release-version
+configuration step is not present in its command transcript. The helper above
+changes release metadata while preserving the native build settings.
 
 v32 addresses the Forge crash in C2 String.equals with compact headers enabled.
 The SPARC array_equals emitter assumed every byte/char array data address was

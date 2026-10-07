@@ -1930,6 +1930,10 @@ class StubGenerator: public StubCodeGenerator {
       BLOCK_COMMENT("Entry:");
     }
 
+    // A backward copy is required only when the destination overlaps above
+    // the source. Lower/equal destinations and disjoint spans copy forward.
+    array_overlap_test(nooverlap_target, LogBytesPerInt);
+
     {
       // UnsafeMemoryAccess page error: continue at UnsafeMemoryAccess common_error_exit
       UnsafeMemoryAccessMark ucmm(this, !aligned, false);
@@ -2160,6 +2164,10 @@ class StubGenerator: public StubCodeGenerator {
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
     }
+
+    // A backward copy is required only when the destination overlaps above
+    // the source. Lower/equal destinations and disjoint spans copy forward.
+    array_overlap_test(nooverlap_target, LogBytesPerLong);
 
     {
       // UnsafeMemoryAccess page error: continue at UnsafeMemoryAccess common_error_exit

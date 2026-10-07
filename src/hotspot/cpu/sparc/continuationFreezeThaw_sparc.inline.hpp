@@ -98,8 +98,17 @@ static inline void freeze_sparc_derelativize_slot(
       ? heap.fp() + raw : (intptr_t*)raw;
   intptr_t* bottom = heap.is_interpreted_frame()
       ? ContinuationHelper::InterpretedFrame::frame_bottom(heap) : heap.fp();
-  intptr_t* stack_value = (heap_value >= heap.unextended_sp() && heap_value < bottom)
-      ? freeze_sparc_translate_pointer(heap, stack, heap_value) : heap_value;
+  intptr_t* stack_value = heap_value;
+  if (heap_value >= heap.unextended_sp() && heap_value < bottom) {
+    if (heap.is_interpreted_frame() &&
+        heap_value >= heap.unextended_sp() + frame::register_save_words) {
+      // Thaw may insert a word above the register-save area to align FP.
+      // Payload pointers must follow FP, not the physical SP displacement.
+      stack_value = stack.fp() + (heap_value - heap.fp());
+    } else {
+      stack_value = freeze_sparc_translate_pointer(heap, stack, heap_value);
+    }
+  }
   stack.sp()[slot] = biased ? (intptr_t)stack_value - STACK_BIAS
                             : (intptr_t)stack_value;
 }
