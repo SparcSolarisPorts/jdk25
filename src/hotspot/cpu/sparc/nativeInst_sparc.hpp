@@ -341,7 +341,7 @@ class NativeCall;
 
 inline NativeCall* nativeCall_at(address instr);
 inline NativeCall* nativeCall_overwriting_at(address instr,
-                                             address destination = NULL);
+                                             address destination = nullptr);
 inline NativeCall* nativeCall_before(address return_address);
 class NativeCall: public NativeInstruction {
  public:
@@ -440,7 +440,7 @@ class NativeCallReg: public NativeInstruction {
 //      == sethi %hi54(addr), O7 ;  jumpl O7, %lo10(addr), O7 ;  <delay>
 // That is, it is essentially the same as a NativeJump.
 class NativeFarCall;
-inline NativeFarCall* nativeFarCall_overwriting_at(address instr, address destination = NULL);
+inline NativeFarCall* nativeFarCall_overwriting_at(address instr, address destination = nullptr);
 inline NativeFarCall* nativeFarCall_at(address instr);
 class NativeFarCall: public NativeInstruction {
  public:

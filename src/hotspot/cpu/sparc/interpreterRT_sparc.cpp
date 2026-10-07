@@ -146,7 +146,7 @@ class SlowSignatureHandler: public NativeSignatureIterator {
   virtual void pass_object() {
     // pass address of from
     intptr_t *from_addr = (intptr_t*)(_from + Interpreter::local_offset_in_bytes(0));
-    *_to++ = (*from_addr == 0) ? NULL : (intptr_t) from_addr;
+    *_to++ = (*from_addr == 0) ? 0 : (intptr_t) from_addr;
     _from -= Interpreter::stackElementSize;
     add_signature( non_float );
    }

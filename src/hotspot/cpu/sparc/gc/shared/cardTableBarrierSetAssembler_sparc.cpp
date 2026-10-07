@@ -77,7 +77,7 @@ void CardTableBarrierSetAssembler::card_table_write(MacroAssembler* masm,
 }
 
 void CardTableBarrierSetAssembler::card_write_barrier_post(MacroAssembler* masm, Register store_addr, Register new_val, Register tmp) {
-  // If we're writing constant NULL, we can skip the write barrier.
+  // If we're writing constant nullptr, we can skip the write barrier.
   if (new_val == G0) return;
   CardTableBarrierSet* bs = barrier_set_cast<CardTableBarrierSet>(BarrierSet::barrier_set());
   card_table_write(masm, bs->card_table()->byte_map_base(), tmp, store_addr);

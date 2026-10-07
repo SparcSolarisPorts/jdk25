@@ -155,9 +155,9 @@ class PICL {
       if (!l1_visitor->is_inconsistent()) {
         l1_visitor->visit(nodeh, "l1-dcache-line-size");
       }
-      static const char* l2_data_cache_line_property_name = NULL;
+      static const char* l2_data_cache_line_property_name = nullptr;
       // On the first visit determine the name of the l2 cache line size property and memoize it.
-      if (l2_data_cache_line_property_name == NULL) {
+      if (l2_data_cache_line_property_name == nullptr) {
         assert(!l2_visitor->is_inconsistent(), "First iteration cannot be inconsistent");
         l2_data_cache_line_property_name = "l2-cache-line-size";
         if (!l2_visitor->visit(nodeh, l2_data_cache_line_property_name)) {
@@ -189,7 +189,7 @@ public:
     return CPUVisitor::visit(nodeh, state);
   }
 
-  PICL(bool is_fujitsu, bool is_sun4v) : _dl_handle(NULL), _L1_data_cache_line_size(0), _L2_data_cache_line_size(0) {
+  PICL(bool is_fujitsu, bool is_sun4v) : _dl_handle(nullptr), _L1_data_cache_line_size(0), _L2_data_cache_line_size(0) {
     if (!open_library()) {
       return;
     }
@@ -227,11 +227,11 @@ extern "C" int PICL_visit_cpu_helper(picl_nodehdl_t nodeh, void *result) {
 template<typename FuncType>
 bool PICL::bind(FuncType& func, const char* name) {
   func = reinterpret_cast<FuncType>(dlsym(_dl_handle, name));
-  return func != NULL;
+  return func != nullptr;
 }
 
 bool PICL::bind_library_functions() {
-  assert(_dl_handle != NULL, "library should be open");
+  assert(_dl_handle != nullptr, "library should be open");
   return bind(_picl_initialize,         "picl_initialize"        ) &&
          bind(_picl_shutdown,           "picl_shutdown"          ) &&
          bind(_picl_get_root,           "picl_get_root"          ) &&
@@ -243,7 +243,7 @@ bool PICL::bind_library_functions() {
 
 bool PICL::open_library() {
   _dl_handle = dlopen("libpicl.so.1", RTLD_LAZY);
-  if (_dl_handle == NULL) {
+  if (_dl_handle == nullptr) {
     return false;
   }
   if (!bind_library_functions()) {
@@ -255,21 +255,21 @@ bool PICL::open_library() {
 }
 
 void PICL::close_library() {
-  assert(_dl_handle != NULL, "library should be open");
+  assert(_dl_handle != nullptr, "library should be open");
   dlclose(_dl_handle);
-  _dl_handle = NULL;
+  _dl_handle = nullptr;
 }
 
 class Sysinfo {
   char* _string;
 public:
-  Sysinfo(int si) : _string(NULL) {
+  Sysinfo(int si) : _string(nullptr) {
     char   tmp;
     size_t bufsize = sysinfo(si, &tmp, 1);
 
     if (bufsize != -1) {
       char* buf = (char*) os::malloc(bufsize, mtInternal);
-      if (buf != NULL) {
+      if (buf != nullptr) {
         if (sysinfo(si, buf, bufsize) == bufsize) {
           _string = buf;
         } else {
@@ -280,7 +280,7 @@ public:
   }
 
   ~Sysinfo() {
-    if (_string != NULL) {
+    if (_string != nullptr) {
       os::free(_string);
     }
   }
@@ -290,7 +290,7 @@ public:
   }
 
   bool valid() const {
-    return _string != NULL;
+    return _string != nullptr;
   }
 
   bool match(const char* s) const {
@@ -298,7 +298,7 @@ public:
   }
 
   bool match_substring(const char* s) const {
-    return valid() ? strstr(_string, s) != NULL : false;
+    return valid() ? strstr(_string, s) != nullptr : false;
   }
 };
 

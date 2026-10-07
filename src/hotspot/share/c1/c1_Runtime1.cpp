@@ -1228,13 +1228,13 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* current, C1StubId stub_id ))
         if (load_klass_or_mirror_patch_id ||
             stub_id == C1StubId::load_appendix_patching_id) {
           // Update the location in the nmethod with the proper
-          // metadata.  When the code was generated, a NULL was stuffed
+          // metadata.  When the code was generated, a nullptr was stuffed
           // in the metadata table and that table needs to be update to
           // have the right value.  On intel the value is kept
           // directly in the instruction instead of in the metadata
           // table, so set_data above effectively updated the value.
           nmethod* nm = CodeCache::find_nmethod(instr_pc);
-          assert(nm != NULL, "invalid nmethod_pc");
+          assert(nm != nullptr, "invalid nmethod_pc");
           RelocIterator mds(nm, copy_buff, copy_buff + 1);
           bool found = false;
           while (mds.next() && !found) {

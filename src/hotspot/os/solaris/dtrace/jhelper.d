@@ -83,12 +83,12 @@ dtrace:helper:ustack:
    * this initialization can be removed.
    */
   init_done  = 0;
-  this->error = (char *) NULL;
-  this->result = (char *) NULL;
+  this->error = (char *) 0;
+  this->result = (char *) 0;
   this->isMethod = 0;
   this->codecache = 0;
-  this->klass = (pointer) NULL;
-  this->vtbl  = (pointer) NULL;
+  this->klass = (pointer) 0;
+  this->vtbl  = (pointer) 0;
   this->suffix = '\0';
 }
 
@@ -524,13 +524,13 @@ dtrace:helper:ustack:
 }
 
 dtrace:helper:ustack:
-/this->done && this->error == (char *) NULL/
+/this->done && this->error == (char *) 0/
 {
   this->result;
 }
 
 dtrace:helper:ustack:
-/this->done && this->error != (char *) NULL/
+/this->done && this->error != (char *) 0/
 {
   this->error;
 }
@@ -546,5 +546,5 @@ dtrace:helper:ustack:
 dtrace:helper:ustack:
 /!this->done/
 {
-  NULL;
+  0;
 }

@@ -50,9 +50,9 @@ VtableStub* VtableStubs::create_vtable_stub(int vtable_index) {
   // Read "A word on VtableStub sizing" in share/code/vtableStubs.hpp for details on stub sizing.
   const int stub_code_length = code_size_limit(true);
   VtableStub* s = new(stub_code_length) VtableStub(true, vtable_index);
-  // Can be NULL if there is no free space in the code cache.
-  if (s == NULL) {
-    return NULL;
+  // Can be nullptr if there is no free space in the code cache.
+  if (s == nullptr) {
+    return nullptr;
   }
 
   // Count unused bytes in instruction sequences of variable size.
@@ -138,9 +138,9 @@ VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   // Read "A word on VtableStub sizing" in share/code/vtableStubs.hpp for details on stub sizing.
   const int stub_code_length = code_size_limit(false);
   VtableStub* s = new(stub_code_length) VtableStub(false, itable_index);
-  // Can be NULL if there is no free space in the code cache.
-  if (s == NULL) {
-    return NULL;
+  // Can be nullptr if there is no free space in the code cache.
+  if (s == nullptr) {
+    return nullptr;
   }
   // Count unused bytes in instruction sequences of variable size.
   // We add them to the computed buffer size in order to avoid
@@ -228,7 +228,7 @@ VtableStub* VtableStubs::create_itable_stub(int itable_index) {
   }
 #endif
 
-  // If the following load is through a NULL pointer, we'll take an OS
+  // If the following load is through a nullptr pointer, we'll take an OS
   // exception that should translate into an AbstractMethodError.  We need the
   // window count to be correct at that time.
   __ restore(L5_method, 0, G5_method);

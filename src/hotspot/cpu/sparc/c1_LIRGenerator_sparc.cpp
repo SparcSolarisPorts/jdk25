@@ -571,7 +571,7 @@ void LIRGenerator::do_ShiftOp(ShiftOp* x) {
   }
   value.load_item();
   // the old backend doesn't support this
-  if (count.is_constant() && count.type()->as_IntConstant() != NULL && value.type()->is_int()) {
+  if (count.is_constant() && count.type()->as_IntConstant() != nullptr && value.type()->is_int()) {
     jint c = count.get_jint_constant() & 0x1f;
     assert(c >= 0 && c < 32, "should be small");
     count.dont_load_item();
@@ -1089,7 +1089,7 @@ void LIRGenerator::do_NewObjectArray(NewObjectArray* x) {
   CodeEmitInfo* info = state_for(x, x->state());
   // in case of patching (i.e., object class is not yet loaded), we need to reexecute the instruction
   // and therefore provide the state before the parameters have been consumed
-  CodeEmitInfo* patching_info = NULL;
+  CodeEmitInfo* patching_info = nullptr;
   if (!x->klass()->is_loaded() || PatchALot) {
     patching_info = state_for(x, x->state_before());
   }
@@ -1128,7 +1128,7 @@ void LIRGenerator::do_NewMultiArray(NewMultiArray* x) {
   }
 
   // Evaluate state_for early since it may emit code.
-  CodeEmitInfo* patching_info = NULL;
+  CodeEmitInfo* patching_info = nullptr;
   if (!x->klass()->is_loaded() || PatchALot) {
     patching_info = state_for(x, x->state_before());
 
@@ -1181,7 +1181,7 @@ void LIRGenerator::do_BlockBegin(BlockBegin* x) {
 
 void LIRGenerator::do_CheckCast(CheckCast* x) {
   LIRItem obj(x->obj(), this);
-  CodeEmitInfo* patching_info = NULL;
+  CodeEmitInfo* patching_info = nullptr;
   if (!x->klass()->is_loaded() || (PatchALot && !x->is_incompatible_class_change_check() && !x->is_invokespecial_receiver_check())) {
     // must do this before locking the destination register as an oop register,
     // and before the obj is loaded (so x->obj()->item() is valid for creating a debug info location)
@@ -1195,10 +1195,10 @@ void LIRGenerator::do_CheckCast(CheckCast* x) {
                                     state_for(x, x->state_before(), true /*ignore_xhandler*/));
 
   if (x->is_incompatible_class_change_check()) {
-    assert(patching_info == NULL, "can't patch this");
+    assert(patching_info == nullptr, "can't patch this");
     stub = new SimpleExceptionStub(C1StubId::throw_incompatible_class_change_error_id, LIR_OprFact::illegalOpr, info_for_exception);
   } else if (x->is_invokespecial_receiver_check()) {
-    assert(patching_info == NULL, "can't patch this");
+    assert(patching_info == nullptr, "can't patch this");
     stub = new DeoptimizeStub(info_for_exception,
                               Deoptimization::Reason_class_check,
                               Deoptimization::Action_none);
@@ -1216,7 +1216,7 @@ void LIRGenerator::do_CheckCast(CheckCast* x) {
 
 void LIRGenerator::do_InstanceOf(InstanceOf* x) {
   LIRItem obj(x->obj(), this);
-  CodeEmitInfo* patching_info = NULL;
+  CodeEmitInfo* patching_info = nullptr;
   if (!x->klass()->is_loaded() || PatchALot) {
     patching_info = state_for(x, x->state_before());
   }

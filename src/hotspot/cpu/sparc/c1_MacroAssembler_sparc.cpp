@@ -30,6 +30,8 @@
 #include "interpreter/interpreter.hpp"
 #include "oops/arrayOop.hpp"
 #include "oops/markWord.hpp"
+#include "oops/klass.hpp"
+#include "utilities/align.hpp"
 #include "runtime/basicLock.hpp"
 #include "runtime/os.hpp"
 #include "runtime/sharedRuntime.hpp"
@@ -162,19 +164,23 @@ void C1_MacroAssembler::try_allocate(
 
 void C1_MacroAssembler::initialize_header(Register obj, Register klass, Register len, Register t1, Register t2) {
   assert_different_registers(obj, klass, len, t1, t2);
-  set((intx)markWord::prototype().value(), t1);
-  st_ptr(t1, obj, oopDesc::mark_offset_in_bytes());
-  if (UseCompressedClassPointers) {
-    // Save klass
-    mov(klass, t1);
-    encode_klass_not_null(t1);
-    stw(t1, obj, oopDesc::klass_offset_in_bytes());
+  if (UseCompactObjectHeaders) {
+    ld_ptr(klass, in_bytes(Klass::prototype_header_offset()), t1);
+    st_ptr(t1, obj, oopDesc::mark_offset_in_bytes());
   } else {
-    st_ptr(klass, obj, oopDesc::klass_offset_in_bytes());
+    set((intx)markWord::prototype().value(), t1);
+    st_ptr(t1, obj, oopDesc::mark_offset_in_bytes());
+    if (UseCompressedClassPointers) {
+      mov(klass, t1);
+      encode_klass_not_null(t1);
+      stw(t1, obj, oopDesc::klass_offset_in_bytes());
+    } else {
+      st_ptr(klass, obj, oopDesc::klass_offset_in_bytes());
+    }
   }
   if (len->is_valid()) {
     st(len, obj, arrayOopDesc::length_offset_in_bytes());
-  } else if (UseCompressedClassPointers) {
+  } else if (UseCompressedClassPointers && !UseCompactObjectHeaders) {
     // otherwise length is in the class gap
     store_klass_gap(G0, obj);
   }
@@ -251,7 +257,7 @@ void C1_MacroAssembler::initialize_object(
       sub(var_size_in_bytes, hdr_size_in_bytes, t2); // compute size of body
       initialize_body(t1, t2);
     } else if (con_size_in_bytes <= threshold) {
-      // use explicit NULL stores
+      // use explicit nullptr stores
       for (int i = hdr_size_in_bytes; i < con_size_in_bytes; i += HeapWordSize)     st_ptr(G0, obj, i);
     } else if (con_size_in_bytes > hdr_size_in_bytes) {
       // use a loop
@@ -281,7 +287,7 @@ void C1_MacroAssembler::allocate_array(
   Register t1,                         // temp register
   Register t2,                         // temp register
   Register t3,                         // temp register
-  int      hdr_size,                   // object header size in words
+  int      hdr_size,                   // array header size in bytes
   int      elt_size,                   // element size in bytes
   Register klass,                      // object klass
   Label&   slow_case                   // continuation point if fast allocation fails
@@ -315,7 +321,7 @@ void C1_MacroAssembler::allocate_array(
     case  8: delayed()->sll(len, 3, arr_size); break;
     default: ShouldNotReachHere();
   }
-  add(arr_size, hdr_size * wordSize + MinObjAlignmentInBytesMask, arr_size); // add space for header & alignment
+  add(arr_size, hdr_size + MinObjAlignmentInBytesMask, arr_size); // add space for header & alignment
   and3(arr_size, ~MinObjAlignmentInBytesMask, arr_size);                     // align array size
 
   // allocate space & initialize header
@@ -329,8 +335,14 @@ void C1_MacroAssembler::allocate_array(
   // initialize body
   const Register base  = t2;
   const Register index = t3;
-  add(obj, hdr_size * wordSize, base);               // compute address of first element
-  sub(arr_size, hdr_size * wordSize, index);         // compute index = number of words to clear
+  // Array payloads can start halfway through a heap word (compact headers,
+  // or uncompressed klass pointers). Preserve the preceding length field.
+  const int aligned_header = align_up(hdr_size, HeapWordSize);
+  if (hdr_size != aligned_header) {
+    stw(G0, obj, hdr_size);
+  }
+  add(obj, aligned_header, base);
+  sub(arr_size, aligned_header, index);
   initialize_body(base, index);
 
   if (CURRENT_ENV->dtrace_alloc_probes()) {

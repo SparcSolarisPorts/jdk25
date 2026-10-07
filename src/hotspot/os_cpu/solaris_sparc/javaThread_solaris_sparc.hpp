@@ -28,7 +28,7 @@ private:
 
   void pd_initialize() {
     _anchor.clear();
-    _base_of_stack_pointer        = NULL;
+    _base_of_stack_pointer        = nullptr;
   }
 
   frame pd_last_frame();

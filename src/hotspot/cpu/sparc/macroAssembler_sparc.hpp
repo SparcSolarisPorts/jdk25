@@ -309,7 +309,7 @@ class AddressLiteral {
 
  protected:
   // creation
-  AddressLiteral() : _address(NULL), _rspec() {}
+  AddressLiteral() : _address(nullptr), _rspec() {}
 
  public:
   AddressLiteral(address addr, RelocationHolder const& rspec)
@@ -976,6 +976,7 @@ public:
 
   // klass oop manipulations if compressed
   void load_klass(Register src_oop, Register klass);
+  void load_narrow_klass(Register src_oop, Register klass);
   void store_klass(Register klass, Register dst_oop);
   void store_klass_gap(Register s, Register dst_oop);
 

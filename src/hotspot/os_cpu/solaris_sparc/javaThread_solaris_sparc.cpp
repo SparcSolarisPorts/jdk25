@@ -29,7 +29,7 @@ frame JavaThread::pd_last_frame() {
   assert(has_last_Java_frame(), "must have last_Java_sp() when suspended");
   assert(_anchor.walkable(), "thread has not dumped its register windows yet");
 
-  assert(_anchor.last_Java_pc() != NULL, "Ack no pc!");
+  assert(_anchor.last_Java_pc() != nullptr, "Ack no pc!");
   return frame(last_Java_sp(), frame::unpatchable, _anchor.last_Java_pc());
 }
 
@@ -78,8 +78,8 @@ bool JavaThread::pd_get_top_frame(frame* fr_addr,
   // we try to glean some information out of the ucontext.
   intptr_t* ret_sp;
   address addr = os::fetch_frame_from_context(uc,
-    &ret_sp, NULL /* ret_fp only used on Solaris X86 */);
-  if (addr == NULL || ret_sp == NULL) {
+    &ret_sp, nullptr /* ret_fp only used on Solaris X86 */);
+  if (addr == nullptr || ret_sp == nullptr) {
     // ucontext wasn't useful
     return false;
   }

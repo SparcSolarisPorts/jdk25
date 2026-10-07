@@ -49,9 +49,9 @@ void RegisterMap::pd_clear() {
     frame fr = _thread->last_frame();
     _window = fr.sp();
   } else {
-    _window = NULL;
+    _window = nullptr;
   }
-  _younger_window = NULL;
+  _younger_window = nullptr;
 }
 
 
@@ -98,11 +98,11 @@ address RegisterMap::pd_location(VMReg regname) const {
   assert(regname->is_reg(), "sanity check");
   // Only the GPRs get handled this way
   if( !regname->is_Register())
-    return NULL;
+    return nullptr;
 
   // don't talk about bad registers
   if ((bad_mask & ((LocationValidType)1 << regname->value())) != 0) {
-    return NULL;
+    return nullptr;
   }
 
   // Convert to a GPR
@@ -110,9 +110,9 @@ address RegisterMap::pd_location(VMReg regname) const {
   int second_word = 0;
   // 32-bit registers for in, out and local
   if (!regname->is_concrete()) {
-    // HMM ought to return NULL for any non-concrete (odd) vmreg
+    // HMM ought to return nullptr for any non-concrete (odd) vmreg
     // this all tied up in the fact we put out double oopMaps for
-    // register locations. When that is fixed we'd will return NULL
+    // register locations. When that is fixed we'd will return nullptr
     // (or assert here).
     reg = regname->prev()->as_Register();
     second_word = sizeof(jint);
@@ -120,11 +120,11 @@ address RegisterMap::pd_location(VMReg regname) const {
     reg = regname->as_Register();
   }
   if (reg->is_out()) {
-    return _younger_window == NULL ? NULL :
+    return _younger_window == nullptr ? nullptr :
       second_word + (address)&_younger_window[reg->after_save()->sp_offset_in_saved_window()];
   }
   if (reg->is_local() || reg->is_in()) {
-    assert(_window != NULL, "Window should be available");
+    assert(_window != nullptr, "Window should be available");
     return second_word + (address)&_window[reg->sp_offset_in_saved_window()];
   }
   // Only the window'd GPRs get handled this way; not the globals.
@@ -323,18 +323,18 @@ bool frame::safe_for_sender(JavaThread *thread) {
 void frame::init(intptr_t* sp, address pc, CodeBlob* cb) {
   assert( (((intptr_t)sp & (wordSize-1)) == 0), "frame constructor passed an invalid sp");
   _sp = sp;
-  _younger_sp = NULL;
+  _younger_sp = nullptr;
   _fp = sp == nullptr ? nullptr
                       : (intptr_t*)((intptr_t)sp[FP->sp_offset_in_saved_window()] + STACK_BIAS);
   _unextended_sp = sp;
   _pc = pc;
   _cb = cb;
-  _oop_map = NULL;
+  _oop_map = nullptr;
   _on_heap = false;
   DEBUG_ONLY(_frame_index = -1;)
   _sp_adjustment_by_callee = 0;
-  assert(pc == NULL && cb == NULL || pc != NULL, "can't have a cb and no pc!");
-  if (_cb == NULL && _pc != NULL ) {
+  assert(pc == nullptr && cb == nullptr || pc != nullptr, "can't have a cb and no pc!");
+  if (_cb == nullptr && _pc != nullptr ) {
     _cb = CodeCache::find_blob(_pc);
   }
   _deopt_state = unknown;
@@ -351,13 +351,13 @@ frame::frame(intptr_t* sp, intptr_t* younger_sp, bool younger_frame_is_interpret
   _sp_adjustment_by_callee(0) {
   _on_heap = false;
   DEBUG_ONLY(_frame_index = -1;)
-  _oop_map = NULL;
+  _oop_map = nullptr;
   _fp = (intptr_t*)((intptr_t)sp[FP->sp_offset_in_saved_window()] + STACK_BIAS);
   _unextended_sp = sp;
-  if (younger_sp == NULL) {
+  if (younger_sp == nullptr) {
     // make a deficient frame which doesn't know where its PC is
-    _pc = NULL;
-    _cb = NULL;
+    _pc = nullptr;
+    _cb = nullptr;
   } else {
     _pc = (address)younger_sp[I7->sp_offset_in_saved_window()] + pc_return_offset;
     assert( (intptr_t*)younger_sp[FP->sp_offset_in_saved_window()] == (intptr_t*)((intptr_t)sp - STACK_BIAS), "younger_sp must be valid");
@@ -368,7 +368,7 @@ frame::frame(intptr_t* sp, intptr_t* younger_sp, bool younger_frame_is_interpret
     // So do not put add any asserts on the _pc here.
   }
 
-  if (_pc != NULL)
+  if (_pc != nullptr)
     _cb = CodeCache::find_blob(_pc);
 
   // Check for MethodHandle call sites.
@@ -394,9 +394,9 @@ frame::frame(intptr_t* sp, intptr_t* younger_sp, bool younger_frame_is_interpret
   // It is important that the frame is fully constructed when we do
   // this lookup as get_deopt_original_pc() needs a correct value for
   // unextended_sp() which uses _sp_adjustment_by_callee.
-  if (_pc != NULL) {
+  if (_pc != nullptr) {
     address original_pc = get_deopt_original_pc();
-    if (original_pc != NULL) {
+    if (original_pc != nullptr) {
       _pc = original_pc;
       _deopt_state = is_deoptimized;
     } else {
@@ -408,7 +408,7 @@ frame::frame(intptr_t* sp, intptr_t* younger_sp, bool younger_frame_is_interpret
 #ifndef PRODUCT
 // This is a generic constructor which is only used by pns() in debug.cpp.
 frame::frame(void* sp, void* fp, void* pc) {
-  init((intptr_t*)sp, (address)pc, NULL);
+  init((intptr_t*)sp, (address)pc, nullptr);
 }
 
 extern "C" void findpc(intptr_t x);
@@ -459,7 +459,7 @@ JavaThread** frame::saved_thread_address(const frame& f) {
 }
 
 frame frame::sender_for_entry_frame(RegisterMap *map) const {
-  assert(map != NULL, "map must be set");
+  assert(map != nullptr, "map must be set");
   // Java frame called from C; skip all C frames and return top C
   // frame of that chunk as the sender
   JavaFrameAnchor* jfa = entry_frame_call_wrapper()->anchor();
@@ -472,10 +472,10 @@ frame frame::sender_for_entry_frame(RegisterMap *map) const {
     // Capture _last_Java_pc (if needed) and mark anchor walkable.
     jfa->capture_last_Java_pc(_sp);
   }
-  assert(jfa->last_Java_pc() != NULL, "No captured pc!");
+  assert(jfa->last_Java_pc() != nullptr, "No captured pc!");
   map->clear();
   map->make_integer_regs_unsaved();
-  map->shift_window(last_Java_sp, NULL);
+  map->shift_window(last_Java_sp, nullptr);
   assert(map->include_argument_oops(), "should be set by clear");
   return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
 }
@@ -496,7 +496,7 @@ bool frame::upcall_stub_frame_is_first() const {
 }
 
 frame frame::sender_for_upcall_stub_frame(RegisterMap* map) const {
-  assert(map != NULL, "map must be set");
+  assert(map != nullptr, "map must be set");
   assert(is_upcall_stub_frame(), "must be upcall stub frame");
   UpcallStub* blob = _cb->as_upcall_stub();
   JavaFrameAnchor* jfa = blob->jfa_for_frame(*this);
@@ -507,11 +507,11 @@ frame frame::sender_for_upcall_stub_frame(RegisterMap* map) const {
     // SPARC needs the register-window state materialized before stack walking.
     jfa->capture_last_Java_pc(_sp);
   }
-  assert(jfa->last_Java_pc() != NULL, "No captured pc");
+  assert(jfa->last_Java_pc() != nullptr, "No captured pc");
 
   map->clear();
   map->make_integer_regs_unsaved();
-  map->shift_window(last_Java_sp, NULL);
+  map->shift_window(last_Java_sp, nullptr);
   return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
 }
 
@@ -555,11 +555,11 @@ static bool sp_is_valid(intptr_t* old_sp, intptr_t* young_sp, intptr_t* sp) {
 
 /*
   Find the (biased) sp that is just younger than old_sp starting at sp.
-  If not found return NULL. Register windows are assumed to be flushed.
+  If not found return nullptr. Register windows are assumed to be flushed.
 */
 intptr_t* frame::next_younger_sp_or_null(intptr_t* old_sp, intptr_t* sp) {
 
-  intptr_t* previous_sp = NULL;
+  intptr_t* previous_sp = nullptr;
   intptr_t* orig_sp = sp;
 
   int max_frames = (old_sp - sp) / 16; // Minimum frame size is 16
@@ -573,7 +573,7 @@ intptr_t* frame::next_younger_sp_or_null(intptr_t* old_sp, intptr_t* sp) {
     sp = (intptr_t*)((intptr_t)sp + STACK_BIAS);
   }
 
-  return (sp == old_sp ? previous_sp : NULL);
+  return (sp == old_sp ? previous_sp : nullptr);
 }
 
 /*
@@ -583,7 +583,7 @@ intptr_t* frame::next_younger_sp_or_null(intptr_t* old_sp, intptr_t* sp) {
   thread stack in question are flushed.
 */
 bool frame::is_valid_stack_pointer(intptr_t* valid_sp, intptr_t* sp) {
-  return next_younger_sp_or_null(valid_sp, sp) != NULL;
+  return next_younger_sp_or_null(valid_sp, sp) != nullptr;
 }
 
 bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
@@ -648,12 +648,12 @@ bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
 // in the bad old _post_Java_state days.
 //
 void JavaFrameAnchor::capture_last_Java_pc(intptr_t* sp) {
-  if (last_Java_sp() != NULL && last_Java_pc() == NULL) {
+  if (last_Java_sp() != nullptr && last_Java_pc() == nullptr) {
     // try and find the sp just younger than _last_Java_sp
     intptr_t* _post_Java_sp = frame::next_younger_sp_or_null(last_Java_sp(), sp);
     // Really this should never fail otherwise VM call must have non-standard
     // frame linkage (bad) or stack is not properly flushed (worse).
-    guarantee(_post_Java_sp != NULL, "bad stack!");
+    guarantee(_post_Java_sp != nullptr, "bad stack!");
     _last_Java_pc = (address) _post_Java_sp[ I7->sp_offset_in_saved_window()] + frame::pc_return_offset;
 
   }
@@ -668,7 +668,7 @@ void JavaFrameAnchor::make_walkable() {
   // We always flush in case the profiler wants it but we won't mark
   // the windows as flushed unless we have a last_Java_frame
   intptr_t* sp = StubRoutines::Sparc::flush_callers_register_windows_func()();
-  if (last_Java_sp() != NULL ) {
+  if (last_Java_sp() != nullptr ) {
     capture_last_Java_pc(sp);
   }
 }

@@ -48,8 +48,8 @@
     _location_valid[0] = 0;  // avoid the shift_individual_registers game
   }
   void pd_initialize() {
-    _window = NULL;
-    _younger_window = NULL;
+    _window = nullptr;
+    _younger_window = nullptr;
     _location_valid[0] = 0;  // avoid the shift_individual_registers game
   }
 

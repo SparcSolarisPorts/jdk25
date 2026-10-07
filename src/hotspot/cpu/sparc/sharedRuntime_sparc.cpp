@@ -2620,7 +2620,7 @@ void SharedRuntime::generate_deopt_blob() {
   //   - Deoptimization::fetch_unroll_info
   //   - Deoptimization::unpack_frames
 
-  OopMap* map = NULL;
+  OopMap* map = nullptr;
 
   int start = __ offset();
 
@@ -2932,7 +2932,7 @@ UncommonTrapBlob* OptoRuntime::generate_uncommon_trap_blob() {
 // Tricky, tricky, tricky...
 
 SafepointBlob* SharedRuntime::generate_handler_blob(SharedStubId id, address call_ptr) {
-  assert (StubRoutines::forward_exception_entry() != NULL, "must be generated before");
+  assert (StubRoutines::forward_exception_entry() != nullptr, "must be generated before");
 
   // allocate space for the code
   ResourceMark rm;
@@ -2943,7 +2943,7 @@ SafepointBlob* SharedRuntime::generate_handler_blob(SharedStubId id, address cal
   MacroAssembler* masm                = new MacroAssembler(&buffer);
   int             frame_size_words;
   OopMapSet *oop_maps = new OopMapSet();
-  OopMap* map = NULL;
+  OopMap* map = nullptr;
 
   int start = __ offset();
 
@@ -3052,7 +3052,7 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(SharedStubId id, address desti
   MacroAssembler* masm                = new MacroAssembler(&buffer);
   int             frame_size_words;
   OopMapSet *oop_maps = new OopMapSet();
-  OopMap* map = NULL;
+  OopMap* map = nullptr;
 
   int start = __ offset();
 

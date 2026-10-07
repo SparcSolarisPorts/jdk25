@@ -1,6 +1,433 @@
+--- a/src/hotspot/cpu/sparc/c1_CodeStubs_sparc.cpp
++++ b/src/hotspot/cpu/sparc/c1_CodeStubs_sparc.cpp
+@@ -285,7 +285,7 @@
+ #ifdef ASSERT
+     address start = __ pc();
+ #endif
+-    AddressLiteral addrlit(NULL, metadata_Relocation::spec(_index));
++    AddressLiteral addrlit(nullptr, metadata_Relocation::spec(_index));
+     __ patchable_set(addrlit, _obj);
+ 
+ #ifdef ASSERT
+@@ -300,7 +300,7 @@
+ #ifdef ASSERT
+     address start = __ pc();
+ #endif
+-    AddressLiteral addrlit(NULL, oop_Relocation::spec(_index));
++    AddressLiteral addrlit(nullptr, oop_Relocation::spec(_index));
+     __ patchable_set(addrlit, _obj);
+ 
+ #ifdef ASSERT
+--- a/src/hotspot/cpu/sparc/c1_LIRAssembler_sparc.cpp
++++ b/src/hotspot/cpu/sparc/c1_LIRAssembler_sparc.cpp
+@@ -294,7 +294,7 @@
+ 
+   address handler_base = __ start_a_stub(exception_handler_size());
+ 
+-  if (handler_base == NULL) {
++  if (handler_base == nullptr) {
+     // not enough space left for the handler
+     bailout("exception handler overflow");
+     return -1;
+@@ -381,7 +381,7 @@
+   // generate code for deopt handler
+   ciMethod* method = compilation()->method();
+   address handler_base = __ start_a_stub(deopt_handler_size());
+-  if (handler_base == NULL) {
++  if (handler_base == nullptr) {
+     // not enough space left for the handler
+     bailout("deopt handler overflow");
+     return -1;
+@@ -420,10 +420,10 @@
+   int oop_index = __ oop_recorder()->allocate_oop_index(nullptr);
+   PatchingStub* patch = new PatchingStub(_masm, patching_id(info), oop_index);
+ 
+-  AddressLiteral addrlit(NULL, oop_Relocation::spec(oop_index));
++  AddressLiteral addrlit(nullptr, oop_Relocation::spec(oop_index));
+   assert(addrlit.rspec().type() == relocInfo::oop_type, "must be an oop reloc");
+-  // It may not seem necessary to use a sethi/add pair to load a NULL into dest, but the
+-  // NULL will be dynamically patched later and the patched value may be large.  We must
++  // It may not seem necessary to use a sethi/add pair to load a nullptr into dest, but the
++  // nullptr will be dynamically patched later and the patched value may be large.  We must
+   // therefore generate the sethi/add as a placeholders
+   __ patchable_set(addrlit, reg);
+ 
+@@ -439,10 +439,10 @@
+   // Allocate a new index in table to hold the klass once it's been patched
+   int index = __ oop_recorder()->allocate_metadata_index(nullptr);
+   PatchingStub* patch = new PatchingStub(_masm, PatchingStub::load_klass_id, index);
+-  AddressLiteral addrlit(NULL, metadata_Relocation::spec(index));
++  AddressLiteral addrlit(nullptr, metadata_Relocation::spec(index));
+   assert(addrlit.rspec().type() == relocInfo::metadata_type, "must be an metadata reloc");
+-  // It may not seem necessary to use a sethi/add pair to load a NULL into dest, but the
+-  // NULL will be dynamically patched later and the patched value may be large.  We must
++  // It may not seem necessary to use a sethi/add pair to load a nullptr into dest, but the
++  // nullptr will be dynamically patched later and the patched value may be large.  We must
+   // therefore generate the sethi/add as a placeholders
+   __ patchable_set(addrlit, reg);
+ 
+@@ -552,7 +552,7 @@
+   if (op->block() != nullptr)  _branch_target_blocks.append(op->block());
+   if (op->ublock() != nullptr) _branch_target_blocks.append(op->ublock());
+ #endif
+-  assert(op->info() == NULL, "shouldn't have CodeEmitInfo");
++  assert(op->info() == nullptr, "shouldn't have CodeEmitInfo");
+ 
+   if (op->cond() == lir_cond_always) {
+     __ br(Assembler::always, false, Assembler::pt, *(op->label()));
+@@ -1018,7 +1018,7 @@
+     case T_OBJECT: {
+       jobject obj = c->as_jobject();
+       LIR_Opr tmp;
+-      if (obj == NULL) {
++      if (obj == nullptr) {
+         tmp = FrameMap::G0_opr;
+       } else {
+         tmp = FrameMap::O7_opr;
+@@ -1038,7 +1038,7 @@
+     default:
+       Unimplemented();
+   }
+-  if (info != NULL) {
++  if (info != nullptr) {
+     assert(offset != -1, "offset should've been set");
+     add_debug_info_for_null_check(offset, info);
+   }
+@@ -1114,7 +1114,7 @@
+     case T_FLOAT:
+       {
+         address const_addr = __ float_constant(c->as_jfloat());
+-        if (const_addr == NULL) {
++        if (const_addr == nullptr) {
+           bailout("const section overflow");
+           break;
+         }
+@@ -1137,7 +1137,7 @@
+     case T_DOUBLE:
+       {
+         address const_addr = __ double_constant(c->as_jdouble());
+-        if (const_addr == NULL) {
++        if (const_addr == nullptr) {
+           bailout("const section overflow");
+           break;
+         }
+@@ -1239,7 +1239,7 @@
+     __ verify_oop(src);
+   }
+ 
+-  PatchingStub* patch = NULL;
++  PatchingStub* patch = nullptr;
+   if (needs_patching) {
+     patch = new PatchingStub(_masm, PatchingStub::access_field_id);
+     assert(!to_reg->is_double_cpu() ||
+@@ -1276,10 +1276,10 @@
+     offset = load(src, disp_reg, to_reg, type, wide);
+   }
+ 
+-  if (patch != NULL) {
++  if (patch != nullptr) {
+     patching_epilog(patch, patch_code, src, info);
+   }
+-  if (info != NULL) add_debug_info_for_null_check(offset, info);
++  if (info != nullptr) add_debug_info_for_null_check(offset, info);
+ }
+ 
+ 
+@@ -1352,7 +1352,7 @@
+     __ verify_oop(src);
+   }
+ 
+-  PatchingStub* patch = NULL;
++  PatchingStub* patch = nullptr;
+   if (needs_patching) {
+     patch = new PatchingStub(_masm, PatchingStub::access_field_id);
+     assert(!from_reg->is_double_cpu() ||
+@@ -1389,11 +1389,11 @@
+     offset = store(from_reg, src, disp_reg, type, wide);
+   }
+ 
+-  if (patch != NULL) {
++  if (patch != nullptr) {
+     patching_epilog(patch, patch_code, src, info);
+   }
+ 
+-  if (info != NULL) add_debug_info_for_null_check(offset, info);
++  if (info != nullptr) add_debug_info_for_null_check(offset, info);
+ }
+ 
+ 
+@@ -1411,7 +1411,7 @@
+ 
+ int LIR_Assembler::safepoint_poll(LIR_Opr tmp, CodeEmitInfo* info) {
+   __ ld_ptr(Address(G2_thread, JavaThread::polling_page_offset()), tmp->as_register());
+-  if (info != NULL) {
++  if (info != nullptr) {
+     add_debug_info_for_branch(info);
+   }
+   int offset = __ offset();
+@@ -1433,7 +1433,7 @@
+   int start = __ offset();
+   __ relocate(static_stub_Relocation::spec(call_pc));
+ 
+-  __ set_metadata(NULL, G5);
++  __ set_metadata(nullptr, G5);
+   // must be set to -1 at code generation time
+   AddressLiteral addrlit(-1);
+   __ jump_to(addrlit, G3);
+@@ -1947,8 +1947,8 @@
+       // Simple test for basic type arrays
+       if (UseCompressedClassPointers) {
+         // We don't need decode because we just need to compare
+-        __ lduw(src, oopDesc::klass_offset_in_bytes(), tmp);
+-        __ lduw(dst, oopDesc::klass_offset_in_bytes(), tmp2);
++        __ load_narrow_klass(src, tmp);
++        __ load_narrow_klass(dst, tmp2);
+         __ cmp(tmp, tmp2);
+         __ br(Assembler::notEqual, false, Assembler::pt, *stub->entry());
+       } else {
+@@ -1969,7 +1969,7 @@
+       __ load_klass(src, G3);
+       __ load_klass(dst, G1);
+ 
+-      __ check_klass_subtype_fast_path(G3, G1, tmp, tmp2, &cont, copyfunc_addr == NULL ? stub->entry() : &slow, NULL);
++      __ check_klass_subtype_fast_path(G3, G1, tmp, tmp2, &cont, copyfunc_addr == nullptr ? stub->entry() : &slow, nullptr);
+ 
+       __ call(Runtime1::entry_for(C1StubId::slow_subtype_check_id), relocInfo::runtime_call_type);
+       __ delayed()->nop();
+@@ -2085,12 +2085,13 @@
+       __ encode_klass_not_null(tmp);
+       // load the raw value of the dst klass, since we will be comparing
+       // uncompressed values directly.
+-      __ lduw(dst, oopDesc::klass_offset_in_bytes(), tmp2);
++      __ load_narrow_klass(dst, tmp2);
+       if (basic_type != T_OBJECT) {
+         __ cmp(tmp, tmp2);
+         __ br(Assembler::notEqual, false, Assembler::pn, halt);
+         // load the raw value of the src klass.
+-        __ delayed()->lduw(src, oopDesc::klass_offset_in_bytes(), tmp2);
++        __ delayed()->nop();
++        __ load_narrow_klass(src, tmp2);
+         __ cmp_and_br_short(tmp, tmp2, Assembler::equal, Assembler::pn, known_ok);
+       } else {
+         __ cmp(tmp, tmp2);
+@@ -2148,7 +2149,8 @@
+   }
+ 
+   bool disjoint = (flags & LIR_OpArrayCopy::overlapping) == 0;
+-  bool aligned = (flags & LIR_OpArrayCopy::unaligned) == 0;
++  bool aligned = (flags & LIR_OpArrayCopy::unaligned) == 0 &&
++                 (arrayOopDesc::base_offset_in_bytes(basic_type) % HeapWordSize) == 0;
+   const char *name;
+   address entry = StubRoutines::select_arraycopy_function(basic_type, aligned, disjoint, name, false);
+ 
+@@ -2270,7 +2272,7 @@
+                       op->tmp1()->as_register(),
+                       op->tmp2()->as_register(),
+                       op->tmp3()->as_register(),
+-                      (arrayOopDesc::base_offset_in_bytes(op->type()) >> LogBytesPerWord),
++                      arrayOopDesc::base_offset_in_bytes(op->type()),
+                       type2aelembytes(op->type()),
+                       op->klass()->as_register(),
+                       *op->stub()->entry());
+@@ -2322,7 +2324,7 @@
+ void LIR_Assembler::setup_md_access(ciMethod* method, int bci,
+                                     ciMethodData*& md, ciProfileData*& data, int& mdo_offset_bias) {
+   md = method->method_data_or_null();
+-  assert(md != NULL, "Sanity");
++  assert(md != nullptr, "Sanity");
+   data = md->bci_to_data(bci);
+   assert(data != nullptr,       "need data for checkcast");
+   assert(data->is_ReceiverTypeData(), "need ReceiverTypeData for type check");
+@@ -2412,7 +2414,7 @@
+     } else {
+       // perform the fast part of the checking logic
+       __ check_klass_subtype_fast_path(klass_RInfo, k_RInfo, Rtmp1, O7, success_target,
+-                                       failure_target, NULL);
++                                       failure_target, nullptr);
+     }
+     if (need_slow_path) {
+       // call out-of-line instance of __ check_klass_subtype_slow_path(...):
+@@ -2508,7 +2510,7 @@
+     // get instance klass
+     __ ld_ptr(Address(k_RInfo, ObjArrayKlass::element_klass_offset()), k_RInfo);
+     // perform the fast part of the checking logic
+-    __ check_klass_subtype_fast_path(klass_RInfo, k_RInfo, Rtmp1, O7, success_target, failure_target, NULL);
++    __ check_klass_subtype_fast_path(klass_RInfo, k_RInfo, Rtmp1, O7, success_target, failure_target, nullptr);
+ 
+     // call out-of-line instance of __ check_klass_subtype_slow_path(...):
+     assert(klass_RInfo == G3 && k_RInfo == G1, "incorrect call setup");
+@@ -2694,16 +2696,11 @@
+   Register result = op->result_opr()->as_pointer_register();
+ 
+   CodeEmitInfo* info = op->info();
+-  if (info != NULL) {
++  if (info != nullptr) {
+     add_debug_info_for_null_check_here(info);
+   }
+ 
+-  if (UseCompressedClassPointers) {
+-    __ lduw(obj, oopDesc::klass_offset_in_bytes(), result);
+-    __ decode_klass_not_null(result);
+-  } else {
+-    __ ld_ptr(obj, oopDesc::klass_offset_in_bytes(), result);
+-  }
++  __ load_klass(obj, result);
+ }
+ 
+ void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
+@@ -2713,7 +2710,7 @@
+ 
+   // Update counter for all call types
+   ciMethodData* md = method->method_data_or_null();
+-  assert(md != NULL, "Sanity");
++  assert(md != nullptr, "Sanity");
+   ciProfileData* data = md->bci_to_data(bci);
+   assert(data != nullptr && data->is_CounterData(), "need CounterData for calls");
+   assert(op->mdo()->is_single_cpu(),  "mdo must be allocated");
+@@ -2889,7 +2886,7 @@
+           __ delayed()->nop();
+         }
+       } else {
+-        assert(ciTypeEntries::valid_ciklass(current_klass) != NULL &&
++        assert(ciTypeEntries::valid_ciklass(current_klass) != nullptr &&
+                ciTypeEntries::valid_ciklass(current_klass) != exact_klass, "conflict only");
+ 
+         __ btst(TypeEntries::type_unknown, tmp2);
+@@ -2927,7 +2924,7 @@
+ #endif
+ 
+       } else {
+-        assert(ciTypeEntries::valid_ciklass(current_klass) != NULL &&
++        assert(ciTypeEntries::valid_ciklass(current_klass) != nullptr &&
+                ciTypeEntries::valid_ciklass(current_klass) != exact_klass, "inconsistent");
+ 
+         // already unknown. Nothing to do anymore.
+@@ -3010,7 +3007,7 @@
+   }
+   __ call(dest, relocInfo::runtime_call_type);
+   __ delayed()->nop();
+-  if (info != NULL) {
++  if (info != nullptr) {
+     add_call_info_here(info);
+   }
+   if (tmp->is_valid()) {
+@@ -3072,7 +3069,7 @@
+     } else {
+       Unimplemented();
+     }
+-    if (info != NULL) {
++    if (info != nullptr) {
+       add_debug_info_for_null_check(null_check_offset, info);
+     }
+ 
+@@ -3214,14 +3211,14 @@
+       case lir_cond_float_branch:
+       case lir_branch: {
+         LIR_OpBranch* branch = op->as_OpBranch();
+-        assert(branch->info() == NULL, "shouldn't be state on branches anymore");
+-        LIR_Op* delay_op = NULL;
++        assert(branch->info() == nullptr, "shouldn't be state on branches anymore");
++        LIR_Op* delay_op = nullptr;
+         // we'd like to be able to pull following instructions into
+         // this slot but we don't know enough to do it safely yet so
+         // only optimize block to block control flow.
+         if (branch->block()) {
+           LIR_Op* prev = inst->at(i - 1);
+-          if (prev && LIR_Assembler::is_single_instruction(prev) && prev->info() == NULL) {
++          if (prev && LIR_Assembler::is_single_instruction(prev) && prev->info() == nullptr) {
+             // swap previous instruction into delay slot
+             inst->at_put(i - 1, op);
+             inst->at_put(i, new LIR_OpDelay(prev, op->info()));
+@@ -3230,7 +3227,7 @@
+         }
+ 
+         if (!delay_op) {
+-          delay_op = new LIR_OpDelay(new LIR_Op0(lir_nop), NULL);
++          delay_op = new LIR_OpDelay(new LIR_Op0(lir_nop), nullptr);
+         }
+         inst->insert_before(i + 1, delay_op);
+         break;
+@@ -3240,7 +3237,7 @@
+       case lir_optvirtual_call:
+       case lir_dynamic_call: {
+         LIR_Op* prev = inst->at(i - 1);
+-        if (prev && prev->code() == lir_move && prev->info() == NULL &&
++        if (prev && prev->code() == lir_move && prev->info() == nullptr &&
+              (!prev->result_opr()->is_single_cpu() ||
+              prev->result_opr()->as_register() != O0) &&
+             LIR_Assembler::is_single_instruction(prev)) {
+--- a/src/hotspot/cpu/sparc/c1_LIRGenerator_sparc.cpp
++++ b/src/hotspot/cpu/sparc/c1_LIRGenerator_sparc.cpp
+@@ -571,7 +571,7 @@
+   }
+   value.load_item();
+   // the old backend doesn't support this
+-  if (count.is_constant() && count.type()->as_IntConstant() != NULL && value.type()->is_int()) {
++  if (count.is_constant() && count.type()->as_IntConstant() != nullptr && value.type()->is_int()) {
+     jint c = count.get_jint_constant() & 0x1f;
+     assert(c >= 0 && c < 32, "should be small");
+     count.dont_load_item();
+@@ -1089,7 +1089,7 @@
+   CodeEmitInfo* info = state_for(x, x->state());
+   // in case of patching (i.e., object class is not yet loaded), we need to reexecute the instruction
+   // and therefore provide the state before the parameters have been consumed
+-  CodeEmitInfo* patching_info = NULL;
++  CodeEmitInfo* patching_info = nullptr;
+   if (!x->klass()->is_loaded() || PatchALot) {
+     patching_info = state_for(x, x->state_before());
+   }
+@@ -1128,7 +1128,7 @@
+   }
+ 
+   // Evaluate state_for early since it may emit code.
+-  CodeEmitInfo* patching_info = NULL;
++  CodeEmitInfo* patching_info = nullptr;
+   if (!x->klass()->is_loaded() || PatchALot) {
+     patching_info = state_for(x, x->state_before());
+ 
+@@ -1181,7 +1181,7 @@
+ 
+ void LIRGenerator::do_CheckCast(CheckCast* x) {
+   LIRItem obj(x->obj(), this);
+-  CodeEmitInfo* patching_info = NULL;
++  CodeEmitInfo* patching_info = nullptr;
+   if (!x->klass()->is_loaded() || (PatchALot && !x->is_incompatible_class_change_check() && !x->is_invokespecial_receiver_check())) {
+     // must do this before locking the destination register as an oop register,
+     // and before the obj is loaded (so x->obj()->item() is valid for creating a debug info location)
+@@ -1195,10 +1195,10 @@
+                                     state_for(x, x->state_before(), true /*ignore_xhandler*/));
+ 
+   if (x->is_incompatible_class_change_check()) {
+-    assert(patching_info == NULL, "can't patch this");
++    assert(patching_info == nullptr, "can't patch this");
+     stub = new SimpleExceptionStub(C1StubId::throw_incompatible_class_change_error_id, LIR_OprFact::illegalOpr, info_for_exception);
+   } else if (x->is_invokespecial_receiver_check()) {
+-    assert(patching_info == NULL, "can't patch this");
++    assert(patching_info == nullptr, "can't patch this");
+     stub = new DeoptimizeStub(info_for_exception,
+                               Deoptimization::Reason_class_check,
+                               Deoptimization::Action_none);
+@@ -1216,7 +1216,7 @@
+ 
+ void LIRGenerator::do_InstanceOf(InstanceOf* x) {
+   LIRItem obj(x->obj(), this);
+-  CodeEmitInfo* patching_info = NULL;
++  CodeEmitInfo* patching_info = nullptr;
+   if (!x->klass()->is_loaded() || PatchALot) {
+     patching_info = state_for(x, x->state_before());
+   }
 --- a/src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.cpp
-@@ -59,6 +59,14 @@
+@@ -30,6 +30,8 @@
+ #include "interpreter/interpreter.hpp"
+ #include "oops/arrayOop.hpp"
+ #include "oops/markWord.hpp"
++#include "oops/klass.hpp"
++#include "utilities/align.hpp"
+ #include "runtime/basicLock.hpp"
+ #include "runtime/os.hpp"
+ #include "runtime/sharedRuntime.hpp"
+@@ -59,6 +61,14 @@
  
  void C1_MacroAssembler::lock_object(Register Rmark, Register Roop, Register Rbox, Register Rscratch, Label& slow_case) {
    assert_different_registers(Rmark, Roop, Rbox, Rscratch);
@@ -15,11 +442,10 @@
  
    Label done;
  
-@@ -103,6 +111,14 @@
- 
+@@ -104,6 +114,14 @@
  void C1_MacroAssembler::unlock_object(Register Rmark, Register Roop, Register Rbox, Label& slow_case) {
    assert_different_registers(Rmark, Roop, Rbox);
-+
+ 
 +  if (LockingMode == LM_LIGHTWEIGHT) {
 +    // O7 is excluded from C1 allocation. The caller's return PC is in I7.
 +    assert_different_registers(Rmark, Roop, Rbox, O7);
@@ -27,9 +453,98 @@
 +    lightweight_unlock(Roop, Rmark, O7, slow_case);
 +    return;
 +  }
- 
++
    Label done;
  
+   Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
+@@ -146,19 +164,23 @@
+ 
+ void C1_MacroAssembler::initialize_header(Register obj, Register klass, Register len, Register t1, Register t2) {
+   assert_different_registers(obj, klass, len, t1, t2);
+-  set((intx)markWord::prototype().value(), t1);
+-  st_ptr(t1, obj, oopDesc::mark_offset_in_bytes());
+-  if (UseCompressedClassPointers) {
+-    // Save klass
+-    mov(klass, t1);
+-    encode_klass_not_null(t1);
+-    stw(t1, obj, oopDesc::klass_offset_in_bytes());
++  if (UseCompactObjectHeaders) {
++    ld_ptr(klass, in_bytes(Klass::prototype_header_offset()), t1);
++    st_ptr(t1, obj, oopDesc::mark_offset_in_bytes());
+   } else {
+-    st_ptr(klass, obj, oopDesc::klass_offset_in_bytes());
++    set((intx)markWord::prototype().value(), t1);
++    st_ptr(t1, obj, oopDesc::mark_offset_in_bytes());
++    if (UseCompressedClassPointers) {
++      mov(klass, t1);
++      encode_klass_not_null(t1);
++      stw(t1, obj, oopDesc::klass_offset_in_bytes());
++    } else {
++      st_ptr(klass, obj, oopDesc::klass_offset_in_bytes());
++    }
+   }
+   if (len->is_valid()) {
+     st(len, obj, arrayOopDesc::length_offset_in_bytes());
+-  } else if (UseCompressedClassPointers) {
++  } else if (UseCompressedClassPointers && !UseCompactObjectHeaders) {
+     // otherwise length is in the class gap
+     store_klass_gap(G0, obj);
+   }
+@@ -235,7 +257,7 @@
+       sub(var_size_in_bytes, hdr_size_in_bytes, t2); // compute size of body
+       initialize_body(t1, t2);
+     } else if (con_size_in_bytes <= threshold) {
+-      // use explicit NULL stores
++      // use explicit nullptr stores
+       for (int i = hdr_size_in_bytes; i < con_size_in_bytes; i += HeapWordSize)     st_ptr(G0, obj, i);
+     } else if (con_size_in_bytes > hdr_size_in_bytes) {
+       // use a loop
+@@ -265,7 +287,7 @@
+   Register t1,                         // temp register
+   Register t2,                         // temp register
+   Register t3,                         // temp register
+-  int      hdr_size,                   // object header size in words
++  int      hdr_size,                   // array header size in bytes
+   int      elt_size,                   // element size in bytes
+   Register klass,                      // object klass
+   Label&   slow_case                   // continuation point if fast allocation fails
+@@ -299,7 +321,7 @@
+     case  8: delayed()->sll(len, 3, arr_size); break;
+     default: ShouldNotReachHere();
+   }
+-  add(arr_size, hdr_size * wordSize + MinObjAlignmentInBytesMask, arr_size); // add space for header & alignment
++  add(arr_size, hdr_size + MinObjAlignmentInBytesMask, arr_size); // add space for header & alignment
+   and3(arr_size, ~MinObjAlignmentInBytesMask, arr_size);                     // align array size
+ 
+   // allocate space & initialize header
+@@ -313,8 +335,14 @@
+   // initialize body
+   const Register base  = t2;
+   const Register index = t3;
+-  add(obj, hdr_size * wordSize, base);               // compute address of first element
+-  sub(arr_size, hdr_size * wordSize, index);         // compute index = number of words to clear
++  // Array payloads can start halfway through a heap word (compact headers,
++  // or uncompressed klass pointers). Preserve the preceding length field.
++  const int aligned_header = align_up(hdr_size, HeapWordSize);
++  if (hdr_size != aligned_header) {
++    stw(G0, obj, hdr_size);
++  }
++  add(obj, aligned_header, base);
++  sub(arr_size, aligned_header, index);
+   initialize_body(base, index);
+ 
+   if (CURRENT_ENV->dtrace_alloc_probes()) {
+--- a/src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.hpp
++++ b/src/hotspot/cpu/sparc/c1_MacroAssembler_sparc.hpp
+@@ -79,7 +79,7 @@
+     Register t1,                       // temp register
+     Register t2,                       // temp register
+     Register t3,                       // temp register
+-    int      hdr_size,                 // object header size in words
++    int      hdr_size,                 // array header size in bytes
+     int      elt_size,                 // element size in bytes
+     Register klass,                    // object klass
+     Label&   slow_case                 // continuation point if fast allocation fails
 --- a/src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/c1_Runtime1_sparc.cpp
 @@ -27,6 +27,7 @@
@@ -40,10 +555,38 @@
  #include "compiler/oopMap.hpp"
  #include "gc/shared/cardTable.hpp"
  #include "gc/shared/cardTableBarrierSet.hpp"
-@@ -619,6 +620,40 @@
+@@ -332,7 +333,7 @@
+   } else {
+     call_offset = __ call_RT(result, noreg, target, arg1, arg2, arg3);
+   }
+-  OopMapSet* oop_maps = NULL;
++  OopMapSet* oop_maps = nullptr;
+ 
+   oop_maps = new OopMapSet();
+   oop_maps->add_gc_map(call_offset, oop_map);
+@@ -382,7 +383,7 @@
+ 
+ OopMapSet* Runtime1::generate_code_for(C1StubId id, StubAssembler* sasm) {
+ 
+-  OopMapSet* oop_maps = NULL;
++  OopMapSet* oop_maps = nullptr;
+   // for better readability
+   const bool must_gc_arguments = true;
+   const bool dont_gc_arguments = false;
+@@ -607,7 +608,7 @@
+ 
+         __ save_frame(0);               // Blow no registers!
+ 
+-        __ check_klass_subtype_slow_path(G3, G1, L0, L1, L2, L4, NULL, &miss);
++        __ check_klass_subtype_slow_path(G3, G1, L0, L1, L2, L4, nullptr, &miss);
+ 
+         __ mov(1, G3);
+         __ ret();                       // Result in G5 is 'true'
+@@ -618,6 +619,40 @@
+         __ ret();                       // Result in G5 is 'false'
          __ delayed()->restore();        // free copy or add can go here
        }
- 
++
 +    case C1StubId::is_instance_of_id:
 +      {
 +        // C calling convention: O0 = Class mirror, O1 = object, O0 = boolean.
@@ -77,10 +620,58 @@
 +        __ delayed()->restore();
 +      }
 +      break;
-+
+ 
      case C1StubId::monitorenter_nofpu_id:
      case C1StubId::monitorenter_id:
-       { // G4: object
+@@ -672,7 +707,7 @@
+         oop_maps->add_gc_map(call_offset, oop_map);
+         restore_live_registers(sasm);
+         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
+-        assert(deopt_blob != NULL, "deoptimization blob must have been created");
++        assert(deopt_blob != nullptr, "deoptimization blob must have been created");
+         AddressLiteral dest(deopt_blob->unpack_with_reexecution());
+         __ jump_to(dest, O0);
+         __ delayed()->restore();
+@@ -733,7 +768,7 @@
+         oop_maps->add_gc_map(call_offset, oop_map);
+ 
+         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
+-        assert(deopt_blob != NULL, "deoptimization blob must have been created");
++        assert(deopt_blob != nullptr, "deoptimization blob must have been created");
+         restore_live_registers(sasm);
+ 
+         AddressLiteral dest(deopt_blob->unpack_with_reexecution());
+--- a/src/hotspot/cpu/sparc/c1_sparcTrace.hpp
++++ b/src/hotspot/cpu/sparc/c1_sparcTrace.hpp
+@@ -24,7 +24,7 @@
+ 
+ inline int init_level() {
+   const char* s = ::getenv("SPARC_C1_TRACE");
+-  if (s == NULL || s[0] == '\0' || (s[0] == '0' && s[1] == '\0')) {
++  if (s == nullptr || s[0] == '\0' || (s[0] == '0' && s[1] == '\0')) {
+     return 0;
+   }
+   int v = ::atoi(s);
+@@ -42,16 +42,16 @@
+ }
+ 
+ inline bool matches(ciMethod* method) {
+-  if (method == NULL || level() == 0) {
++  if (method == nullptr || level() == 0) {
+     return false;
+   }
+   const char* f = filter();
+-  if (f == NULL || f[0] == '\0') {
++  if (f == nullptr || f[0] == '\0') {
+     return true;
+   }
+   const char* holder = method->holder()->name()->as_utf8();
+   const char* name = method->name()->as_utf8();
+-  return ::strstr(holder, f) != NULL || ::strstr(name, f) != NULL;
++  return ::strstr(holder, f) != nullptr || ::strstr(name, f) != nullptr;
+ }
+ 
+ inline bool active(ciMethod* method, int min_level = 1) {
 --- a/src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
 @@ -26,17 +26,21 @@
@@ -347,8 +938,272 @@
  }
  
  inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(
+--- a/src/hotspot/cpu/sparc/frame_sparc.cpp
++++ b/src/hotspot/cpu/sparc/frame_sparc.cpp
+@@ -49,9 +49,9 @@
+     frame fr = _thread->last_frame();
+     _window = fr.sp();
+   } else {
+-    _window = NULL;
+-  }
+-  _younger_window = NULL;
++    _window = nullptr;
++  }
++  _younger_window = nullptr;
+ }
+ 
+ 
+@@ -98,11 +98,11 @@
+   assert(regname->is_reg(), "sanity check");
+   // Only the GPRs get handled this way
+   if( !regname->is_Register())
+-    return NULL;
++    return nullptr;
+ 
+   // don't talk about bad registers
+   if ((bad_mask & ((LocationValidType)1 << regname->value())) != 0) {
+-    return NULL;
++    return nullptr;
+   }
+ 
+   // Convert to a GPR
+@@ -110,9 +110,9 @@
+   int second_word = 0;
+   // 32-bit registers for in, out and local
+   if (!regname->is_concrete()) {
+-    // HMM ought to return NULL for any non-concrete (odd) vmreg
++    // HMM ought to return nullptr for any non-concrete (odd) vmreg
+     // this all tied up in the fact we put out double oopMaps for
+-    // register locations. When that is fixed we'd will return NULL
++    // register locations. When that is fixed we'd will return nullptr
+     // (or assert here).
+     reg = regname->prev()->as_Register();
+     second_word = sizeof(jint);
+@@ -120,11 +120,11 @@
+     reg = regname->as_Register();
+   }
+   if (reg->is_out()) {
+-    return _younger_window == NULL ? NULL :
++    return _younger_window == nullptr ? nullptr :
+       second_word + (address)&_younger_window[reg->after_save()->sp_offset_in_saved_window()];
+   }
+   if (reg->is_local() || reg->is_in()) {
+-    assert(_window != NULL, "Window should be available");
++    assert(_window != nullptr, "Window should be available");
+     return second_word + (address)&_window[reg->sp_offset_in_saved_window()];
+   }
+   // Only the window'd GPRs get handled this way; not the globals.
+@@ -323,18 +323,18 @@
+ void frame::init(intptr_t* sp, address pc, CodeBlob* cb) {
+   assert( (((intptr_t)sp & (wordSize-1)) == 0), "frame constructor passed an invalid sp");
+   _sp = sp;
+-  _younger_sp = NULL;
++  _younger_sp = nullptr;
+   _fp = sp == nullptr ? nullptr
+                       : (intptr_t*)((intptr_t)sp[FP->sp_offset_in_saved_window()] + STACK_BIAS);
+   _unextended_sp = sp;
+   _pc = pc;
+   _cb = cb;
+-  _oop_map = NULL;
++  _oop_map = nullptr;
+   _on_heap = false;
+   DEBUG_ONLY(_frame_index = -1;)
+   _sp_adjustment_by_callee = 0;
+-  assert(pc == NULL && cb == NULL || pc != NULL, "can't have a cb and no pc!");
+-  if (_cb == NULL && _pc != NULL ) {
++  assert(pc == nullptr && cb == nullptr || pc != nullptr, "can't have a cb and no pc!");
++  if (_cb == nullptr && _pc != nullptr ) {
+     _cb = CodeCache::find_blob(_pc);
+   }
+   _deopt_state = unknown;
+@@ -351,13 +351,13 @@
+   _sp_adjustment_by_callee(0) {
+   _on_heap = false;
+   DEBUG_ONLY(_frame_index = -1;)
+-  _oop_map = NULL;
++  _oop_map = nullptr;
+   _fp = (intptr_t*)((intptr_t)sp[FP->sp_offset_in_saved_window()] + STACK_BIAS);
+   _unextended_sp = sp;
+-  if (younger_sp == NULL) {
++  if (younger_sp == nullptr) {
+     // make a deficient frame which doesn't know where its PC is
+-    _pc = NULL;
+-    _cb = NULL;
++    _pc = nullptr;
++    _cb = nullptr;
+   } else {
+     _pc = (address)younger_sp[I7->sp_offset_in_saved_window()] + pc_return_offset;
+     assert( (intptr_t*)younger_sp[FP->sp_offset_in_saved_window()] == (intptr_t*)((intptr_t)sp - STACK_BIAS), "younger_sp must be valid");
+@@ -368,7 +368,7 @@
+     // So do not put add any asserts on the _pc here.
+   }
+ 
+-  if (_pc != NULL)
++  if (_pc != nullptr)
+     _cb = CodeCache::find_blob(_pc);
+ 
+   // Check for MethodHandle call sites.
+@@ -394,9 +394,9 @@
+   // It is important that the frame is fully constructed when we do
+   // this lookup as get_deopt_original_pc() needs a correct value for
+   // unextended_sp() which uses _sp_adjustment_by_callee.
+-  if (_pc != NULL) {
++  if (_pc != nullptr) {
+     address original_pc = get_deopt_original_pc();
+-    if (original_pc != NULL) {
++    if (original_pc != nullptr) {
+       _pc = original_pc;
+       _deopt_state = is_deoptimized;
+     } else {
+@@ -408,7 +408,7 @@
+ #ifndef PRODUCT
+ // This is a generic constructor which is only used by pns() in debug.cpp.
+ frame::frame(void* sp, void* fp, void* pc) {
+-  init((intptr_t*)sp, (address)pc, NULL);
++  init((intptr_t*)sp, (address)pc, nullptr);
+ }
+ 
+ extern "C" void findpc(intptr_t x);
+@@ -459,7 +459,7 @@
+ }
+ 
+ frame frame::sender_for_entry_frame(RegisterMap *map) const {
+-  assert(map != NULL, "map must be set");
++  assert(map != nullptr, "map must be set");
+   // Java frame called from C; skip all C frames and return top C
+   // frame of that chunk as the sender
+   JavaFrameAnchor* jfa = entry_frame_call_wrapper()->anchor();
+@@ -472,10 +472,10 @@
+     // Capture _last_Java_pc (if needed) and mark anchor walkable.
+     jfa->capture_last_Java_pc(_sp);
+   }
+-  assert(jfa->last_Java_pc() != NULL, "No captured pc!");
++  assert(jfa->last_Java_pc() != nullptr, "No captured pc!");
+   map->clear();
+   map->make_integer_regs_unsaved();
+-  map->shift_window(last_Java_sp, NULL);
++  map->shift_window(last_Java_sp, nullptr);
+   assert(map->include_argument_oops(), "should be set by clear");
+   return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
+ }
+@@ -496,7 +496,7 @@
+ }
+ 
+ frame frame::sender_for_upcall_stub_frame(RegisterMap* map) const {
+-  assert(map != NULL, "map must be set");
++  assert(map != nullptr, "map must be set");
+   assert(is_upcall_stub_frame(), "must be upcall stub frame");
+   UpcallStub* blob = _cb->as_upcall_stub();
+   JavaFrameAnchor* jfa = blob->jfa_for_frame(*this);
+@@ -507,11 +507,11 @@
+     // SPARC needs the register-window state materialized before stack walking.
+     jfa->capture_last_Java_pc(_sp);
+   }
+-  assert(jfa->last_Java_pc() != NULL, "No captured pc");
++  assert(jfa->last_Java_pc() != nullptr, "No captured pc");
+ 
+   map->clear();
+   map->make_integer_regs_unsaved();
+-  map->shift_window(last_Java_sp, NULL);
++  map->shift_window(last_Java_sp, nullptr);
+   return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
+ }
+ 
+@@ -555,11 +555,11 @@
+ 
+ /*
+   Find the (biased) sp that is just younger than old_sp starting at sp.
+-  If not found return NULL. Register windows are assumed to be flushed.
++  If not found return nullptr. Register windows are assumed to be flushed.
+ */
+ intptr_t* frame::next_younger_sp_or_null(intptr_t* old_sp, intptr_t* sp) {
+ 
+-  intptr_t* previous_sp = NULL;
++  intptr_t* previous_sp = nullptr;
+   intptr_t* orig_sp = sp;
+ 
+   int max_frames = (old_sp - sp) / 16; // Minimum frame size is 16
+@@ -573,7 +573,7 @@
+     sp = (intptr_t*)((intptr_t)sp + STACK_BIAS);
+   }
+ 
+-  return (sp == old_sp ? previous_sp : NULL);
++  return (sp == old_sp ? previous_sp : nullptr);
+ }
+ 
+ /*
+@@ -583,7 +583,7 @@
+   thread stack in question are flushed.
+ */
+ bool frame::is_valid_stack_pointer(intptr_t* valid_sp, intptr_t* sp) {
+-  return next_younger_sp_or_null(valid_sp, sp) != NULL;
++  return next_younger_sp_or_null(valid_sp, sp) != nullptr;
+ }
+ 
+ bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
+@@ -648,12 +648,12 @@
+ // in the bad old _post_Java_state days.
+ //
+ void JavaFrameAnchor::capture_last_Java_pc(intptr_t* sp) {
+-  if (last_Java_sp() != NULL && last_Java_pc() == NULL) {
++  if (last_Java_sp() != nullptr && last_Java_pc() == nullptr) {
+     // try and find the sp just younger than _last_Java_sp
+     intptr_t* _post_Java_sp = frame::next_younger_sp_or_null(last_Java_sp(), sp);
+     // Really this should never fail otherwise VM call must have non-standard
+     // frame linkage (bad) or stack is not properly flushed (worse).
+-    guarantee(_post_Java_sp != NULL, "bad stack!");
++    guarantee(_post_Java_sp != nullptr, "bad stack!");
+     _last_Java_pc = (address) _post_Java_sp[ I7->sp_offset_in_saved_window()] + frame::pc_return_offset;
+ 
+   }
+@@ -668,7 +668,7 @@
+   // We always flush in case the profiler wants it but we won't mark
+   // the windows as flushed unless we have a last_Java_frame
+   intptr_t* sp = StubRoutines::Sparc::flush_callers_register_windows_func()();
+-  if (last_Java_sp() != NULL ) {
++  if (last_Java_sp() != nullptr ) {
+     capture_last_Java_pc(sp);
+   }
+ }
+--- a/src/hotspot/cpu/sparc/frame_sparc.hpp
++++ b/src/hotspot/cpu/sparc/frame_sparc.hpp
+@@ -164,7 +164,7 @@
+   // matches this port: sparc does not emit post-call nops).
+   intptr_t* younger_sp() const {
+     assert_absolute();
+-    assert(_younger_sp != NULL, "frame must possess a younger_sp");
++    assert(_younger_sp != nullptr, "frame must possess a younger_sp");
+     return _younger_sp;
+   }
+   intptr_t* younger_sp_or_null() const { assert_absolute(); return _younger_sp; }
+@@ -190,7 +190,7 @@
+ 
+   // make a deficient frame which doesn't know where its PC is:
+   enum unpatchable_t { unpatchable };
+-  frame(intptr_t* sp, unpatchable_t, address pc = NULL, CodeBlob* cb = NULL);
++  frame(intptr_t* sp, unpatchable_t, address pc = nullptr, CodeBlob* cb = nullptr);
+ 
+   void init(intptr_t* sp, address pc, CodeBlob* cb);
+ 
 --- a/src/hotspot/cpu/sparc/frame_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/frame_sparc.inline.hpp
+@@ -35,11 +35,11 @@
+ // Constructors
+ 
+ inline frame::frame() {
+-  _pc = NULL;
+-  _sp = NULL;
+-  _younger_sp = NULL;
+-  _unextended_sp = NULL;
+-  _fp = NULL;
++  _pc = nullptr;
++  _sp = nullptr;
++  _younger_sp = nullptr;
++  _unextended_sp = nullptr;
++  _fp = nullptr;
+     _cb = nullptr;
+   _oop_map = nullptr;
+   _deopt_state = unknown;
 @@ -194,7 +194,9 @@
  // return address:
  
@@ -362,6 +1217,23 @@
  inline address* frame::I7_addr() const  { return (address*) &sp()[ I7->sp_offset_in_saved_window()]; }
 --- a/src/hotspot/cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
+@@ -102,11 +102,11 @@
+ 
+ #undef __
+ 
+-static address satb_log_enqueue_with_frame = NULL;
+-static u_char* satb_log_enqueue_with_frame_end = NULL;
+-
+-static address satb_log_enqueue_frameless = NULL;
+-static u_char* satb_log_enqueue_frameless_end = NULL;
++static address satb_log_enqueue_with_frame = nullptr;
++static u_char* satb_log_enqueue_with_frame_end = nullptr;
++
++static address satb_log_enqueue_frameless = nullptr;
++static u_char* satb_log_enqueue_frameless_end = nullptr;
+ 
+ static int EnqueueCodeSize = 128 DEBUG_ONLY( + 256); // Instructions?
+ 
 @@ -820,7 +820,12 @@
  
  static void generate_c2_barrier_runtime_call(MacroAssembler* masm, G1BarrierStubC2* stub, const Register arg, const address runtime_path) {
@@ -453,8 +1325,28 @@
                         reg_save_index * BytesPerWord;
  
      if (vm_reg->is_Register()) {
+--- a/src/hotspot/cpu/sparc/gc/shared/cardTableBarrierSetAssembler_sparc.cpp
++++ b/src/hotspot/cpu/sparc/gc/shared/cardTableBarrierSetAssembler_sparc.cpp
+@@ -77,7 +77,7 @@
+ }
+ 
+ void CardTableBarrierSetAssembler::card_write_barrier_post(MacroAssembler* masm, Register store_addr, Register new_val, Register tmp) {
+-  // If we're writing constant NULL, we can skip the write barrier.
++  // If we're writing constant nullptr, we can skip the write barrier.
+   if (new_val == G0) return;
+   CardTableBarrierSet* bs = barrier_set_cast<CardTableBarrierSet>(BarrierSet::barrier_set());
+   card_table_write(masm, bs->card_table()->byte_map_base(), tmp, store_addr);
 --- a/src/hotspot/cpu/sparc/interp_masm_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/interp_masm_sparc.cpp
+@@ -218,7 +218,7 @@
+     Label L;
+     Register thr_state = G3_scratch;
+     ld_ptr(G2_thread, JavaThread::jvmti_thread_state_offset(), thr_state);
+-    br_null_short(thr_state, pt, L); // if (thread->jvmti_thread_state() == NULL) exit;
++    br_null_short(thr_state, pt, L); // if (thread->jvmti_thread_state() == nullptr) exit;
+ 
+     // Initiate earlyret handling only if it is not already being processed.
+     // If the flag has the earlyret_processing bit set, it means that this code
 @@ -483,7 +483,7 @@
    assert(G4_scratch != Gframe_size, "Only you can prevent register aliasing!");
  
@@ -463,6 +1355,38 @@
 +  lduh(Lmethod, in_bytes(Method::access_flags_offset()), Gframe_size);  // Load access flags.
    btst(JVM_ACC_NATIVE, Gframe_size);
    br(Assembler::notZero, false, Assembler::pt, done);
+   delayed()->nop();
+@@ -742,7 +742,7 @@
+   add(result, index, result);
+   load_heap_oop(result, arrayOopDesc::base_offset_in_bytes(T_OBJECT), result, tmp);
+   // The resulting oop is null if the reference is not yet resolved.
+-  // It is Universe::the_null_sentinel() if the reference resolved to NULL via condy.
++  // It is Universe::the_null_sentinel() if the reference resolved to nullptr via condy.
+ }
+ 
+ 
+@@ -779,11 +779,11 @@
+ 
+   check_klass_subtype_fast_path(Rsub_klass, Rsuper_klass,
+                                 Rtmp1, Rtmp2,
+-                                &ok_is_subtype, &not_subtype, NULL);
++                                &ok_is_subtype, &not_subtype, nullptr);
+ 
+   check_klass_subtype_slow_path(Rsub_klass, Rsuper_klass,
+                                 Rtmp1, Rtmp2, Rtmp3, /*hack:*/ noreg,
+-                                &ok_is_subtype, NULL);
++                                &ok_is_subtype, nullptr);
+ 
+   bind(not_subtype);
+   profile_typecheck_failed(Rtmp1);
+@@ -821,7 +821,7 @@
+ void InterpreterMacroAssembler::throw_if_not_2( address  throw_entry_point,
+                                                 Register Rscratch,
+                                                 Label&   ok ) {
+-  assert(throw_entry_point != NULL, "entry point must be generated by now");
++  assert(throw_entry_point != nullptr, "entry point must be generated by now");
+   AddressLiteral dest(throw_entry_point);
+   jump_to(dest, Rscratch);
    delayed()->nop();
 @@ -959,7 +959,7 @@
    const Address access_flags(Lmethod, Method::access_flags_offset());
@@ -509,6 +1433,17 @@
    if (LockingMode == LM_MONITOR) {
      call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
    } else {
+--- a/src/hotspot/cpu/sparc/interpreterRT_sparc.cpp
++++ b/src/hotspot/cpu/sparc/interpreterRT_sparc.cpp
+@@ -146,7 +146,7 @@
+   virtual void pass_object() {
+     // pass address of from
+     intptr_t *from_addr = (intptr_t*)(_from + Interpreter::local_offset_in_bytes(0));
+-    *_to++ = (*from_addr == 0) ? NULL : (intptr_t) from_addr;
++    *_to++ = (*from_addr == 0) ? 0 : (intptr_t) from_addr;
+     _from -= Interpreter::stackElementSize;
+     add_signature( non_float );
+    }
 --- a/src/hotspot/cpu/sparc/macroAssembler_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/macroAssembler_sparc.cpp
 @@ -41,6 +41,7 @@
@@ -519,6 +1454,15 @@
  #include "runtime/objectMonitor.hpp"
  #include "runtime/os.inline.hpp"
  #include "runtime/safepoint.hpp"
+@@ -173,7 +174,7 @@
+ 
+ void MacroAssembler::resolve_jobject(Register value, Register tmp) {
+   Label done, not_weak, weak_tagged;
+-  br_null(value, false, Assembler::pn, done); // Use NULL as-is.
++  br_null(value, false, Assembler::pn, done); // Use nullptr as-is.
+   delayed()->andcc(value, JNIHandles::tag_mask, G0); // Test for tagged handle
+   brx(Assembler::zero, true, Assembler::pt, not_weak);
+   delayed()->nop();
 @@ -278,22 +279,22 @@
  void MacroAssembler::inc_held_monitor_count(Register java_thread) {
    if (!Continuations::enabled()) return;
@@ -547,6 +1491,156 @@
  }
  
  void MacroAssembler::post_call_nop() {
+@@ -332,7 +333,7 @@
+ #endif
+ 
+ #ifdef ASSERT
+-address last_get_thread = NULL;
++address last_get_thread = nullptr;
+ #endif
+ 
+ // call this when G2_thread is not known to be valid
+@@ -442,7 +443,7 @@
+ #endif /* ASSERT */
+   //
+   // When returning from calling out from Java mode the frame anchor's last_Java_pc
+-  // will always be set to NULL. It is set here so that if we are doing a call to
++  // will always be set to nullptr. It is set here so that if we are doing a call to
+   // native (not VM) that we capture the known pc and don't have to rely on the
+   // native call having a standard frame linkage where we can find the pc.
+ 
+@@ -715,7 +716,7 @@
+ 
+ int MacroAssembler::ic_check_size() {
+   // lduw|ldx (receiver klass) + ldx (speculated klass) + cmp + trap
+-  return 4 * BytesPerInstWord;
++  return (UseCompactObjectHeaders ? 5 : 4) * BytesPerInstWord;
+ }
+ 
+ int MacroAssembler::ic_check(int end_alignment) {
+@@ -738,7 +739,7 @@
+   // receiver when UseCompressedClassPointers is on, the full Klass*
+   // otherwise (see CompiledICData::initialize).
+   if (UseCompressedClassPointers) {
+-    lduw(receiver, oopDesc::klass_offset_in_bytes(), tmp1);
++    load_narrow_klass(receiver, tmp1);
+   } else {
+     ld_ptr(receiver, oopDesc::klass_offset_in_bytes(), tmp1);
+   }
+@@ -838,7 +839,7 @@
+ }
+ 
+ int MacroAssembler::worst_case_insts_for_set() {
+-  return insts_for_sethi(NULL, true) + 1;
++  return insts_for_sethi(nullptr, true) + 1;
+ }
+ 
+ 
+@@ -1068,14 +1069,14 @@
+ 
+ 
+ AddressLiteral MacroAssembler::allocate_metadata_address(Metadata* obj) {
+-  assert(oop_recorder() != NULL, "this assembler needs a Recorder");
++  assert(oop_recorder() != nullptr, "this assembler needs a Recorder");
+   int index = oop_recorder()->allocate_metadata_index(obj);
+   RelocationHolder rspec = metadata_Relocation::spec(index);
+   return AddressLiteral((address)obj, rspec);
+ }
+ 
+ AddressLiteral MacroAssembler::constant_metadata_address(Metadata* obj) {
+-  assert(oop_recorder() != NULL, "this assembler needs a Recorder");
++  assert(oop_recorder() != nullptr, "this assembler needs a Recorder");
+   int index = oop_recorder()->find_index(obj);
+   RelocationHolder rspec = metadata_Relocation::spec(index);
+   return AddressLiteral((address)obj, rspec);
+@@ -1095,7 +1096,7 @@
+ }
+ 
+ void  MacroAssembler::set_narrow_oop(jobject obj, Register d) {
+-  assert(oop_recorder() != NULL, "this assembler needs an OopRecorder");
++  assert(oop_recorder() != nullptr, "this assembler needs an OopRecorder");
+   int oop_index = oop_recorder()->find_index(obj);
+   RelocationHolder rspec = oop_Relocation::spec(oop_index);
+ 
+@@ -1110,7 +1111,7 @@
+ }
+ 
+ void  MacroAssembler::set_narrow_klass(Klass* k, Register d) {
+-  assert(oop_recorder() != NULL, "this assembler needs an OopRecorder");
++  assert(oop_recorder() != nullptr, "this assembler needs an OopRecorder");
+   int klass_index = oop_recorder()->find_index(k);
+   RelocationHolder rspec = metadata_Relocation::spec(klass_index);
+   narrowKlass encoded_k = CompressedKlassPointers::encode(k);
+@@ -1231,7 +1232,7 @@
+   // plausibility check for oops
+   if (!VerifyOops) return;
+ 
+-  if (reg == G0)  return;       // always NULL, which is always an oop
++  if (reg == G0)  return;       // always nullptr, which is always an oop
+ 
+   BLOCK_COMMENT("verify_oop {");
+   char buffer[64];
+@@ -1242,7 +1243,7 @@
+   }
+ #endif
+ 
+-  const char* real_msg = NULL;
++  const char* real_msg = nullptr;
+   {
+     ResourceMark rm;
+     stringStream ss;
+@@ -1280,7 +1281,7 @@
+   // plausibility check for oops
+   if (!VerifyOops) return;
+ 
+-  const char* real_msg = NULL;
++  const char* real_msg = nullptr;
+   {
+     ResourceMark rm;
+     stringStream ss;
+@@ -1314,7 +1315,7 @@
+ }
+ 
+ // side-door communication with signalHandler in os_solaris.cpp
+-address MacroAssembler::_verify_oop_implicit_branch[3] = { NULL };
++address MacroAssembler::_verify_oop_implicit_branch[3] = { nullptr };
+ 
+ // This macro is expanded just once; it creates shared code.  Contract:
+ // receives an oop in O0.  Must restore O0 & O7 from TLS.  Must not smash ANY
+@@ -1350,7 +1351,7 @@
+   Register O4_temp = O4;
+ 
+   // mark lower end of faulting range
+-  assert(_verify_oop_implicit_branch[0] == NULL, "set once");
++  assert(_verify_oop_implicit_branch[0] == nullptr, "set once");
+   _verify_oop_implicit_branch[0] = pc();
+ 
+   // We can't check the mark oop because it could be in the process of
+@@ -1370,7 +1371,7 @@
+   // Check the Klass* of this object for being in the right area of memory.
+   // Cannot do the load in the delay above slot in case O0 is null
+   load_klass(O0_obj, O0_obj);
+-  // assert((klass != NULL)
++  // assert((klass != nullptr)
+   br_null_short(O0_obj, pn, fail);
+ 
+   wrccr( O5_save_flags ); // Restore CCR's
+@@ -2261,13 +2262,13 @@
+   check_klass_subtype_fast_path(sub_klass, super_klass,
+                                 temp_reg, temp2_reg,
+                                 (did_save ? &L_pop_to_success : &L_success),
+-                                (did_save ? &L_pop_to_failure : &L_failure), NULL);
++                                (did_save ? &L_pop_to_failure : &L_failure), nullptr);
+ 
+   if (!did_save)
+     save_frame_and_mov(0, sub_klass, sub_2, super_klass, sup_2);
+   check_klass_subtype_slow_path(sub_2, sup_2,
+                                 L2, L3, L4, L5,
+-                                NULL, &L_pop_to_failure);
++                                nullptr, &L_pop_to_failure);
+ 
+   // on success:
+   bind(L_pop_to_success);
 @@ -2491,6 +2492,105 @@
  }
  
@@ -697,9 +1791,183 @@
     Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
  
     Label done ;
+@@ -2958,14 +3088,25 @@
+   // MachCallDynamicJavaNode::ret_addr_offset()
+   // if this changes, change that.
+   if (UseCompressedClassPointers) {
+-    lduw(src_oop, oopDesc::klass_offset_in_bytes(), klass);
++    load_narrow_klass(src_oop, klass);
+     decode_klass_not_null(klass);
+   } else {
+     ld_ptr(src_oop, oopDesc::klass_offset_in_bytes(), klass);
+   }
+ }
+ 
++void MacroAssembler::load_narrow_klass(Register src_oop, Register klass) {
++  assert(UseCompressedClassPointers, "narrow klass required");
++  if (UseCompactObjectHeaders) {
++    ldx(src_oop, oopDesc::mark_offset_in_bytes(), klass);
++    srlx(klass, markWord::klass_shift, klass);
++  } else {
++    lduw(src_oop, oopDesc::klass_offset_in_bytes(), klass);
++  }
++}
++
+ void MacroAssembler::store_klass(Register klass, Register dst_oop) {
++  assert(!UseCompactObjectHeaders, "compact klass is initialized in the mark word");
+   if (UseCompressedClassPointers) {
+     assert(dst_oop != klass, "not enough registers");
+     encode_klass_not_null(klass);
+@@ -2976,7 +3117,7 @@
+ }
+ 
+ void MacroAssembler::store_klass_gap(Register s, Register d) {
+-  if (UseCompressedClassPointers) {
++  if (UseCompressedClassPointers && !UseCompactObjectHeaders) {
+     assert(s != d, "not enough registers");
+     st(s, d, oopDesc::klass_gap_offset_in_bytes());
+   }
+@@ -3047,10 +3188,10 @@
+ 
+ void MacroAssembler::encode_heap_oop(Register src, Register dst) {
+   assert (UseCompressedOops, "must be compressed");
+-  assert (Universe::heap() != NULL, "java heap should be initialized");
++  assert (Universe::heap() != nullptr, "java heap should be initialized");
+   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+   verify_oop(src);
+-  if (CompressedOops::base() == NULL) {
++  if (CompressedOops::base() == nullptr) {
+     srlx(src, LogMinObjAlignmentInBytes, dst);
+     return;
+   }
+@@ -3075,20 +3216,20 @@
+ 
+ void MacroAssembler::encode_heap_oop_not_null(Register r) {
+   assert (UseCompressedOops, "must be compressed");
+-  assert (Universe::heap() != NULL, "java heap should be initialized");
++  assert (Universe::heap() != nullptr, "java heap should be initialized");
+   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+   verify_oop(r);
+-  if (CompressedOops::base() != NULL)
++  if (CompressedOops::base() != nullptr)
+     sub(r, G6_heapbase, r);
+   srlx(r, LogMinObjAlignmentInBytes, r);
+ }
+ 
+ void MacroAssembler::encode_heap_oop_not_null(Register src, Register dst) {
+   assert (UseCompressedOops, "must be compressed");
+-  assert (Universe::heap() != NULL, "java heap should be initialized");
++  assert (Universe::heap() != nullptr, "java heap should be initialized");
+   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+   verify_oop(src);
+-  if (CompressedOops::base() == NULL) {
++  if (CompressedOops::base() == nullptr) {
+     srlx(src, LogMinObjAlignmentInBytes, dst);
+   } else {
+     sub(src, G6_heapbase, dst);
+@@ -3099,7 +3240,7 @@
+ // Same algorithm as oops.inline.hpp decode_heap_oop.
+ void  MacroAssembler::decode_heap_oop(Register src, Register dst) {
+   assert (UseCompressedOops, "must be compressed");
+-  assert (Universe::heap() != NULL, "java heap should be initialized");
++  assert (Universe::heap() != nullptr, "java heap should be initialized");
+   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+   sllx(src, LogMinObjAlignmentInBytes, dst);
+   if (CompressedOops::base() != nullptr) {
+@@ -3116,10 +3257,10 @@
+   // pd_code_size_limit.
+   // Also do not verify_oop as this is called by verify_oop.
+   assert (UseCompressedOops, "must be compressed");
+-  assert (Universe::heap() != NULL, "java heap should be initialized");
++  assert (Universe::heap() != nullptr, "java heap should be initialized");
+   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+   sllx(r, LogMinObjAlignmentInBytes, r);
+-  if (CompressedOops::base() != NULL)
++  if (CompressedOops::base() != nullptr)
+     add(r, G6_heapbase, r);
+ }
+ 
+@@ -3130,13 +3271,13 @@
+   assert (UseCompressedOops, "must be compressed");
+   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+   sllx(src, LogMinObjAlignmentInBytes, dst);
+-  if (CompressedOops::base() != NULL)
++  if (CompressedOops::base() != nullptr)
+     add(dst, G6_heapbase, dst);
+ }
+ 
+ void MacroAssembler::encode_klass_not_null(Register r) {
+   assert (UseCompressedClassPointers, "must be compressed");
+-  if (CompressedKlassPointers::base() != NULL) {
++  if (CompressedKlassPointers::base() != nullptr) {
+     assert(r != G6_heapbase, "bad register choice");
+     set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
+     sub(r, G6_heapbase, r);
+@@ -3154,7 +3295,7 @@
+     encode_klass_not_null(src);
+   } else {
+     assert (UseCompressedClassPointers, "must be compressed");
+-    if (CompressedKlassPointers::base() != NULL) {
++    if (CompressedKlassPointers::base() != nullptr) {
+       set((intptr_t)CompressedKlassPointers::base(), dst);
+       sub(src, dst, dst);
+       if (CompressedKlassPointers::shift() != 0) {
+@@ -3173,7 +3314,7 @@
+ int MacroAssembler::instr_size_for_decode_klass_not_null() {
+   assert (UseCompressedClassPointers, "only for compressed klass ptrs");
+   int num_instrs = 1;  // shift src,dst or add
+-  if (CompressedKlassPointers::base() != NULL) {
++  if (CompressedKlassPointers::base() != nullptr) {
+     // set + add + set
+     num_instrs += insts_for_internal_set((intptr_t)CompressedKlassPointers::base()) +
+                   insts_for_internal_set((intptr_t)CompressedOops::base());
+@@ -3190,7 +3331,7 @@
+   // Do not add assert code to this unless you change vtableStubs_sparc.cpp
+   // pd_code_size_limit.
+   assert (UseCompressedClassPointers, "must be compressed");
+-  if (CompressedKlassPointers::base() != NULL) {
++  if (CompressedKlassPointers::base() != nullptr) {
+     assert(r != G6_heapbase, "bad register choice");
+     set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
+     if (CompressedKlassPointers::shift() != 0)
+@@ -3209,7 +3350,7 @@
+     // Do not add assert code to this unless you change vtableStubs_sparc.cpp
+     // pd_code_size_limit.
+     assert (UseCompressedClassPointers, "must be compressed");
+-    if (CompressedKlassPointers::base() != NULL) {
++    if (CompressedKlassPointers::base() != nullptr) {
+       if (CompressedKlassPointers::shift() != 0) {
+         assert((src != G6_heapbase) && (dst != G6_heapbase), "bad register choice");
+         set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
+@@ -3253,7 +3394,7 @@
+ 
+ void MacroAssembler::reinit_heapbase() {
+   if (UseCompressedOops || UseCompressedClassPointers) {
+-    if (Universe::heap() != NULL) {
++    if (Universe::heap() != nullptr) {
+       set((intptr_t)CompressedOops::base(), G6_heapbase);
+     } else {
+       AddressLiteral base(CompressedOops::base_addr());
 --- a/src/hotspot/cpu/sparc/macroAssembler_sparc.hpp
 +++ b/src/hotspot/cpu/sparc/macroAssembler_sparc.hpp
-@@ -1179,6 +1179,11 @@
+@@ -309,7 +309,7 @@
+ 
+  protected:
+   // creation
+-  AddressLiteral() : _address(NULL), _rspec() {}
++  AddressLiteral() : _address(nullptr), _rspec() {}
+ 
+  public:
+   AddressLiteral(address addr, RelocationHolder const& rspec)
+@@ -976,6 +976,7 @@
+ 
+   // klass oop manipulations if compressed
+   void load_klass(Register src_oop, Register klass);
++  void load_narrow_klass(Register src_oop, Register klass);
+   void store_klass(Register klass, Register dst_oop);
+   void store_klass_gap(Register s, Register dst_oop);
+ 
+@@ -1179,6 +1180,11 @@
  
    // These set the icc condition code to equal if the lock succeeded
    // and notEqual if it failed and requires a slow case
@@ -711,6 +1979,221 @@
    void compiler_lock_object(Register Roop, Register Rmark, Register Rbox,
                              Register Rscratch);
    void compiler_unlock_object(Register Roop, Register Rmark, Register Rbox,
+--- a/src/hotspot/cpu/sparc/macroAssembler_sparc.inline.hpp
++++ b/src/hotspot/cpu/sparc/macroAssembler_sparc.inline.hpp
+@@ -246,10 +246,10 @@
+ 
+ inline void MacroAssembler::call( address d, RelocationHolder const& rspec ) {
+   intptr_t disp;
+-  // NULL is ok because it will be relocated later.
+-  // Must change NULL to a reachable address in order to
++  // nullptr is ok because it will be relocated later.
++  // Must change nullptr to a reachable address in order to
+   // pass asserts here and in wdisp.
+-  if ( d == NULL )
++  if ( d == nullptr )
+     d = pc();
+ 
+   // Is this address within range of the call instruction?
+--- a/src/hotspot/cpu/sparc/matcher_sparc.hpp
++++ b/src/hotspot/cpu/sparc/matcher_sparc.hpp
+@@ -87,14 +87,14 @@
+   static bool const_oop_prefer_decode() {
+     // TODO: Check if loading ConP from TOC in heap-based mode is better:
+     // Prefer ConN+DecodeN over ConP in simple compressed oops mode.
+-    // return CompressedOops::base() == NULL;
++    // return CompressedOops::base() == nullptr;
+     return true;
+   }
+ 
+   static bool const_klass_prefer_decode() {
+     // TODO: Check if loading ConP from TOC in heap-based mode is better:
+     // Prefer ConNKlass+DecodeNKlass over ConP in simple compressed klass mode.
+-    // return CompressedKlassPointers::base() == NULL;
++    // return CompressedKlassPointers::base() == nullptr;
+     return true;
+   }
+ 
+--- a/src/hotspot/cpu/sparc/methodHandles_sparc.cpp
++++ b/src/hotspot/cpu/sparc/methodHandles_sparc.cpp
+@@ -224,14 +224,14 @@
+     // They are linked to Java-generated adapters via MethodHandleNatives.linkMethod.
+     // They all allow an appendix argument.
+     __ should_not_reach_here();           // empty stubs make SG sick
+-    return NULL;
++    return nullptr;
+   }
+ 
+   // No need in interpreter entry for linkToNative for now.
+   // Interpreter calls compiled entry through i2c.
+   if (iid == vmIntrinsics::_linkToNative) {
+     __ should_not_reach_here();           // Empty stubs make SG sick.
+-    return NULL;
++    return nullptr;
+   }
+ 
+   // I5_savedSP/O5_savedSP: sender SP (must preserve; see prepare_to_jump_from_interpreted)
+@@ -530,7 +530,7 @@
+ 
+     // walk up to the right frame using the "tracing_fp" argument
+     intptr_t* cur_sp = StubRoutines::Sparc::flush_callers_register_windows_func()();
+-    frame cur_frame(cur_sp, frame::unpatchable, NULL);
++    frame cur_frame(cur_sp, frame::unpatchable, nullptr);
+ 
+     while (cur_frame.fp() != (intptr_t *)(STACK_BIAS+(uintptr_t)tracing_fp)) {
+       cur_frame = os::get_sender_for_C_frame(&cur_frame);
+--- a/src/hotspot/cpu/sparc/nativeInst_sparc.cpp
++++ b/src/hotspot/cpu/sparc/nativeInst_sparc.cpp
+@@ -151,7 +151,7 @@
+ void NativeCall::replace_mt_safe(address instr_addr, address code_buffer) {
+   assert(CodeCache_lock->is_locked() ||
+          SafepointSynchronize::is_at_safepoint(), "concurrent code patching");
+-   assert (instr_addr != NULL, "illegal address for code patching");
++   assert (instr_addr != nullptr, "illegal address for code patching");
+    NativeCall* n_call =  nativeCall_at (instr_addr); // checking that it is a call
+    assert(NativeCall::instruction_size == 8, "wrong instruction size; must be 8");
+    int i0 = ((int*)code_buffer)[0];
+@@ -270,7 +270,7 @@
+ 
+ bool NativeFarCall::destination_is_compiled_verified_entry_point() {
+   nmethod* callee = CodeCache::find_nmethod(destination());
+-  if (callee == NULL) {
++  if (callee == nullptr) {
+     return false;
+   } else {
+     return destination() == callee->verified_entry_point();
+@@ -322,15 +322,15 @@
+ 
+   // also store the value into an oop_Relocation cell, if any
+   CodeBlob* cb = CodeCache::find_blob(instruction_address());
+-  nmethod*  nm = cb ? cb->as_nmethod_or_null() : NULL;
+-  if (nm != NULL) {
++  nmethod*  nm = cb ? cb->as_nmethod_or_null() : nullptr;
++  if (nm != nullptr) {
+     RelocIterator iter(nm, instruction_address(), next_instruction_address());
+-    oop* oop_addr = NULL;
+-    Metadata** metadata_addr = NULL;
++    oop* oop_addr = nullptr;
++    Metadata** metadata_addr = nullptr;
+     while (iter.next()) {
+       if (iter.type() == relocInfo::oop_type) {
+         oop_Relocation *r = iter.oop_reloc();
+-        if (oop_addr == NULL) {
++        if (oop_addr == nullptr) {
+           oop_addr = r->oop_addr();
+           *oop_addr = cast_to_oop(x);
+         } else {
+@@ -339,7 +339,7 @@
+       }
+       if (iter.type() == relocInfo::metadata_type) {
+         metadata_Relocation *r = iter.metadata_reloc();
+-        if (metadata_addr == NULL) {
++        if (metadata_addr == nullptr) {
+           metadata_addr = r->metadata_addr();
+           *metadata_addr = (Metadata*)x;
+         } else {
+@@ -426,15 +426,15 @@
+ 
+   // also store the value into an oop_Relocation cell, if any
+   CodeBlob* cb = CodeCache::find_blob(instruction_address());
+-  nmethod*  nm = cb ? cb->as_nmethod_or_null() : NULL;
+-  if (nm != NULL) {
++  nmethod*  nm = cb ? cb->as_nmethod_or_null() : nullptr;
++  if (nm != nullptr) {
+     RelocIterator iter(nm, instruction_address(), next_instruction_address());
+-    oop* oop_addr = NULL;
+-    Metadata** metadata_addr = NULL;
++    oop* oop_addr = nullptr;
++    Metadata** metadata_addr = nullptr;
+     while (iter.next()) {
+       if (iter.type() == relocInfo::oop_type) {
+         oop_Relocation *r = iter.oop_reloc();
+-        if (oop_addr == NULL) {
++        if (oop_addr == nullptr) {
+           oop_addr = r->oop_addr();
+           *oop_addr = cast_to_oop(x);
+         } else {
+@@ -443,7 +443,7 @@
+       }
+       if (iter.type() == relocInfo::metadata_type) {
+         metadata_Relocation *r = iter.metadata_reloc();
+-        if (metadata_addr == NULL) {
++        if (metadata_addr == nullptr) {
+           metadata_addr = r->metadata_addr();
+           *metadata_addr = (Metadata*)x;
+         } else {
+@@ -495,15 +495,15 @@
+ 
+   // also store the value into an oop_Relocation cell, if any
+   CodeBlob* cb = CodeCache::find_blob(instruction_address());
+-  nmethod*  nm = cb ? cb->as_nmethod_or_null() : NULL;
+-  if (nm != NULL) {
++  nmethod*  nm = cb ? cb->as_nmethod_or_null() : nullptr;
++  if (nm != nullptr) {
+     RelocIterator iter(nm, instruction_address(), next_instruction_address());
+-    oop* oop_addr = NULL;
+-    Metadata** metadata_addr = NULL;
++    oop* oop_addr = nullptr;
++    Metadata** metadata_addr = nullptr;
+     while (iter.next()) {
+       if (iter.type() == relocInfo::oop_type) {
+         oop_Relocation *r = iter.oop_reloc();
+-        if (oop_addr == NULL) {
++        if (oop_addr == nullptr) {
+           oop_addr = r->oop_addr();
+           *oop_addr = cast_to_oop(x);
+         } else {
+@@ -512,7 +512,7 @@
+       }
+       if (iter.type() == relocInfo::metadata_type) {
+         metadata_Relocation *r = iter.metadata_reloc();
+-        if (metadata_addr == NULL) {
++        if (metadata_addr == nullptr) {
+           metadata_addr = r->metadata_addr();
+           *metadata_addr = (Metadata*)x;
+         } else {
+@@ -879,7 +879,7 @@
+ void NativeGeneralJump::replace_mt_safe(address instr_addr, address code_buffer) {
+    assert(CodeCache_lock->is_locked() ||
+          SafepointSynchronize::is_at_safepoint(), "concurrent code patching");
+-   assert (instr_addr != NULL, "illegal address for code patching");
++   assert (instr_addr != nullptr, "illegal address for code patching");
+    NativeGeneralJump* h_jump =  nativeGeneralJump_at (instr_addr); // checking that it is a call
+    assert(NativeGeneralJump::instruction_size == 8, "wrong instruction size; must be 8");
+    int i0 = ((int*)code_buffer)[0];
+--- a/src/hotspot/cpu/sparc/nativeInst_sparc.hpp
++++ b/src/hotspot/cpu/sparc/nativeInst_sparc.hpp
+@@ -341,7 +341,7 @@
+ 
+ inline NativeCall* nativeCall_at(address instr);
+ inline NativeCall* nativeCall_overwriting_at(address instr,
+-                                             address destination = NULL);
++                                             address destination = nullptr);
+ inline NativeCall* nativeCall_before(address return_address);
+ class NativeCall: public NativeInstruction {
+  public:
+@@ -440,7 +440,7 @@
+ //      == sethi %hi54(addr), O7 ;  jumpl O7, %lo10(addr), O7 ;  <delay>
+ // That is, it is essentially the same as a NativeJump.
+ class NativeFarCall;
+-inline NativeFarCall* nativeFarCall_overwriting_at(address instr, address destination = NULL);
++inline NativeFarCall* nativeFarCall_overwriting_at(address instr, address destination = nullptr);
+ inline NativeFarCall* nativeFarCall_at(address instr);
+ class NativeFarCall: public NativeInstruction {
+  public:
+--- a/src/hotspot/cpu/sparc/registerMap_sparc.hpp
++++ b/src/hotspot/cpu/sparc/registerMap_sparc.hpp
+@@ -48,8 +48,8 @@
+     _location_valid[0] = 0;  // avoid the shift_individual_registers game
+   }
+   void pd_initialize() {
+-    _window = NULL;
+-    _younger_window = NULL;
++    _window = nullptr;
++    _younger_window = nullptr;
+     _location_valid[0] = 0;  // avoid the shift_individual_registers game
+   }
+ 
 --- a/src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 @@ -33,8 +33,11 @@
@@ -917,9 +2400,235 @@
    if (method->is_method_handle_intrinsic()) {
      vmIntrinsics::ID iid = method->intrinsic_id();
      intptr_t start = (intptr_t)__ pc();
+@@ -2438,7 +2620,7 @@
+   //   - Deoptimization::fetch_unroll_info
+   //   - Deoptimization::unpack_frames
+ 
+-  OopMap* map = NULL;
++  OopMap* map = nullptr;
+ 
+   int start = __ offset();
+ 
+@@ -2750,7 +2932,7 @@
+ // Tricky, tricky, tricky...
+ 
+ SafepointBlob* SharedRuntime::generate_handler_blob(SharedStubId id, address call_ptr) {
+-  assert (StubRoutines::forward_exception_entry() != NULL, "must be generated before");
++  assert (StubRoutines::forward_exception_entry() != nullptr, "must be generated before");
+ 
+   // allocate space for the code
+   ResourceMark rm;
+@@ -2761,7 +2943,7 @@
+   MacroAssembler* masm                = new MacroAssembler(&buffer);
+   int             frame_size_words;
+   OopMapSet *oop_maps = new OopMapSet();
+-  OopMap* map = NULL;
++  OopMap* map = nullptr;
+ 
+   int start = __ offset();
+ 
+@@ -2870,7 +3052,7 @@
+   MacroAssembler* masm                = new MacroAssembler(&buffer);
+   int             frame_size_words;
+   OopMapSet *oop_maps = new OopMapSet();
+-  OopMap* map = NULL;
++  OopMap* map = nullptr;
+ 
+   int start = __ offset();
+ 
 --- a/src/hotspot/cpu/sparc/sparc.ad
 +++ b/src/hotspot/cpu/sparc/sparc.ad
-@@ -9551,6 +9551,19 @@
+@@ -553,8 +553,9 @@
+     int v_off = entry_offset + in_bytes(vtableEntry::method_offset());
+     int klass_load_size;
+     if (UseCompressedClassPointers) {
+-      assert(Universe::heap() != NULL, "java heap should be initialized");
+-      klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() + 1*BytesPerInstWord;
++      assert(Universe::heap() != nullptr, "java heap should be initialized");
++      klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() +
++                        (UseCompactObjectHeaders ? 2 : 1)*BytesPerInstWord;
+     } else {
+       klass_load_size = 1*BytesPerInstWord;
+     }
+@@ -628,7 +629,7 @@
+   const TypePtr *adr_type = TYPE_PTR_SENTINAL;  // Check for base==RegI, disp==immP
+   const Node* addr = n->get_base_and_disp(offset, adr_type);
+   assert(adr_type == (const TypePtr*)-1, "VerifyOops: no support for sparc operands with base==RegI, disp==immP");
+-  assert(addr != NULL && addr != (Node*)-1, "invalid addr");
++  assert(addr != nullptr && addr != (Node*)-1, "invalid addr");
+   assert(addr->bottom_type()->isa_oopptr() == atype, "");
+   atype = atype->add_offset(offset);
+   assert(disp32 == offset, "wrong disp32");
+@@ -796,7 +797,7 @@
+         // a store
+         // inputs are (0:control, 1:memory, 2:address, 3:value)
+         Node* n2 = n->in(3);
+-        if (n2 != NULL) {
++        if (n2 != nullptr) {
+           const Type* t = n2->bottom_type();
+           is_verified_oop_store = t->isa_oop_ptr() ? (t->is_ptr()->_offset==0) : false;
+         }
+@@ -842,7 +843,7 @@
+       Node* addr = n->in(2);
+       if (!(addr->is_Mach() && addr->as_Mach()->ideal_Opcode() == Op_AddP)) {
+         const TypeOopPtr* atype = addr->bottom_type()->isa_instptr();  // %%% oopptr?
+-        if (atype != NULL) {
++        if (atype != nullptr) {
+           intptr_t offset = get_offset_from_base(n, atype, disp32);
+           intptr_t offset_2 = get_offset_from_base_2(n, atype, disp32);
+           if (offset != offset_2) {
+@@ -1406,12 +1407,12 @@
+ 
+ #ifndef PRODUCT
+ void MachSpillCopyNode::format( PhaseRegAlloc *ra_, outputStream *st ) const {
+-  implementation( NULL, ra_, false, st );
++  implementation( nullptr, ra_, false, st );
+ }
+ #endif
+ 
+ void MachSpillCopyNode::emit(C2_MacroAssembler* masm, PhaseRegAlloc *ra_) const {
+-  implementation( masm, ra_, false, NULL );
++  implementation( masm, ra_, false, nullptr );
+ }
+ 
+ uint MachSpillCopyNode::size(PhaseRegAlloc *ra_) const {
+@@ -1467,7 +1468,10 @@
+ #ifndef PRODUCT
+ void MachUEPNode::format( PhaseRegAlloc *ra_, outputStream *st ) const {
+   st->print_cr("\nUEP:");
+-  if (UseCompressedClassPointers) {
++  if (UseCompactObjectHeaders) {
++    st->print_cr("\tLDX    [R_O0 + oopDesc::mark_offset_in_bytes],R_G3");
++    st->print_cr("\tSRLX   R_G3,%d,R_G3\t! compact klass", markWord::klass_shift);
++  } else if (UseCompressedClassPointers) {
+     st->print_cr("\tLDUW   [R_O0 + oopDesc::klass_offset_in_bytes],R_G3\t! Inline cache check - compressed klass");
+   } else {
+     st->print_cr("\tLDX    [R_O0 + oopDesc::klass_offset_in_bytes],R_G3\t! Inline cache check");
+@@ -1496,7 +1500,7 @@
+   AddressLiteral exception_blob(OptoRuntime::exception_blob()->entry_point());
+ 
+   address base = __ start_a_stub(size_exception_handler());
+-  if (base == NULL) {
++  if (base == nullptr) {
+     ciEnv::current()->record_failure("CodeCache is full");
+     return 0;  // CodeBuffer::expand failed
+   }
+@@ -1520,7 +1524,7 @@
+   AddressLiteral deopt_blob(SharedRuntime::deopt_blob()->unpack());
+ 
+   address base = __ start_a_stub(size_deopt_handler());
+-  if (base == NULL) {
++  if (base == nullptr) {
+     ciEnv::current()->record_failure("CodeCache is full");
+     return 0;  // CodeBuffer::expand failed
+   }
+@@ -1607,7 +1611,7 @@
+ }
+ 
+ const RegMask* Matcher::predicate_reg_mask(void) {
+-  return NULL;
++  return nullptr;
+ }
+ 
+ 
+@@ -1622,7 +1626,7 @@
+ }
+ 
+ #ifdef ASSERT
+-address last_rethrow = NULL;  // debugging aid for Rethrow encoding
++address last_rethrow = nullptr;  // debugging aid for Rethrow encoding
+ #endif
+ 
+ // Vector width in bytes
+@@ -1668,7 +1672,7 @@
+ 
+ MachOper* Matcher::pd_specialize_generic_vector_operand(MachOper* original_opnd, uint ideal_reg, bool is_temp) {
+   ShouldNotReachHere(); // generic vector operands not supported
+-  return NULL;
++  return nullptr;
+ }
+ 
+ bool Matcher::is_reg2reg_move(MachNode* m) {
+@@ -2263,7 +2267,7 @@
+ 
+       // Emit stub for static call.
+       address stub = CompiledDirectCall::emit_to_interp_stub(masm);
+-      if (stub == NULL) {
++      if (stub == nullptr) {
+         ciEnv::current()->record_failure("CodeCache is full");
+         return;
+       }
+@@ -2290,8 +2294,9 @@
+       __ load_klass(O0, G3_scratch);
+       int klass_load_size;
+       if (UseCompressedClassPointers) {
+-        assert(Universe::heap() != NULL, "java heap should be initialized");
+-        klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() + 1*BytesPerInstWord;
++        assert(Universe::heap() != nullptr, "java heap should be initialized");
++        klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() +
++                        (UseCompactObjectHeaders ? 2 : 1)*BytesPerInstWord;
+       } else {
+         klass_load_size = 1*BytesPerInstWord;
+       }
+@@ -3137,7 +3142,7 @@
+   interface(CONST_INTER);
+ %}
+ 
+-// NULL Pointer Immediate
++// nullptr Pointer Immediate
+ operand immN0()
+ %{
+   predicate(n->get_narrowcon() == 0);
+@@ -5496,6 +5501,7 @@
+ 
+ // Load narrow Klass Pointer
+ instruct loadNKlass(iRegN dst, memory mem) %{
++  predicate(!UseCompactObjectHeaders);
+   match(Set dst (LoadNKlass mem));
+   ins_cost(MEMORY_REF_COST);
+   size(4);
+@@ -5503,6 +5509,22 @@
+   format %{ "LDUW   $mem,$dst\t! compressed klass ptr" %}
+   ins_encode %{
+     __ lduw($mem$$Address, $dst$$Register);
++  %}
++  ins_pipe(iload_mem);
++%}
++
++// Compact headers embed the narrow klass in the high bits of the mark word.
++instruct loadNKlassCompactHeaders(iRegN dst, memory mem) %{
++  predicate(UseCompactObjectHeaders);
++  match(Set dst (LoadNKlass mem));
++  ins_cost(MEMORY_REF_COST + DEFAULT_COST);
++  size(8);
++  format %{ "LDX/SRLX $mem,$dst\t! compact klass ptr" %}
++  ins_encode %{
++    Address klass_addr = $mem$$Address;
++    assert(klass_addr.has_disp(), "klass load must have a constant offset");
++    __ ldx(klass_addr.plus_disp(-oopDesc::klass_offset_in_bytes()), $dst$$Register);
++    __ srlx($dst$$Register, markWord::klass_shift, $dst$$Register);
+   %}
+   ins_pipe(iload_mem);
+ %}
+@@ -5632,7 +5654,7 @@
+   match(Set dst src);
+ 
+   size(4);
+-  format %{ "CLR    $dst\t! compressed NULL ptr" %}
++  format %{ "CLR    $dst\t! compressed nullptr ptr" %}
+   ins_encode %{
+     __ clr($dst$$Register);
+   %}
+@@ -6000,7 +6022,7 @@
+   ins_encode %{
+     __ encode_heap_oop($src$$Register, $dst$$Register);
+   %}
+-  ins_avoid_back_to_back(CompressedOops::base() == NULL ? AVOID_NONE : AVOID_BEFORE);
++  ins_avoid_back_to_back(CompressedOops::base() == nullptr ? AVOID_NONE : AVOID_BEFORE);
+   ins_pipe(ialu_reg);
+ %}
+ 
+@@ -9551,6 +9573,19 @@
    // The hack duplicates the exception oop into G3, so that CreateEx can use it there.
    // ins_encode( form3_rs1_simm13_rd( jump_target, 0x00, R_G0 ), move_return_pc_to_o1() );
    ins_avoid_back_to_back(AVOID_BEFORE);
@@ -952,6 +2661,189 @@
  template <ChunkFrames frame_kind>
 --- a/src/hotspot/cpu/sparc/stubGenerator_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/stubGenerator_sparc.cpp
+@@ -633,7 +633,7 @@
+ 
+     __ check_klass_subtype_slow_path(Rsub, Rsuper,
+                                      L0, L1, L2, L3,
+-                                     NULL, &miss);
++                                     nullptr, &miss);
+ 
+     // Match falls through here.
+     __ addcc(G0,0,Rret);        // set Z flags, Z result
+@@ -691,11 +691,11 @@
+   //  Kills temps:  O3, O4
+   //
+   void array_overlap_test(address no_overlap_target, int log2_elem_size) {
+-    assert(no_overlap_target != NULL, "must be generated");
+-    array_overlap_test(no_overlap_target, NULL, log2_elem_size);
++    assert(no_overlap_target != nullptr, "must be generated");
++    array_overlap_test(no_overlap_target, nullptr, log2_elem_size);
+   }
+   void array_overlap_test(Label& L_no_overlap, int log2_elem_size) {
+-    array_overlap_test(NULL, &L_no_overlap, log2_elem_size);
++    array_overlap_test(nullptr, &L_no_overlap, log2_elem_size);
+   }
+   void array_overlap_test(address no_overlap_target, Label* NOLp, int log2_elem_size) {
+     const Register from       = O0;
+@@ -706,12 +706,12 @@
+ 
+       __ subcc(to, from, to_from);
+       __ sll_ptr(count, log2_elem_size, byte_count);
+-      if (NOLp == NULL)
++      if (NOLp == nullptr)
+         __ brx(Assembler::lessEqualUnsigned, false, Assembler::pt, no_overlap_target);
+       else
+         __ brx(Assembler::lessEqualUnsigned, false, Assembler::pt, (*NOLp));
+       __ delayed()->cmp(to_from, byte_count);
+-      if (NOLp == NULL)
++      if (NOLp == nullptr)
+         __ brx(Assembler::greaterEqualUnsigned, false, Assembler::pt, no_overlap_target);
+       else
+         __ brx(Assembler::greaterEqualUnsigned, false, Assembler::pt, (*NOLp));
+@@ -1007,7 +1007,7 @@
+ 
+     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -1110,7 +1110,7 @@
+ 
+     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -1221,7 +1221,7 @@
+ 
+     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -1551,7 +1551,7 @@
+ 
+     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -1789,7 +1789,7 @@
+     const Register count = O2;
+     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -1924,7 +1924,7 @@
+ 
+     assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -2077,7 +2077,7 @@
+ 
+     assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -2155,7 +2155,7 @@
+ 
+     assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
+       BLOCK_COMMENT("Entry:");
+@@ -2194,7 +2194,7 @@
+ 
+     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here
+       BLOCK_COMMENT("Entry:");
+@@ -2249,7 +2249,7 @@
+ 
+     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here
+       BLOCK_COMMENT("Entry:");
+@@ -2300,7 +2300,7 @@
+     assert_clean_int(super_check_offset, temp);
+ 
+     __ check_klass_subtype_fast_path(sub_klass, super_klass, temp, noreg,
+-                                     &L_success, &L_miss, NULL,
++                                     &L_success, &L_miss, nullptr,
+                                      super_check_offset);
+ 
+     BLOCK_COMMENT("type_check_slow_path:");
+@@ -2308,7 +2308,7 @@
+     __ check_klass_subtype_slow_path(sub_klass->after_save(),
+                                      super_klass->after_save(),
+                                      L0, L1, L2, L4,
+-                                     NULL, &L_pop_to_miss);
++                                     nullptr, &L_pop_to_miss);
+     __ ba(L_success);
+     __ delayed()->restore();
+ 
+@@ -2371,7 +2371,7 @@
+     }
+ #endif //ASSERT
+ 
+-    if (entry != NULL) {
++    if (entry != nullptr) {
+       *entry = __ pc();
+       // caller can pass a 64-bit byte count here (from generic stub)
+       BLOCK_COMMENT("Entry:");
+@@ -2635,7 +2635,7 @@
+     //  assert(src->klass() != nullptr);
+     BLOCK_COMMENT("assert klasses not null");
+     { Label L_a, L_b;
+-      __ br_notnull_short(G3_src_klass, Assembler::pt, L_b); // it is broken if klass is NULL
++      __ br_notnull_short(G3_src_klass, Assembler::pt, L_b); // it is broken if klass is nullptr
+       __ bind(L_a);
+       __ stop("broken null klass");
+       __ bind(L_b);
+@@ -2893,7 +2893,7 @@
+     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit = generate_disjoint_oop_copy(true, &entry,
+                                                                                       "arrayof_oop_disjoint_arraycopy_uninit",
+                                                                                       /*dest_uninitialized*/true);
+-    StubRoutines::_arrayof_oop_arraycopy_uninit          = generate_conjoint_oop_copy(true, entry, NULL,
++    StubRoutines::_arrayof_oop_arraycopy_uninit          = generate_conjoint_oop_copy(true, entry, nullptr,
+                                                                                       "arrayof_oop_arraycopy_uninit",
+                                                                                       /*dest_uninitialized*/true);
+     if (UseCompressedOops) {
+@@ -2906,7 +2906,7 @@
+       StubRoutines::_oop_disjoint_arraycopy_uninit     = generate_disjoint_oop_copy(false, &entry,
+                                                                                     "oop_disjoint_arraycopy_uninit",
+                                                                                     /*dest_uninitialized*/true);
+-      StubRoutines::_oop_arraycopy_uninit              = generate_conjoint_oop_copy(false, entry, NULL,
++      StubRoutines::_oop_arraycopy_uninit              = generate_conjoint_oop_copy(false, entry, nullptr,
+                                                                                     "oop_arraycopy_uninit",
+                                                                                     /*dest_uninitialized*/true);
+     } else {
 @@ -4805,7 +4805,6 @@
     *   I2   - int* y-addr
     *   I3   - int  y-len
@@ -1085,8 +2977,44 @@
  }
  
  
+--- a/src/hotspot/cpu/sparc/stubRoutines_sparc.cpp
++++ b/src/hotspot/cpu/sparc/stubRoutines_sparc.cpp
+@@ -37,7 +37,7 @@
+   address bootstrap_flush_windows(void) {
+     Thread* thread = Thread::current_or_null();
+     // Very early in process there is no thread.
+-    if (thread != NULL) {
++    if (thread != nullptr) {
+       guarantee(thread->is_Java_thread(), "Not a Java thread.");
+       JavaThread* jt = (JavaThread*)thread;
+       guarantee(!jt->has_last_Java_frame(), "Must be able to flush registers!");
 --- a/src/hotspot/cpu/sparc/templateInterpreterGenerator_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/templateInterpreterGenerator_sparc.cpp
+@@ -175,13 +175,13 @@
+   // Generate code to initiate compilation on the counter overflow.
+ 
+   // InterpreterRuntime::frequency_counter_overflow takes two arguments,
+-  // the first indicates if the counter overflow occurs at a backwards branch (NULL bcp)
++  // the first indicates if the counter overflow occurs at a backwards branch (nullptr bcp)
+   // and the second is only used when the first is true.  We pass zero for both.
+   // The call returns the address of the verified entry point for the method or null
+   // if the compilation did not complete (either went background or bailed out).
+   __ set((int)false, O2);
+   __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::frequency_counter_overflow), O2, O2, true);
+-  // returns verified_entry_point or NULL
++  // returns verified_entry_point or nullptr
+   // we ignore it in any case
+   __ ba_short(Lcontinue);
+ }
+@@ -239,7 +239,7 @@
+     __ call_VM(Oexception, CAST_FROM_FN_PTR(address, InterpreterRuntime::create_exception), G3_scratch, G4_scratch);
+   }
+   // throw exception
+-  assert(Interpreter::throw_exception_entry() != NULL, "generate it first");
++  assert(Interpreter::throw_exception_entry() != nullptr, "generate it first");
+   AddressLiteral thrower(Interpreter::throw_exception_entry());
+   __ jump_to(thrower, G3_scratch);
+   __ delayed()->nop();
 @@ -483,7 +483,7 @@
  // ebx - Method*
  //
@@ -1096,6 +3024,75 @@
  
  #ifdef ASSERT
   { Label ok;
+@@ -709,7 +709,7 @@
+   //    LcpoolCache: constant pool cache
+   //
+   // 4) Initialize the non-argument locals if necessary:
+-  //    Non-argument locals may need to be initialized to NULL
++  //    Non-argument locals may need to be initialized to nullptr
+   //    for GC to work. If the oop-map information is accurate
+   //    (in the absence of the JSR problem), no initialization
+   //    is necessary.
+@@ -856,7 +856,7 @@
+   // Check if local 0 != null
+   // If the receiver is null then it is OK to jump to the slow path.
+   __ ld_ptr(Gargs, G0, Otos_i ); // get local 0
+-  // check if local 0 == NULL and go the slow path
++  // check if local 0 == nullptr and go the slow path
+   __ cmp_and_brx_short(Otos_i, 0, Assembler::equal, Assembler::pn, slow_path);
+ 
+   __ load_heap_oop(Otos_i, referent_offset, Otos_i, G3_scratch, ON_WEAK_OOP_REF);
+@@ -927,7 +927,7 @@
+     __ jump_to_entry(Interpreter::entry_for_kind(Interpreter::native));
+     return entry;
+   }
+-  return NULL;
++  return nullptr;
+ }
+ 
+ /**
+@@ -983,7 +983,7 @@
+     __ jump_to_entry(Interpreter::entry_for_kind(Interpreter::native));
+     return entry;
+   }
+-  return NULL;
++  return nullptr;
+ }
+ 
+ /**
+@@ -1036,17 +1036,17 @@
+ 
+     return entry;
+   }
+-  return NULL;
+-}
+-
+-// Float16 is not supported on SPARC; returning NULL makes the shared
++  return nullptr;
++}
++
++// Float16 is not supported on SPARC; returning nullptr makes the shared
+ // generator fall back to the normal (non-intrinsic) entry point.
+ address TemplateInterpreterGenerator::generate_Float_float16ToFloat_entry() {
+-  return NULL;
++  return nullptr;
+ }
+ 
+ address TemplateInterpreterGenerator::generate_Float_floatToFloat16_entry() {
+-  return NULL;
++  return nullptr;
+ }
+ 
+ /* Math routines only partially supported.
+@@ -1099,7 +1099,7 @@
+     default:
+       break;
+   }
+-  return NULL;
++  return nullptr;
+ }
+ 
+ // TODO: rather than touching all pages, check against stack_overflow_limit and bang yellow page to
 @@ -1149,7 +1149,7 @@
    // make sure method is native & not abstract
    // rethink these assertions - they can be simplified and shared (gri 2/25/2000)
@@ -1143,7 +3140,33 @@
        __ delayed()->nop();
 --- a/src/hotspot/cpu/sparc/templateTable_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/templateTable_sparc.cpp
-@@ -2326,7 +2326,9 @@
+@@ -36,6 +36,7 @@
+ #include "oops/methodData.hpp"
+ #include "oops/methodCounters.hpp"
+ #include "oops/objArrayKlass.hpp"
++#include "oops/instanceOop.hpp"
+ #include "oops/oop.inline.hpp"
+ #include "oops/resolvedFieldEntry.hpp"
+ #include "oops/resolvedIndyEntry.hpp"
+@@ -370,7 +371,7 @@
+     __ cmp(G3_scratch, Otos_i);
+     __ br(Assembler::notEqual, true, Assembler::pt, notNull);
+     __ delayed()->nop();
+-    __ clr(Otos_i);  // NULL object reference
++    __ clr(Otos_i);  // nullptr object reference
+     __ bind(notNull);
+   }
+ 
+@@ -2305,7 +2306,7 @@
+       }
+       __ verify_oop(Otos_i);
+     }
+-    // Otos_i: object pointer or NULL if static
++    // Otos_i: object pointer or nullptr if static
+     // Rcache: field entry pointer
+     __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_access),
+                Otos_i, Rcache);
+@@ -2326,7 +2327,9 @@
    Register Rclass = Rcache;
    Register Roffset= G4_scratch;
    Register Rflags = G1_scratch;
@@ -1154,7 +3177,16 @@
  
    resolve_cache_and_index_for_field(byte_no, Rcache, index);
    jvmti_post_field_access(Rcache, index, is_static, false);
-@@ -2694,7 +2696,9 @@
+@@ -2671,7 +2674,7 @@
+     }
+     // setup pointer to jvalue object
+     __ mov(Lesp, G1_scratch);  __ inc(G1_scratch, wordSize);
+-    // G4_scratch:  object pointer or NULL if static
++    // G4_scratch:  object pointer or nullptr if static
+     // G3_scratch: field entry pointer
+     // G1_scratch: jvalue object on the stack
+     __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_modification),
+@@ -2694,7 +2697,9 @@
    Register Rclass = Rcache;
    Register Roffset= G4_scratch;
    Register Rflags = G1_scratch;
@@ -1165,6 +3197,74 @@
  
    resolve_cache_and_index_for_field(byte_no, Rcache, index);
    jvmti_post_field_mod(Rcache, index, is_static);
+@@ -3151,7 +3156,7 @@
+   __ lduh(G4_scratch, in_bytes(ConstMethod::size_of_parameters_offset()), G4_scratch);
+   __ load_receiver(G4_scratch, O0);
+ 
+-  // receiver NULL check
++  // receiver nullptr check
+   __ null_check(O0);
+ 
+   __ profile_final_call(O4);
+@@ -3559,9 +3564,9 @@
+   if (UseTLAB) {
+     // clear object fields
+     __ bind(initialize_object);
+-    __ deccc(Roffset, sizeof(oopDesc));
++    __ deccc(Roffset, instanceOopDesc::header_size() * HeapWordSize);
+     __ br(Assembler::zero, false, Assembler::pt, initialize_header);
+-    __ delayed()->add(RallocatedObject, sizeof(oopDesc), G3_scratch);
++    __ delayed()->add(RallocatedObject, instanceOopDesc::header_size() * HeapWordSize, G3_scratch);
+ 
+     // initialize remaining object fields
+     if (UseBlockZeroing) {
+@@ -3591,10 +3596,15 @@
+   // Initialize the header: mark, klass
+   __ bind(initialize_header);
+ 
+-  __ set((intptr_t)markWord::prototype().value(), G4_scratch);
+-  __ st_ptr(G4_scratch, RallocatedObject, oopDesc::mark_offset_in_bytes());       // mark
+-  __ store_klass_gap(G0, RallocatedObject);         // klass gap if compressed
+-  __ store_klass(RinstanceKlass, RallocatedObject); // klass (last for cms)
++  if (UseCompactObjectHeaders) {
++    __ ld_ptr(RinstanceKlass, in_bytes(Klass::prototype_header_offset()), G4_scratch);
++    __ st_ptr(G4_scratch, RallocatedObject, oopDesc::mark_offset_in_bytes());
++  } else {
++    __ set((intptr_t)markWord::prototype().value(), G4_scratch);
++    __ st_ptr(G4_scratch, RallocatedObject, oopDesc::mark_offset_in_bytes());
++    __ store_klass_gap(G0, RallocatedObject);
++    __ store_klass(RinstanceKlass, RallocatedObject);
++  }
+ 
+   {
+     SkipIfEqual skip_if(
+@@ -3645,7 +3655,7 @@
+   Register RobjKlass = O5;
+   Register RspecifiedKlass = O4;
+ 
+-  // Check for casting a NULL
++  // Check for casting a nullptr
+   __ br_null(Otos_i, false, Assembler::pn, is_null);
+   __ delayed()->nop();
+ 
+@@ -3703,7 +3713,7 @@
+   Register RobjKlass = O5;
+   Register RspecifiedKlass = O4;
+ 
+-  // Check for casting a NULL
++  // Check for casting a nullptr
+   __ br_null(Otos_i, false, Assembler::pt, is_null);
+   __ delayed()->nop();
+ 
+@@ -3813,7 +3823,7 @@
+ 
+ 
+   // initialize entry pointer
+-  __ clr(O1); // points to free slot or NULL
++  __ clr(O1); // points to free slot or nullptr
+ 
+   {
+     Label entry, loop, exit;
 --- a/src/hotspot/cpu/sparc/vm_version_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/vm_version_sparc.cpp
 @@ -460,7 +460,8 @@
@@ -1177,6 +3277,421 @@
      warning("Unsupported locking mode for this CPU.");
      FLAG_SET_DEFAULT(LockingMode, LM_LEGACY);
    }
+@@ -513,7 +514,7 @@
+ 
+ void VM_Version::print_features() {
+   tty->print("ISA features [0x%0" PRIx64 "]:", _features);
+-  if (_features_string != NULL) {
++  if (_features_string != nullptr) {
+     tty->print(" %s", _features_string);
+   }
+   tty->cr();
+@@ -548,7 +549,7 @@
+   int core_id = -1;
+   int chip_id = -1;
+   int len = 0;
+-  char* src_string = NULL;
++  char* src_string = nullptr;
+   kstat_ctl_t* kc = kstat_open();
+   if (!kc) {
+     return false;
+@@ -585,15 +586,15 @@
+   _no_of_sockets = 0;
+ 
+   // loop through the kstat chain
+-  kstat_t* ksp = NULL;
+-  for (ksp = kc->kc_chain; ksp != NULL; ksp = ksp->ks_next) {
++  kstat_t* ksp = nullptr;
++  for (ksp = kc->kc_chain; ksp != nullptr; ksp = ksp->ks_next) {
+     // only interested in "cpu_info"
+     if (strcmp(ksp->ks_module, (char*)CPU_INFO) == 0) {
+-      if (kstat_read(kc, ksp, NULL) == -1) {
++      if (kstat_read(kc, ksp, nullptr) == -1) {
+         kstat_close(kc);
+         return false;
+       }
+-      if (ksp->ks_data != NULL) {
++      if (ksp->ks_data != nullptr) {
+         kstat_named_t* knm = (kstat_named_t *)ksp->ks_data;
+         // loop through the number of fields in each record
+         for (int i = 0; i < ksp->ks_ndata; i++) {
+--- a/src/hotspot/cpu/sparc/vtableStubs_sparc.cpp
++++ b/src/hotspot/cpu/sparc/vtableStubs_sparc.cpp
+@@ -50,9 +50,9 @@
+   // Read "A word on VtableStub sizing" in share/code/vtableStubs.hpp for details on stub sizing.
+   const int stub_code_length = code_size_limit(true);
+   VtableStub* s = new(stub_code_length) VtableStub(true, vtable_index);
+-  // Can be NULL if there is no free space in the code cache.
+-  if (s == NULL) {
+-    return NULL;
++  // Can be nullptr if there is no free space in the code cache.
++  if (s == nullptr) {
++    return nullptr;
+   }
+ 
+   // Count unused bytes in instruction sequences of variable size.
+@@ -138,9 +138,9 @@
+   // Read "A word on VtableStub sizing" in share/code/vtableStubs.hpp for details on stub sizing.
+   const int stub_code_length = code_size_limit(false);
+   VtableStub* s = new(stub_code_length) VtableStub(false, itable_index);
+-  // Can be NULL if there is no free space in the code cache.
+-  if (s == NULL) {
+-    return NULL;
++  // Can be nullptr if there is no free space in the code cache.
++  if (s == nullptr) {
++    return nullptr;
+   }
+   // Count unused bytes in instruction sequences of variable size.
+   // We add them to the computed buffer size in order to avoid
+@@ -228,7 +228,7 @@
+   }
+ #endif
+ 
+-  // If the following load is through a NULL pointer, we'll take an OS
++  // If the following load is through a nullptr pointer, we'll take an OS
+   // exception that should translate into an AbstractMethodError.  We need the
+   // window count to be correct at that time.
+   __ restore(L5_method, 0, G5_method);
+--- a/src/hotspot/os/solaris/dtrace/jhelper.d
++++ b/src/hotspot/os/solaris/dtrace/jhelper.d
+@@ -83,12 +83,12 @@
+    * this initialization can be removed.
+    */
+   init_done  = 0;
+-  this->error = (char *) NULL;
+-  this->result = (char *) NULL;
++  this->error = (char *) 0;
++  this->result = (char *) 0;
+   this->isMethod = 0;
+   this->codecache = 0;
+-  this->klass = (pointer) NULL;
+-  this->vtbl  = (pointer) NULL;
++  this->klass = (pointer) 0;
++  this->vtbl  = (pointer) 0;
+   this->suffix = '\0';
+ }
+ 
+@@ -524,13 +524,13 @@
+ }
+ 
+ dtrace:helper:ustack:
+-/this->done && this->error == (char *) NULL/
++/this->done && this->error == (char *) 0/
+ {
+   this->result;
+ }
+ 
+ dtrace:helper:ustack:
+-/this->done && this->error != (char *) NULL/
++/this->done && this->error != (char *) 0/
+ {
+   this->error;
+ }
+@@ -546,5 +546,5 @@
+ dtrace:helper:ustack:
+ /!this->done/
+ {
+-  NULL;
+-}
++  0;
++}
+--- a/src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.cpp
++++ b/src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.cpp
+@@ -29,7 +29,7 @@
+   assert(has_last_Java_frame(), "must have last_Java_sp() when suspended");
+   assert(_anchor.walkable(), "thread has not dumped its register windows yet");
+ 
+-  assert(_anchor.last_Java_pc() != NULL, "Ack no pc!");
++  assert(_anchor.last_Java_pc() != nullptr, "Ack no pc!");
+   return frame(last_Java_sp(), frame::unpatchable, _anchor.last_Java_pc());
+ }
+ 
+@@ -78,8 +78,8 @@
+   // we try to glean some information out of the ucontext.
+   intptr_t* ret_sp;
+   address addr = os::fetch_frame_from_context(uc,
+-    &ret_sp, NULL /* ret_fp only used on Solaris X86 */);
+-  if (addr == NULL || ret_sp == NULL) {
++    &ret_sp, nullptr /* ret_fp only used on Solaris X86 */);
++  if (addr == nullptr || ret_sp == nullptr) {
+     // ucontext wasn't useful
+     return false;
+   }
+--- a/src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.hpp
++++ b/src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.hpp
+@@ -28,7 +28,7 @@
+ 
+   void pd_initialize() {
+     _anchor.clear();
+-    _base_of_stack_pointer        = NULL;
++    _base_of_stack_pointer        = nullptr;
+   }
+ 
+   frame pd_last_frame();
+--- a/src/hotspot/os_cpu/solaris_sparc/os_solaris_sparc.cpp
++++ b/src/hotspot/os_cpu/solaris_sparc/os_solaris_sparc.cpp
+@@ -141,22 +141,22 @@
+ const ucontext_t* os::Solaris::get_valid_uc_in_signal_handler(Thread *thread,
+   const ucontext_t *uc) {
+ 
+-  const ucontext_t *retuc = NULL;
++  const ucontext_t *retuc = nullptr;
+ 
+   // Sometimes the topmost register windows are not properly flushed.
+   // i.e., if the kernel would have needed to take a page fault
+-  if (uc != NULL && uc->uc_mcontext.gwins != NULL) {
++  if (uc != nullptr && uc->uc_mcontext.gwins != nullptr) {
+     ::handle_unflushed_register_windows(uc->uc_mcontext.gwins);
+   }
+ 
+-  if (uc != NULL) {
+-    if (uc->uc_link == NULL) {
++  if (uc != nullptr) {
++    if (uc->uc_link == nullptr) {
+       // cannot validate without uc_link so accept current ucontext
+       retuc = uc;
+     } else if (os::Solaris::valid_ucontext(thread, uc, uc->uc_link)) {
+       // first ucontext is valid so try the next one
+       uc = uc->uc_link;
+-      if (uc->uc_link == NULL) {
++      if (uc->uc_link == nullptr) {
+         // cannot validate without uc_link so accept current ucontext
+         retuc = uc;
+       } else if (os::Solaris::valid_ucontext(thread, uc, uc->uc_link)) {
+@@ -181,7 +181,7 @@
+ // Solaris X86 only
+ intptr_t* os::Solaris::ucontext_get_fp(const ucontext_t *uc) {
+   ShouldNotReachHere();
+-  return NULL;
++  return nullptr;
+ }
+ 
+ address os::Posix::ucontext_get_pc(const ucontext_t *uc) {
+@@ -196,16 +196,16 @@
+   address  epc;
+   const ucontext_t *uc = (const ucontext_t*)ucVoid;
+ 
+-  if (uc != NULL) {
++  if (uc != nullptr) {
+     epc = os::Posix::ucontext_get_pc(uc);
+     if (ret_sp) *ret_sp = os::Solaris::ucontext_get_sp(uc);
+     // On SPARC a frame's base and its sp are the same address (frame::fp()
+     // is the identity mapping), so the sp from the context doubles as fp.
+     if (ret_fp) *ret_fp = os::Solaris::ucontext_get_sp(uc);
+   } else {
+-    epc = NULL;
+-    if (ret_sp) *ret_sp = (intptr_t *)NULL;
+-    if (ret_fp) *ret_fp = (intptr_t *)NULL;
++    epc = nullptr;
++    if (ret_sp) *ret_sp = (intptr_t *)nullptr;
++    if (ret_fp) *ret_fp = (intptr_t *)nullptr;
+   }
+ 
+   return epc;
+@@ -260,7 +260,7 @@
+                 CAST_FROM_FN_PTR(address, os::current_frame));
+   if (os::is_first_C_frame(&myframe)) {
+     // stack is not walkable
+-    return frame(NULL, NULL, false);
++    return frame(nullptr, nullptr, false);
+   } else {
+     return os::get_sender_for_C_frame(&myframe);
+   }
+@@ -268,21 +268,21 @@
+ 
+ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
+                                              ucontext_t* uc, JavaThread* thread) {
+-  if (info == NULL || info->si_code <= 0 || info->si_code == SI_NOINFO) {
++  if (info == nullptr || info->si_code <= 0 || info->si_code == SI_NOINFO) {
+     // can't decode this kind of signal
+-    info = NULL;
++    info = nullptr;
+   } else {
+     assert(sig == info->si_signo, "bad siginfo");
+   }
+ 
+   // decide if this trap can be handled by a stub
+-  address stub = NULL;
+-
+-  address pc          = NULL;
+-  address npc         = NULL;
++  address stub = nullptr;
++
++  address pc          = nullptr;
++  address npc         = nullptr;
+ 
+   //%note os_trap_1
+-  if (info != NULL && uc != NULL && thread != NULL) {
++  if (info != nullptr && uc != nullptr && thread != nullptr) {
+     // factor me: getPCfromContext
+     pc  = (address) uc->uc_mcontext.gregs[REG_PC];
+     npc = (address) uc->uc_mcontext.gregs[REG_nPC];
+@@ -344,7 +344,7 @@
+         CodeBlob* cb = CodeCache::find_blob(pc);
+         nmethod* nm = (cb != nullptr) ? cb->as_nmethod_or_null() : nullptr;
+         bool is_unsafe_arraycopy = (thread->doing_unsafe_access() && UnsafeMemoryAccess::contains_pc(pc));
+-        if ((nm != NULL && nm->has_unsafe_access()) || is_unsafe_arraycopy) {
++        if ((nm != nullptr && nm->has_unsafe_access()) || is_unsafe_arraycopy) {
+           if (is_unsafe_arraycopy) {
+             npc = UnsafeMemoryAccess::page_error_continue_pc(pc);
+           }
+@@ -393,7 +393,7 @@
+     }
+   }
+ 
+-  if (stub != NULL) {
++  if (stub != nullptr) {
+     // save all thread context in case we need to restore it
+ 
+     thread->set_saved_exception_pc(pc);
+@@ -410,7 +410,7 @@
+ }
+ 
+ void os::print_context(outputStream *st, const void *context) {
+-  if (context == NULL) return;
++  if (context == nullptr) return;
+ 
+   const ucontext_t *uc = (const ucontext_t*)context;
+   st->print_cr("Registers:");
+--- a/src/hotspot/os_cpu/solaris_sparc/vm_version_solaris_sparc.cpp
++++ b/src/hotspot/os_cpu/solaris_sparc/vm_version_solaris_sparc.cpp
+@@ -155,9 +155,9 @@
+       if (!l1_visitor->is_inconsistent()) {
+         l1_visitor->visit(nodeh, "l1-dcache-line-size");
+       }
+-      static const char* l2_data_cache_line_property_name = NULL;
++      static const char* l2_data_cache_line_property_name = nullptr;
+       // On the first visit determine the name of the l2 cache line size property and memoize it.
+-      if (l2_data_cache_line_property_name == NULL) {
++      if (l2_data_cache_line_property_name == nullptr) {
+         assert(!l2_visitor->is_inconsistent(), "First iteration cannot be inconsistent");
+         l2_data_cache_line_property_name = "l2-cache-line-size";
+         if (!l2_visitor->visit(nodeh, l2_data_cache_line_property_name)) {
+@@ -189,7 +189,7 @@
+     return CPUVisitor::visit(nodeh, state);
+   }
+ 
+-  PICL(bool is_fujitsu, bool is_sun4v) : _dl_handle(NULL), _L1_data_cache_line_size(0), _L2_data_cache_line_size(0) {
++  PICL(bool is_fujitsu, bool is_sun4v) : _dl_handle(nullptr), _L1_data_cache_line_size(0), _L2_data_cache_line_size(0) {
+     if (!open_library()) {
+       return;
+     }
+@@ -227,11 +227,11 @@
+ template<typename FuncType>
+ bool PICL::bind(FuncType& func, const char* name) {
+   func = reinterpret_cast<FuncType>(dlsym(_dl_handle, name));
+-  return func != NULL;
++  return func != nullptr;
+ }
+ 
+ bool PICL::bind_library_functions() {
+-  assert(_dl_handle != NULL, "library should be open");
++  assert(_dl_handle != nullptr, "library should be open");
+   return bind(_picl_initialize,         "picl_initialize"        ) &&
+          bind(_picl_shutdown,           "picl_shutdown"          ) &&
+          bind(_picl_get_root,           "picl_get_root"          ) &&
+@@ -243,7 +243,7 @@
+ 
+ bool PICL::open_library() {
+   _dl_handle = dlopen("libpicl.so.1", RTLD_LAZY);
+-  if (_dl_handle == NULL) {
++  if (_dl_handle == nullptr) {
+     return false;
+   }
+   if (!bind_library_functions()) {
+@@ -255,21 +255,21 @@
+ }
+ 
+ void PICL::close_library() {
+-  assert(_dl_handle != NULL, "library should be open");
++  assert(_dl_handle != nullptr, "library should be open");
+   dlclose(_dl_handle);
+-  _dl_handle = NULL;
++  _dl_handle = nullptr;
+ }
+ 
+ class Sysinfo {
+   char* _string;
+ public:
+-  Sysinfo(int si) : _string(NULL) {
++  Sysinfo(int si) : _string(nullptr) {
+     char   tmp;
+     size_t bufsize = sysinfo(si, &tmp, 1);
+ 
+     if (bufsize != -1) {
+       char* buf = (char*) os::malloc(bufsize, mtInternal);
+-      if (buf != NULL) {
++      if (buf != nullptr) {
+         if (sysinfo(si, buf, bufsize) == bufsize) {
+           _string = buf;
+         } else {
+@@ -280,7 +280,7 @@
+   }
+ 
+   ~Sysinfo() {
+-    if (_string != NULL) {
++    if (_string != nullptr) {
+       os::free(_string);
+     }
+   }
+@@ -290,7 +290,7 @@
+   }
+ 
+   bool valid() const {
+-    return _string != NULL;
++    return _string != nullptr;
+   }
+ 
+   bool match(const char* s) const {
+@@ -298,7 +298,7 @@
+   }
+ 
+   bool match_substring(const char* s) const {
+-    return valid() ? strstr(_string, s) != NULL : false;
++    return valid() ? strstr(_string, s) != nullptr : false;
+   }
+ };
+ 
+--- a/src/hotspot/share/c1/c1_Runtime1.cpp
++++ b/src/hotspot/share/c1/c1_Runtime1.cpp
+@@ -1228,13 +1228,13 @@
+         if (load_klass_or_mirror_patch_id ||
+             stub_id == C1StubId::load_appendix_patching_id) {
+           // Update the location in the nmethod with the proper
+-          // metadata.  When the code was generated, a NULL was stuffed
++          // metadata.  When the code was generated, a nullptr was stuffed
+           // in the metadata table and that table needs to be update to
+           // have the right value.  On intel the value is kept
+           // directly in the instruction instead of in the metadata
+           // table, so set_data above effectively updated the value.
+           nmethod* nm = CodeCache::find_nmethod(instr_pc);
+-          assert(nm != NULL, "invalid nmethod_pc");
++          assert(nm != nullptr, "invalid nmethod_pc");
+           RelocIterator mds(nm, copy_buff, copy_buff + 1);
+           bool found = false;
+           while (mds.next() && !found) {
+--- a/src/hotspot/share/opto/library_call.cpp
++++ b/src/hotspot/share/opto/library_call.cpp
+@@ -7124,7 +7124,7 @@
+     // on SPARC we need to pass the original key since key expansion needs to happen in intrinsics due to
+     // compatibility issues between Java key expansion and SPARC crypto instructions
+     Node* original_k_start = get_original_key_start_from_aescrypt_object(aescrypt_object);
+-    if (original_k_start == NULL) return false;
++    if (original_k_start == nullptr) return false;
+ 
+     // Call the stub.
+     make_runtime_call(RC_LEAF|RC_NO_FP, OptoRuntime::aescrypt_block_Type(),
+--- a/src/hotspot/share/runtime/arguments.cpp
++++ b/src/hotspot/share/runtime/arguments.cpp
+@@ -1854,7 +1854,7 @@
+     warning("UseObjectMonitorTable requires LM_LIGHTWEIGHT");
+   }
+ 
+-#if !defined(X86) && !defined(AARCH64) && !defined(PPC64) && !defined(RISCV64) && !defined(S390)
++#if !defined(X86) && !defined(AARCH64) && !defined(PPC64) && !defined(RISCV64) && !defined(S390) && !defined(SPARC)
+   if (LockingMode == LM_MONITOR) {
+     jio_fprintf(defaultStream::error_stream(),
+                 "LockingMode == 0 (LM_MONITOR) is not fully implemented on this architecture\n");
 --- a/src/hotspot/share/runtime/continuationFreezeThaw.cpp
 +++ b/src/hotspot/share/runtime/continuationFreezeThaw.cpp
 @@ -326,8 +326,9 @@

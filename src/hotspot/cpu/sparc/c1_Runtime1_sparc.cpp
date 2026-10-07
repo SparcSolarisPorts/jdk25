@@ -333,7 +333,7 @@ OopMapSet* Runtime1::generate_stub_call(StubAssembler* sasm, Register result, ad
   } else {
     call_offset = __ call_RT(result, noreg, target, arg1, arg2, arg3);
   }
-  OopMapSet* oop_maps = NULL;
+  OopMapSet* oop_maps = nullptr;
 
   oop_maps = new OopMapSet();
   oop_maps->add_gc_map(call_offset, oop_map);
@@ -383,7 +383,7 @@ OopMapSet* Runtime1::generate_patching(StubAssembler* sasm, address target) {
 
 OopMapSet* Runtime1::generate_code_for(C1StubId id, StubAssembler* sasm) {
 
-  OopMapSet* oop_maps = NULL;
+  OopMapSet* oop_maps = nullptr;
   // for better readability
   const bool must_gc_arguments = true;
   const bool dont_gc_arguments = false;
@@ -608,7 +608,7 @@ OopMapSet* Runtime1::generate_code_for(C1StubId id, StubAssembler* sasm) {
 
         __ save_frame(0);               // Blow no registers!
 
-        __ check_klass_subtype_slow_path(G3, G1, L0, L1, L2, L4, NULL, &miss);
+        __ check_klass_subtype_slow_path(G3, G1, L0, L1, L2, L4, nullptr, &miss);
 
         __ mov(1, G3);
         __ ret();                       // Result in G5 is 'true'
@@ -707,7 +707,7 @@ OopMapSet* Runtime1::generate_code_for(C1StubId id, StubAssembler* sasm) {
         oop_maps->add_gc_map(call_offset, oop_map);
         restore_live_registers(sasm);
         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
-        assert(deopt_blob != NULL, "deoptimization blob must have been created");
+        assert(deopt_blob != nullptr, "deoptimization blob must have been created");
         AddressLiteral dest(deopt_blob->unpack_with_reexecution());
         __ jump_to(dest, O0);
         __ delayed()->restore();
@@ -768,7 +768,7 @@ OopMapSet* Runtime1::generate_code_for(C1StubId id, StubAssembler* sasm) {
         oop_maps->add_gc_map(call_offset, oop_map);
 
         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
-        assert(deopt_blob != NULL, "deoptimization blob must have been created");
+        assert(deopt_blob != nullptr, "deoptimization blob must have been created");
         restore_live_registers(sasm);
 
         AddressLiteral dest(deopt_blob->unpack_with_reexecution());

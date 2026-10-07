@@ -24,7 +24,7 @@ namespace SparcC1Trace {
 
 inline int init_level() {
   const char* s = ::getenv("SPARC_C1_TRACE");
-  if (s == NULL || s[0] == '\0' || (s[0] == '0' && s[1] == '\0')) {
+  if (s == nullptr || s[0] == '\0' || (s[0] == '0' && s[1] == '\0')) {
     return 0;
   }
   int v = ::atoi(s);
@@ -42,16 +42,16 @@ inline const char* filter() {
 }
 
 inline bool matches(ciMethod* method) {
-  if (method == NULL || level() == 0) {
+  if (method == nullptr || level() == 0) {
     return false;
   }
   const char* f = filter();
-  if (f == NULL || f[0] == '\0') {
+  if (f == nullptr || f[0] == '\0') {
     return true;
   }
   const char* holder = method->holder()->name()->as_utf8();
   const char* name = method->name()->as_utf8();
-  return ::strstr(holder, f) != NULL || ::strstr(name, f) != NULL;
+  return ::strstr(holder, f) != nullptr || ::strstr(name, f) != nullptr;
 }
 
 inline bool active(ciMethod* method, int min_level = 1) {

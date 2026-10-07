@@ -79,7 +79,7 @@
     Register t1,                       // temp register
     Register t2,                       // temp register
     Register t3,                       // temp register
-    int      hdr_size,                 // object header size in words
+    int      hdr_size,                 // array header size in bytes
     int      elt_size,                 // element size in bytes
     Register klass,                    // object klass
     Label&   slow_case                 // continuation point if fast allocation fails

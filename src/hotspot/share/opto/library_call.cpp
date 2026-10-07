@@ -7124,7 +7124,7 @@ bool LibraryCallKit::inline_aescrypt_Block(vmIntrinsics::ID id) {
     // on SPARC we need to pass the original key since key expansion needs to happen in intrinsics due to
     // compatibility issues between Java key expansion and SPARC crypto instructions
     Node* original_k_start = get_original_key_start_from_aescrypt_object(aescrypt_object);
-    if (original_k_start == NULL) return false;
+    if (original_k_start == nullptr) return false;
 
     // Call the stub.
     make_runtime_call(RC_LEAF|RC_NO_FP, OptoRuntime::aescrypt_block_Type(),

@@ -553,8 +553,9 @@ int MachCallDynamicJavaNode::ret_addr_offset() {
     int v_off = entry_offset + in_bytes(vtableEntry::method_offset());
     int klass_load_size;
     if (UseCompressedClassPointers) {
-      assert(Universe::heap() != NULL, "java heap should be initialized");
-      klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() + 1*BytesPerInstWord;
+      assert(Universe::heap() != nullptr, "java heap should be initialized");
+      klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() +
+                        (UseCompactObjectHeaders ? 2 : 1)*BytesPerInstWord;
     } else {
       klass_load_size = 1*BytesPerInstWord;
     }
@@ -628,7 +629,7 @@ intptr_t get_offset_from_base(const MachNode* n, const TypePtr* atype, int disp3
   const TypePtr *adr_type = TYPE_PTR_SENTINAL;  // Check for base==RegI, disp==immP
   const Node* addr = n->get_base_and_disp(offset, adr_type);
   assert(adr_type == (const TypePtr*)-1, "VerifyOops: no support for sparc operands with base==RegI, disp==immP");
-  assert(addr != NULL && addr != (Node*)-1, "invalid addr");
+  assert(addr != nullptr && addr != (Node*)-1, "invalid addr");
   assert(addr->bottom_type()->isa_oopptr() == atype, "");
   atype = atype->add_offset(offset);
   assert(disp32 == offset, "wrong disp32");
@@ -796,7 +797,7 @@ void emit_form3_mem_reg(C2_MacroAssembler* masm, PhaseRegAlloc* ra, const MachNo
         // a store
         // inputs are (0:control, 1:memory, 2:address, 3:value)
         Node* n2 = n->in(3);
-        if (n2 != NULL) {
+        if (n2 != nullptr) {
           const Type* t = n2->bottom_type();
           is_verified_oop_store = t->isa_oop_ptr() ? (t->is_ptr()->_offset==0) : false;
         }
@@ -842,7 +843,7 @@ void emit_form3_mem_reg(C2_MacroAssembler* masm, PhaseRegAlloc* ra, const MachNo
       Node* addr = n->in(2);
       if (!(addr->is_Mach() && addr->as_Mach()->ideal_Opcode() == Op_AddP)) {
         const TypeOopPtr* atype = addr->bottom_type()->isa_instptr();  // %%% oopptr?
-        if (atype != NULL) {
+        if (atype != nullptr) {
           intptr_t offset = get_offset_from_base(n, atype, disp32);
           intptr_t offset_2 = get_offset_from_base_2(n, atype, disp32);
           if (offset != offset_2) {
@@ -1406,12 +1407,12 @@ uint MachSpillCopyNode::implementation(C2_MacroAssembler *masm,
 
 #ifndef PRODUCT
 void MachSpillCopyNode::format( PhaseRegAlloc *ra_, outputStream *st ) const {
-  implementation( NULL, ra_, false, st );
+  implementation( nullptr, ra_, false, st );
 }
 #endif
 
 void MachSpillCopyNode::emit(C2_MacroAssembler* masm, PhaseRegAlloc *ra_) const {
-  implementation( masm, ra_, false, NULL );
+  implementation( masm, ra_, false, nullptr );
 }
 
 uint MachSpillCopyNode::size(PhaseRegAlloc *ra_) const {
@@ -1467,7 +1468,10 @@ uint BoxLockNode::size(PhaseRegAlloc *ra_) const {
 #ifndef PRODUCT
 void MachUEPNode::format( PhaseRegAlloc *ra_, outputStream *st ) const {
   st->print_cr("\nUEP:");
-  if (UseCompressedClassPointers) {
+  if (UseCompactObjectHeaders) {
+    st->print_cr("\tLDX    [R_O0 + oopDesc::mark_offset_in_bytes],R_G3");
+    st->print_cr("\tSRLX   R_G3,%d,R_G3\t! compact klass", markWord::klass_shift);
+  } else if (UseCompressedClassPointers) {
     st->print_cr("\tLDUW   [R_O0 + oopDesc::klass_offset_in_bytes],R_G3\t! Inline cache check - compressed klass");
   } else {
     st->print_cr("\tLDX    [R_O0 + oopDesc::klass_offset_in_bytes],R_G3\t! Inline cache check");
@@ -1496,7 +1500,7 @@ int HandlerImpl::emit_exception_handler(C2_MacroAssembler* masm) {
   AddressLiteral exception_blob(OptoRuntime::exception_blob()->entry_point());
 
   address base = __ start_a_stub(size_exception_handler());
-  if (base == NULL) {
+  if (base == nullptr) {
     ciEnv::current()->record_failure("CodeCache is full");
     return 0;  // CodeBuffer::expand failed
   }
@@ -1520,7 +1524,7 @@ int HandlerImpl::emit_deopt_handler(C2_MacroAssembler* masm) {
   AddressLiteral deopt_blob(SharedRuntime::deopt_blob()->unpack());
 
   address base = __ start_a_stub(size_deopt_handler());
-  if (base == NULL) {
+  if (base == nullptr) {
     ciEnv::current()->record_failure("CodeCache is full");
     return 0;  // CodeBuffer::expand failed
   }
@@ -1607,7 +1611,7 @@ bool Matcher::vector_needs_partial_operations(Node* node, const TypeVect* vt) {
 }
 
 const RegMask* Matcher::predicate_reg_mask(void) {
-  return NULL;
+  return nullptr;
 }
 
 
@@ -1622,7 +1626,7 @@ OptoRegPair Matcher::vector_return_value(uint ideal_reg) {
 }
 
 #ifdef ASSERT
-address last_rethrow = NULL;  // debugging aid for Rethrow encoding
+address last_rethrow = nullptr;  // debugging aid for Rethrow encoding
 #endif
 
 // Vector width in bytes
@@ -1668,7 +1672,7 @@ bool Matcher::is_short_branch_offset(int rule, int br_size, int offset) {
 
 MachOper* Matcher::pd_specialize_generic_vector_operand(MachOper* original_opnd, uint ideal_reg, bool is_temp) {
   ShouldNotReachHere(); // generic vector operands not supported
-  return NULL;
+  return nullptr;
 }
 
 bool Matcher::is_reg2reg_move(MachNode* m) {
@@ -2263,7 +2267,7 @@ encode %{
 
       // Emit stub for static call.
       address stub = CompiledDirectCall::emit_to_interp_stub(masm);
-      if (stub == NULL) {
+      if (stub == nullptr) {
         ciEnv::current()->record_failure("CodeCache is full");
         return;
       }
@@ -2290,8 +2294,9 @@ encode %{
       __ load_klass(O0, G3_scratch);
       int klass_load_size;
       if (UseCompressedClassPointers) {
-        assert(Universe::heap() != NULL, "java heap should be initialized");
-        klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() + 1*BytesPerInstWord;
+        assert(Universe::heap() != nullptr, "java heap should be initialized");
+        klass_load_size = MacroAssembler::instr_size_for_decode_klass_not_null() +
+                        (UseCompactObjectHeaders ? 2 : 1)*BytesPerInstWord;
       } else {
         klass_load_size = 1*BytesPerInstWord;
       }
@@ -3137,7 +3142,7 @@ operand immNKlass()
   interface(CONST_INTER);
 %}
 
-// NULL Pointer Immediate
+// nullptr Pointer Immediate
 operand immN0()
 %{
   predicate(n->get_narrowcon() == 0);
@@ -5496,6 +5501,7 @@ instruct loadKlass(iRegP dst, memory mem) %{
 
 // Load narrow Klass Pointer
 instruct loadNKlass(iRegN dst, memory mem) %{
+  predicate(!UseCompactObjectHeaders);
   match(Set dst (LoadNKlass mem));
   ins_cost(MEMORY_REF_COST);
   size(4);
@@ -5503,6 +5509,22 @@ instruct loadNKlass(iRegN dst, memory mem) %{
   format %{ "LDUW   $mem,$dst\t! compressed klass ptr" %}
   ins_encode %{
     __ lduw($mem$$Address, $dst$$Register);
+  %}
+  ins_pipe(iload_mem);
+%}
+
+// Compact headers embed the narrow klass in the high bits of the mark word.
+instruct loadNKlassCompactHeaders(iRegN dst, memory mem) %{
+  predicate(UseCompactObjectHeaders);
+  match(Set dst (LoadNKlass mem));
+  ins_cost(MEMORY_REF_COST + DEFAULT_COST);
+  size(8);
+  format %{ "LDX/SRLX $mem,$dst\t! compact klass ptr" %}
+  ins_encode %{
+    Address klass_addr = $mem$$Address;
+    assert(klass_addr.has_disp(), "klass load must have a constant offset");
+    __ ldx(klass_addr.plus_disp(-oopDesc::klass_offset_in_bytes()), $dst$$Register);
+    __ srlx($dst$$Register, markWord::klass_shift, $dst$$Register);
   %}
   ins_pipe(iload_mem);
 %}
@@ -5632,7 +5654,7 @@ instruct loadConN0(iRegN dst, immN0 src) %{
   match(Set dst src);
 
   size(4);
-  format %{ "CLR    $dst\t! compressed NULL ptr" %}
+  format %{ "CLR    $dst\t! compressed nullptr ptr" %}
   ins_encode %{
     __ clr($dst$$Register);
   %}
@@ -6000,7 +6022,7 @@ instruct encodeHeapOop(iRegN dst, iRegP src) %{
   ins_encode %{
     __ encode_heap_oop($src$$Register, $dst$$Register);
   %}
-  ins_avoid_back_to_back(CompressedOops::base() == NULL ? AVOID_NONE : AVOID_BEFORE);
+  ins_avoid_back_to_back(CompressedOops::base() == nullptr ? AVOID_NONE : AVOID_BEFORE);
   ins_pipe(ialu_reg);
 %}
 

@@ -246,10 +246,10 @@ inline void MacroAssembler::call( address d, relocInfo::relocType rt ) {
 
 inline void MacroAssembler::call( address d, RelocationHolder const& rspec ) {
   intptr_t disp;
-  // NULL is ok because it will be relocated later.
-  // Must change NULL to a reachable address in order to
+  // nullptr is ok because it will be relocated later.
+  // Must change nullptr to a reachable address in order to
   // pass asserts here and in wdisp.
-  if ( d == NULL )
+  if ( d == nullptr )
     d = pc();
 
   // Is this address within range of the call instruction?

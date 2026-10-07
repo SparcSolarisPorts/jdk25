@@ -37,7 +37,7 @@ extern "C" {
   address bootstrap_flush_windows(void) {
     Thread* thread = Thread::current_or_null();
     // Very early in process there is no thread.
-    if (thread != NULL) {
+    if (thread != nullptr) {
       guarantee(thread->is_Java_thread(), "Not a Java thread.");
       JavaThread* jt = (JavaThread*)thread;
       guarantee(!jt->has_last_Java_frame(), "Must be able to flush registers!");

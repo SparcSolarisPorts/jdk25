@@ -633,7 +633,7 @@ class StubGenerator: public StubCodeGenerator {
 
     __ check_klass_subtype_slow_path(Rsub, Rsuper,
                                      L0, L1, L2, L3,
-                                     NULL, &miss);
+                                     nullptr, &miss);
 
     // Match falls through here.
     __ addcc(G0,0,Rret);        // set Z flags, Z result
@@ -691,11 +691,11 @@ class StubGenerator: public StubCodeGenerator {
   //  Kills temps:  O3, O4
   //
   void array_overlap_test(address no_overlap_target, int log2_elem_size) {
-    assert(no_overlap_target != NULL, "must be generated");
-    array_overlap_test(no_overlap_target, NULL, log2_elem_size);
+    assert(no_overlap_target != nullptr, "must be generated");
+    array_overlap_test(no_overlap_target, nullptr, log2_elem_size);
   }
   void array_overlap_test(Label& L_no_overlap, int log2_elem_size) {
-    array_overlap_test(NULL, &L_no_overlap, log2_elem_size);
+    array_overlap_test(nullptr, &L_no_overlap, log2_elem_size);
   }
   void array_overlap_test(address no_overlap_target, Label* NOLp, int log2_elem_size) {
     const Register from       = O0;
@@ -706,12 +706,12 @@ class StubGenerator: public StubCodeGenerator {
 
       __ subcc(to, from, to_from);
       __ sll_ptr(count, log2_elem_size, byte_count);
-      if (NOLp == NULL)
+      if (NOLp == nullptr)
         __ brx(Assembler::lessEqualUnsigned, false, Assembler::pt, no_overlap_target);
       else
         __ brx(Assembler::lessEqualUnsigned, false, Assembler::pt, (*NOLp));
       __ delayed()->cmp(to_from, byte_count);
-      if (NOLp == NULL)
+      if (NOLp == nullptr)
         __ brx(Assembler::greaterEqualUnsigned, false, Assembler::pt, no_overlap_target);
       else
         __ brx(Assembler::greaterEqualUnsigned, false, Assembler::pt, (*NOLp));
@@ -1007,7 +1007,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -1110,7 +1110,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -1221,7 +1221,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -1551,7 +1551,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -1789,7 +1789,7 @@ class StubGenerator: public StubCodeGenerator {
     const Register count = O2;
     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -1924,7 +1924,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -2077,7 +2077,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -2155,7 +2155,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(O2, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from Unsafe.copyMemory)
       BLOCK_COMMENT("Entry:");
@@ -2194,7 +2194,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here
       BLOCK_COMMENT("Entry:");
@@ -2249,7 +2249,7 @@ class StubGenerator: public StubCodeGenerator {
 
     assert_clean_int(count, O3);     // Make sure 'count' is clean int.
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here
       BLOCK_COMMENT("Entry:");
@@ -2300,7 +2300,7 @@ class StubGenerator: public StubCodeGenerator {
     assert_clean_int(super_check_offset, temp);
 
     __ check_klass_subtype_fast_path(sub_klass, super_klass, temp, noreg,
-                                     &L_success, &L_miss, NULL,
+                                     &L_success, &L_miss, nullptr,
                                      super_check_offset);
 
     BLOCK_COMMENT("type_check_slow_path:");
@@ -2308,7 +2308,7 @@ class StubGenerator: public StubCodeGenerator {
     __ check_klass_subtype_slow_path(sub_klass->after_save(),
                                      super_klass->after_save(),
                                      L0, L1, L2, L4,
-                                     NULL, &L_pop_to_miss);
+                                     nullptr, &L_pop_to_miss);
     __ ba(L_success);
     __ delayed()->restore();
 
@@ -2371,7 +2371,7 @@ class StubGenerator: public StubCodeGenerator {
     }
 #endif //ASSERT
 
-    if (entry != NULL) {
+    if (entry != nullptr) {
       *entry = __ pc();
       // caller can pass a 64-bit byte count here (from generic stub)
       BLOCK_COMMENT("Entry:");
@@ -2635,7 +2635,7 @@ class StubGenerator: public StubCodeGenerator {
     //  assert(src->klass() != nullptr);
     BLOCK_COMMENT("assert klasses not null");
     { Label L_a, L_b;
-      __ br_notnull_short(G3_src_klass, Assembler::pt, L_b); // it is broken if klass is NULL
+      __ br_notnull_short(G3_src_klass, Assembler::pt, L_b); // it is broken if klass is nullptr
       __ bind(L_a);
       __ stop("broken null klass");
       __ bind(L_b);
@@ -2893,7 +2893,7 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit = generate_disjoint_oop_copy(true, &entry,
                                                                                       "arrayof_oop_disjoint_arraycopy_uninit",
                                                                                       /*dest_uninitialized*/true);
-    StubRoutines::_arrayof_oop_arraycopy_uninit          = generate_conjoint_oop_copy(true, entry, NULL,
+    StubRoutines::_arrayof_oop_arraycopy_uninit          = generate_conjoint_oop_copy(true, entry, nullptr,
                                                                                       "arrayof_oop_arraycopy_uninit",
                                                                                       /*dest_uninitialized*/true);
     if (UseCompressedOops) {
@@ -2906,7 +2906,7 @@ class StubGenerator: public StubCodeGenerator {
       StubRoutines::_oop_disjoint_arraycopy_uninit     = generate_disjoint_oop_copy(false, &entry,
                                                                                     "oop_disjoint_arraycopy_uninit",
                                                                                     /*dest_uninitialized*/true);
-      StubRoutines::_oop_arraycopy_uninit              = generate_conjoint_oop_copy(false, entry, NULL,
+      StubRoutines::_oop_arraycopy_uninit              = generate_conjoint_oop_copy(false, entry, nullptr,
                                                                                     "oop_arraycopy_uninit",
                                                                                     /*dest_uninitialized*/true);
     } else {

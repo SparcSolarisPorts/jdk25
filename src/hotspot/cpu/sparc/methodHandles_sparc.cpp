@@ -224,14 +224,14 @@ address MethodHandles::generate_method_handle_interpreter_entry(MacroAssembler* 
     // They are linked to Java-generated adapters via MethodHandleNatives.linkMethod.
     // They all allow an appendix argument.
     __ should_not_reach_here();           // empty stubs make SG sick
-    return NULL;
+    return nullptr;
   }
 
   // No need in interpreter entry for linkToNative for now.
   // Interpreter calls compiled entry through i2c.
   if (iid == vmIntrinsics::_linkToNative) {
     __ should_not_reach_here();           // Empty stubs make SG sick.
-    return NULL;
+    return nullptr;
   }
 
   // I5_savedSP/O5_savedSP: sender SP (must preserve; see prepare_to_jump_from_interpreted)
@@ -530,7 +530,7 @@ void trace_method_handle_stub(const char* adaptername,
 
     // walk up to the right frame using the "tracing_fp" argument
     intptr_t* cur_sp = StubRoutines::Sparc::flush_callers_register_windows_func()();
-    frame cur_frame(cur_sp, frame::unpatchable, NULL);
+    frame cur_frame(cur_sp, frame::unpatchable, nullptr);
 
     while (cur_frame.fp() != (intptr_t *)(STACK_BIAS+(uintptr_t)tracing_fp)) {
       cur_frame = os::get_sender_for_C_frame(&cur_frame);

@@ -514,7 +514,7 @@ void VM_Version::initialize() {
 
 void VM_Version::print_features() {
   tty->print("ISA features [0x%0" PRIx64 "]:", _features);
-  if (_features_string != NULL) {
+  if (_features_string != nullptr) {
     tty->print(" %s", _features_string);
   }
   tty->cr();
@@ -549,7 +549,7 @@ bool VM_Version::initialize_cpu_information(void) {
   int core_id = -1;
   int chip_id = -1;
   int len = 0;
-  char* src_string = NULL;
+  char* src_string = nullptr;
   kstat_ctl_t* kc = kstat_open();
   if (!kc) {
     return false;
@@ -586,15 +586,15 @@ bool VM_Version::initialize_cpu_information(void) {
   _no_of_sockets = 0;
 
   // loop through the kstat chain
-  kstat_t* ksp = NULL;
-  for (ksp = kc->kc_chain; ksp != NULL; ksp = ksp->ks_next) {
+  kstat_t* ksp = nullptr;
+  for (ksp = kc->kc_chain; ksp != nullptr; ksp = ksp->ks_next) {
     // only interested in "cpu_info"
     if (strcmp(ksp->ks_module, (char*)CPU_INFO) == 0) {
-      if (kstat_read(kc, ksp, NULL) == -1) {
+      if (kstat_read(kc, ksp, nullptr) == -1) {
         kstat_close(kc);
         return false;
       }
-      if (ksp->ks_data != NULL) {
+      if (ksp->ks_data != nullptr) {
         kstat_named_t* knm = (kstat_named_t *)ksp->ks_data;
         // loop through the number of fields in each record
         for (int i = 0; i < ksp->ks_ndata; i++) {

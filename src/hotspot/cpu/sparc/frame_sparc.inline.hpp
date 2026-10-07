@@ -35,11 +35,11 @@
 // Constructors
 
 inline frame::frame() {
-  _pc = NULL;
-  _sp = NULL;
-  _younger_sp = NULL;
-  _unextended_sp = NULL;
-  _fp = NULL;
+  _pc = nullptr;
+  _sp = nullptr;
+  _younger_sp = nullptr;
+  _unextended_sp = nullptr;
+  _fp = nullptr;
     _cb = nullptr;
   _oop_map = nullptr;
   _deopt_state = unknown;

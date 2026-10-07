@@ -1,8 +1,64 @@
-# JDK 25 Solaris/SPARC continuation candidate (v21)
+# JDK 25 Solaris/SPARC continuation candidate (v22)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v22 fixes defects identified while reviewing the 233 unsuccessful jtreg cases.
+It is cumulative over v21 and preserves continuation fast paths, lightweight
+locking, C1/C2, G1 barriers and optimized arithmetic stubs.
+
+Changes in v22:
+- Compact headers: read the narrow klass from the mark word in interpreter,
+  C1, C2 and inline-cache checks. Initialize the class prototype header during
+  fast allocation, preserve the absence of a klass gap, clear instance fields
+  from the actual header boundary, and account for the extra instruction in
+  inline-cache alignment and dynamic-call return offsets.
+- C1 arrays: pass the header size in bytes instead of truncating to whole heap
+  words. A 20-byte uncompressed-klass header was rounded down to 16, causing
+  body clearing to overwrite the array length. A 12-byte compact header has
+  the same problem. Clear the first four payload bytes separately, then clear
+  aligned eight-byte words. Do not select aligned copy stubs when the array
+  payload base is only four-byte aligned.
+- Monitor-only locking: admit SPARC LockingMode=0 after auditing interpreter,
+  C1, C2 and synchronized JNI paths, which already use runtime monitor locking.
+- Source convention: remove the reported legacy null tokens from port source
+  and shared files. C++ pointers use nullptr, integer JNI slots and DTrace use 0.
+
+Validation completed here: combined SPARC/G1 ADLC generation passed (15 existing
+unused-operand warnings); ArrayHeaderSmoke passed all nine combinations of
+interpreter/C1/C2 and normal/no-CCP/no-compression on Linux/x86 JDK 17. This
+validates the test oracle, not the patched SPARC JVM. Compact-header execution
+and the entire native build require the Solaris/SPARC machine.
+
+This archive does not claim all 233 cases are fixed. failure-status-233.csv has
+one row for every case with observed output and the required next step. 29 cases
+failed before running jcstress because its jar was missing; 24 lacked the native
+gtest library. Remaining continuation/JVMTI crashes, timeouts and independent
+compiler expectations require reruns and retained evidence.
+
+From ~/git/jdk25 after extracting the ZIP into the repository:
+
+```bash
+gmake images test-image JOBS=8 && bash tests/run-header-matrix.sh
+bash tests/rerun-failed-233.sh
+bash tests/collect-failure-evidence.sh
+```
+
+The header matrix runs 15 header/compiler combinations and monitor-only locking,
+with separate logs and crash reports. The 233-case rerun uses the normal VM
+configuration; it does not exclude cases or disable optimizations. The evidence
+collector locates crash reports rather than assuming a scratch-directory name,
+and collects failed .jtr results, header-matrix results and build/rerun logs.
+Preserve the existing crash logs with the collector before rerunning tests if
+possible, as jtreg can reuse scratch directories.
+
+See TEST-DEPENDENCIES.md for missing test dependencies. To pass a resolved
+jcstress artifact to the rerun:
+
+```bash
+JCSTRESS_JAR=/absolute/path/to/jcstress-tests-all.jar bash tests/rerun-failed-233.sh
+```
 
 v21 adapts SPARC multiplyToLen to the JDK 25 five-argument runtime ABI.
 The supplied crypto tests crash in StubRoutines::multiplyToLen. The shared C2

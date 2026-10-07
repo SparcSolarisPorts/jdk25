@@ -175,13 +175,13 @@ void TemplateInterpreterGenerator::generate_counter_overflow(Label& Lcontinue) {
   // Generate code to initiate compilation on the counter overflow.
 
   // InterpreterRuntime::frequency_counter_overflow takes two arguments,
-  // the first indicates if the counter overflow occurs at a backwards branch (NULL bcp)
+  // the first indicates if the counter overflow occurs at a backwards branch (nullptr bcp)
   // and the second is only used when the first is true.  We pass zero for both.
   // The call returns the address of the verified entry point for the method or null
   // if the compilation did not complete (either went background or bailed out).
   __ set((int)false, O2);
   __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::frequency_counter_overflow), O2, O2, true);
-  // returns verified_entry_point or NULL
+  // returns verified_entry_point or nullptr
   // we ignore it in any case
   __ ba_short(Lcontinue);
 }
@@ -239,7 +239,7 @@ address TemplateInterpreterGenerator::generate_exception_handler_common(const ch
     __ call_VM(Oexception, CAST_FROM_FN_PTR(address, InterpreterRuntime::create_exception), G3_scratch, G4_scratch);
   }
   // throw exception
-  assert(Interpreter::throw_exception_entry() != NULL, "generate it first");
+  assert(Interpreter::throw_exception_entry() != nullptr, "generate it first");
   AddressLiteral thrower(Interpreter::throw_exception_entry());
   __ jump_to(thrower, G3_scratch);
   __ delayed()->nop();
@@ -709,7 +709,7 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
   //    LcpoolCache: constant pool cache
   //
   // 4) Initialize the non-argument locals if necessary:
-  //    Non-argument locals may need to be initialized to NULL
+  //    Non-argument locals may need to be initialized to nullptr
   //    for GC to work. If the oop-map information is accurate
   //    (in the absence of the JSR problem), no initialization
   //    is necessary.
@@ -856,7 +856,7 @@ address TemplateInterpreterGenerator::generate_Reference_get_entry(void) {
   // Check if local 0 != null
   // If the receiver is null then it is OK to jump to the slow path.
   __ ld_ptr(Gargs, G0, Otos_i ); // get local 0
-  // check if local 0 == NULL and go the slow path
+  // check if local 0 == nullptr and go the slow path
   __ cmp_and_brx_short(Otos_i, 0, Assembler::equal, Assembler::pn, slow_path);
 
   __ load_heap_oop(Otos_i, referent_offset, Otos_i, G3_scratch, ON_WEAK_OOP_REF);
@@ -927,7 +927,7 @@ address TemplateInterpreterGenerator::generate_CRC32_update_entry() {
     __ jump_to_entry(Interpreter::entry_for_kind(Interpreter::native));
     return entry;
   }
-  return NULL;
+  return nullptr;
 }
 
 /**
@@ -983,7 +983,7 @@ address TemplateInterpreterGenerator::generate_CRC32_updateBytes_entry(AbstractI
     __ jump_to_entry(Interpreter::entry_for_kind(Interpreter::native));
     return entry;
   }
-  return NULL;
+  return nullptr;
 }
 
 /**
@@ -1036,17 +1036,17 @@ address TemplateInterpreterGenerator::generate_CRC32C_updateBytes_entry(Abstract
 
     return entry;
   }
-  return NULL;
+  return nullptr;
 }
 
-// Float16 is not supported on SPARC; returning NULL makes the shared
+// Float16 is not supported on SPARC; returning nullptr makes the shared
 // generator fall back to the normal (non-intrinsic) entry point.
 address TemplateInterpreterGenerator::generate_Float_float16ToFloat_entry() {
-  return NULL;
+  return nullptr;
 }
 
 address TemplateInterpreterGenerator::generate_Float_floatToFloat16_entry() {
-  return NULL;
+  return nullptr;
 }
 
 /* Math routines only partially supported.
@@ -1099,7 +1099,7 @@ address TemplateInterpreterGenerator::generate_math_entry(AbstractInterpreter::M
     default:
       break;
   }
-  return NULL;
+  return nullptr;
 }
 
 // TODO: rather than touching all pages, check against stack_overflow_limit and bang yellow page to

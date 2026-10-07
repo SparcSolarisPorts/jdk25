@@ -164,7 +164,7 @@
   // matches this port: sparc does not emit post-call nops).
   intptr_t* younger_sp() const {
     assert_absolute();
-    assert(_younger_sp != NULL, "frame must possess a younger_sp");
+    assert(_younger_sp != nullptr, "frame must possess a younger_sp");
     return _younger_sp;
   }
   intptr_t* younger_sp_or_null() const { assert_absolute(); return _younger_sp; }
@@ -190,7 +190,7 @@
 
   // make a deficient frame which doesn't know where its PC is:
   enum unpatchable_t { unpatchable };
-  frame(intptr_t* sp, unpatchable_t, address pc = NULL, CodeBlob* cb = NULL);
+  frame(intptr_t* sp, unpatchable_t, address pc = nullptr, CodeBlob* cb = nullptr);
 
   void init(intptr_t* sp, address pc, CodeBlob* cb);
 

@@ -151,7 +151,7 @@ void NativeCall::print() {
 void NativeCall::replace_mt_safe(address instr_addr, address code_buffer) {
   assert(CodeCache_lock->is_locked() ||
          SafepointSynchronize::is_at_safepoint(), "concurrent code patching");
-   assert (instr_addr != NULL, "illegal address for code patching");
+   assert (instr_addr != nullptr, "illegal address for code patching");
    NativeCall* n_call =  nativeCall_at (instr_addr); // checking that it is a call
    assert(NativeCall::instruction_size == 8, "wrong instruction size; must be 8");
    int i0 = ((int*)code_buffer)[0];
@@ -270,7 +270,7 @@ void NativeFarCall::print() {
 
 bool NativeFarCall::destination_is_compiled_verified_entry_point() {
   nmethod* callee = CodeCache::find_nmethod(destination());
-  if (callee == NULL) {
+  if (callee == nullptr) {
     return false;
   } else {
     return destination() == callee->verified_entry_point();
@@ -322,15 +322,15 @@ void NativeMovConstReg::set_data(intptr_t x) {
 
   // also store the value into an oop_Relocation cell, if any
   CodeBlob* cb = CodeCache::find_blob(instruction_address());
-  nmethod*  nm = cb ? cb->as_nmethod_or_null() : NULL;
-  if (nm != NULL) {
+  nmethod*  nm = cb ? cb->as_nmethod_or_null() : nullptr;
+  if (nm != nullptr) {
     RelocIterator iter(nm, instruction_address(), next_instruction_address());
-    oop* oop_addr = NULL;
-    Metadata** metadata_addr = NULL;
+    oop* oop_addr = nullptr;
+    Metadata** metadata_addr = nullptr;
     while (iter.next()) {
       if (iter.type() == relocInfo::oop_type) {
         oop_Relocation *r = iter.oop_reloc();
-        if (oop_addr == NULL) {
+        if (oop_addr == nullptr) {
           oop_addr = r->oop_addr();
           *oop_addr = cast_to_oop(x);
         } else {
@@ -339,7 +339,7 @@ void NativeMovConstReg::set_data(intptr_t x) {
       }
       if (iter.type() == relocInfo::metadata_type) {
         metadata_Relocation *r = iter.metadata_reloc();
-        if (metadata_addr == NULL) {
+        if (metadata_addr == nullptr) {
           metadata_addr = r->metadata_addr();
           *metadata_addr = (Metadata*)x;
         } else {
@@ -426,15 +426,15 @@ void NativeMovConstReg32::set_data(intptr_t x) {
 
   // also store the value into an oop_Relocation cell, if any
   CodeBlob* cb = CodeCache::find_blob(instruction_address());
-  nmethod*  nm = cb ? cb->as_nmethod_or_null() : NULL;
-  if (nm != NULL) {
+  nmethod*  nm = cb ? cb->as_nmethod_or_null() : nullptr;
+  if (nm != nullptr) {
     RelocIterator iter(nm, instruction_address(), next_instruction_address());
-    oop* oop_addr = NULL;
-    Metadata** metadata_addr = NULL;
+    oop* oop_addr = nullptr;
+    Metadata** metadata_addr = nullptr;
     while (iter.next()) {
       if (iter.type() == relocInfo::oop_type) {
         oop_Relocation *r = iter.oop_reloc();
-        if (oop_addr == NULL) {
+        if (oop_addr == nullptr) {
           oop_addr = r->oop_addr();
           *oop_addr = cast_to_oop(x);
         } else {
@@ -443,7 +443,7 @@ void NativeMovConstReg32::set_data(intptr_t x) {
       }
       if (iter.type() == relocInfo::metadata_type) {
         metadata_Relocation *r = iter.metadata_reloc();
-        if (metadata_addr == NULL) {
+        if (metadata_addr == nullptr) {
           metadata_addr = r->metadata_addr();
           *metadata_addr = (Metadata*)x;
         } else {
@@ -495,15 +495,15 @@ void NativeMovConstRegPatching::set_data(int x) {
 
   // also store the value into an oop_Relocation cell, if any
   CodeBlob* cb = CodeCache::find_blob(instruction_address());
-  nmethod*  nm = cb ? cb->as_nmethod_or_null() : NULL;
-  if (nm != NULL) {
+  nmethod*  nm = cb ? cb->as_nmethod_or_null() : nullptr;
+  if (nm != nullptr) {
     RelocIterator iter(nm, instruction_address(), next_instruction_address());
-    oop* oop_addr = NULL;
-    Metadata** metadata_addr = NULL;
+    oop* oop_addr = nullptr;
+    Metadata** metadata_addr = nullptr;
     while (iter.next()) {
       if (iter.type() == relocInfo::oop_type) {
         oop_Relocation *r = iter.oop_reloc();
-        if (oop_addr == NULL) {
+        if (oop_addr == nullptr) {
           oop_addr = r->oop_addr();
           *oop_addr = cast_to_oop(x);
         } else {
@@ -512,7 +512,7 @@ void NativeMovConstRegPatching::set_data(int x) {
       }
       if (iter.type() == relocInfo::metadata_type) {
         metadata_Relocation *r = iter.metadata_reloc();
-        if (metadata_addr == NULL) {
+        if (metadata_addr == nullptr) {
           metadata_addr = r->metadata_addr();
           *metadata_addr = (Metadata*)x;
         } else {
@@ -879,7 +879,7 @@ void NativeGeneralJump::insert_unconditional(address code_pos, address entry) {
 void NativeGeneralJump::replace_mt_safe(address instr_addr, address code_buffer) {
    assert(CodeCache_lock->is_locked() ||
          SafepointSynchronize::is_at_safepoint(), "concurrent code patching");
-   assert (instr_addr != NULL, "illegal address for code patching");
+   assert (instr_addr != nullptr, "illegal address for code patching");
    NativeGeneralJump* h_jump =  nativeGeneralJump_at (instr_addr); // checking that it is a call
    assert(NativeGeneralJump::instruction_size == 8, "wrong instruction size; must be 8");
    int i0 = ((int*)code_buffer)[0];

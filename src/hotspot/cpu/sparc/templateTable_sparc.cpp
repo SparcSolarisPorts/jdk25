@@ -36,6 +36,7 @@
 #include "oops/methodData.hpp"
 #include "oops/methodCounters.hpp"
 #include "oops/objArrayKlass.hpp"
+#include "oops/instanceOop.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/resolvedFieldEntry.hpp"
 #include "oops/resolvedIndyEntry.hpp"
@@ -370,7 +371,7 @@ void TemplateTable::fast_aldc(LdcType type) {
     __ cmp(G3_scratch, Otos_i);
     __ br(Assembler::notEqual, true, Assembler::pt, notNull);
     __ delayed()->nop();
-    __ clr(Otos_i);  // NULL object reference
+    __ clr(Otos_i);  // nullptr object reference
     __ bind(notNull);
   }
 
@@ -2305,7 +2306,7 @@ void TemplateTable::jvmti_post_field_access(Register Rcache,
       }
       __ verify_oop(Otos_i);
     }
-    // Otos_i: object pointer or NULL if static
+    // Otos_i: object pointer or nullptr if static
     // Rcache: field entry pointer
     __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_access),
                Otos_i, Rcache);
@@ -2673,7 +2674,7 @@ void TemplateTable::jvmti_post_field_mod(Register Rcache, Register index, bool i
     }
     // setup pointer to jvalue object
     __ mov(Lesp, G1_scratch);  __ inc(G1_scratch, wordSize);
-    // G4_scratch:  object pointer or NULL if static
+    // G4_scratch:  object pointer or nullptr if static
     // G3_scratch: field entry pointer
     // G1_scratch: jvalue object on the stack
     __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_modification),
@@ -3155,7 +3156,7 @@ void TemplateTable::invokevfinal_helper(Register Rscratch, Register Rret) {
   __ lduh(G4_scratch, in_bytes(ConstMethod::size_of_parameters_offset()), G4_scratch);
   __ load_receiver(G4_scratch, O0);
 
-  // receiver NULL check
+  // receiver nullptr check
   __ null_check(O0);
 
   __ profile_final_call(O4);
@@ -3563,9 +3564,9 @@ void TemplateTable::_new() {
   if (UseTLAB) {
     // clear object fields
     __ bind(initialize_object);
-    __ deccc(Roffset, sizeof(oopDesc));
+    __ deccc(Roffset, instanceOopDesc::header_size() * HeapWordSize);
     __ br(Assembler::zero, false, Assembler::pt, initialize_header);
-    __ delayed()->add(RallocatedObject, sizeof(oopDesc), G3_scratch);
+    __ delayed()->add(RallocatedObject, instanceOopDesc::header_size() * HeapWordSize, G3_scratch);
 
     // initialize remaining object fields
     if (UseBlockZeroing) {
@@ -3595,10 +3596,15 @@ void TemplateTable::_new() {
   // Initialize the header: mark, klass
   __ bind(initialize_header);
 
-  __ set((intptr_t)markWord::prototype().value(), G4_scratch);
-  __ st_ptr(G4_scratch, RallocatedObject, oopDesc::mark_offset_in_bytes());       // mark
-  __ store_klass_gap(G0, RallocatedObject);         // klass gap if compressed
-  __ store_klass(RinstanceKlass, RallocatedObject); // klass (last for cms)
+  if (UseCompactObjectHeaders) {
+    __ ld_ptr(RinstanceKlass, in_bytes(Klass::prototype_header_offset()), G4_scratch);
+    __ st_ptr(G4_scratch, RallocatedObject, oopDesc::mark_offset_in_bytes());
+  } else {
+    __ set((intptr_t)markWord::prototype().value(), G4_scratch);
+    __ st_ptr(G4_scratch, RallocatedObject, oopDesc::mark_offset_in_bytes());
+    __ store_klass_gap(G0, RallocatedObject);
+    __ store_klass(RinstanceKlass, RallocatedObject);
+  }
 
   {
     SkipIfEqual skip_if(
@@ -3649,7 +3655,7 @@ void TemplateTable::checkcast() {
   Register RobjKlass = O5;
   Register RspecifiedKlass = O4;
 
-  // Check for casting a NULL
+  // Check for casting a nullptr
   __ br_null(Otos_i, false, Assembler::pn, is_null);
   __ delayed()->nop();
 
@@ -3707,7 +3713,7 @@ void TemplateTable::instanceof() {
   Register RobjKlass = O5;
   Register RspecifiedKlass = O4;
 
-  // Check for casting a NULL
+  // Check for casting a nullptr
   __ br_null(Otos_i, false, Assembler::pt, is_null);
   __ delayed()->nop();
 
@@ -3817,7 +3823,7 @@ void TemplateTable::monitorenter() {
 
 
   // initialize entry pointer
-  __ clr(O1); // points to free slot or NULL
+  __ clr(O1); // points to free slot or nullptr
 
   {
     Label entry, loop, exit;

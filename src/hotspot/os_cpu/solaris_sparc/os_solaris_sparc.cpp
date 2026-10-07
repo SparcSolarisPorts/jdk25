@@ -141,22 +141,22 @@ bool os::Solaris::valid_ucontext(Thread* thread, const ucontext_t* valid, const 
 const ucontext_t* os::Solaris::get_valid_uc_in_signal_handler(Thread *thread,
   const ucontext_t *uc) {
 
-  const ucontext_t *retuc = NULL;
+  const ucontext_t *retuc = nullptr;
 
   // Sometimes the topmost register windows are not properly flushed.
   // i.e., if the kernel would have needed to take a page fault
-  if (uc != NULL && uc->uc_mcontext.gwins != NULL) {
+  if (uc != nullptr && uc->uc_mcontext.gwins != nullptr) {
     ::handle_unflushed_register_windows(uc->uc_mcontext.gwins);
   }
 
-  if (uc != NULL) {
-    if (uc->uc_link == NULL) {
+  if (uc != nullptr) {
+    if (uc->uc_link == nullptr) {
       // cannot validate without uc_link so accept current ucontext
       retuc = uc;
     } else if (os::Solaris::valid_ucontext(thread, uc, uc->uc_link)) {
       // first ucontext is valid so try the next one
       uc = uc->uc_link;
-      if (uc->uc_link == NULL) {
+      if (uc->uc_link == nullptr) {
         // cannot validate without uc_link so accept current ucontext
         retuc = uc;
       } else if (os::Solaris::valid_ucontext(thread, uc, uc->uc_link)) {
@@ -181,7 +181,7 @@ intptr_t* os::Solaris::ucontext_get_sp(const ucontext_t *uc) {
 // Solaris X86 only
 intptr_t* os::Solaris::ucontext_get_fp(const ucontext_t *uc) {
   ShouldNotReachHere();
-  return NULL;
+  return nullptr;
 }
 
 address os::Posix::ucontext_get_pc(const ucontext_t *uc) {
@@ -196,16 +196,16 @@ address os::fetch_frame_from_context(const void* ucVoid,
   address  epc;
   const ucontext_t *uc = (const ucontext_t*)ucVoid;
 
-  if (uc != NULL) {
+  if (uc != nullptr) {
     epc = os::Posix::ucontext_get_pc(uc);
     if (ret_sp) *ret_sp = os::Solaris::ucontext_get_sp(uc);
     // On SPARC a frame's base and its sp are the same address (frame::fp()
     // is the identity mapping), so the sp from the context doubles as fp.
     if (ret_fp) *ret_fp = os::Solaris::ucontext_get_sp(uc);
   } else {
-    epc = NULL;
-    if (ret_sp) *ret_sp = (intptr_t *)NULL;
-    if (ret_fp) *ret_fp = (intptr_t *)NULL;
+    epc = nullptr;
+    if (ret_sp) *ret_sp = (intptr_t *)nullptr;
+    if (ret_fp) *ret_fp = (intptr_t *)nullptr;
   }
 
   return epc;
@@ -260,7 +260,7 @@ frame os::current_frame() {
                 CAST_FROM_FN_PTR(address, os::current_frame));
   if (os::is_first_C_frame(&myframe)) {
     // stack is not walkable
-    return frame(NULL, NULL, false);
+    return frame(nullptr, nullptr, false);
   } else {
     return os::get_sender_for_C_frame(&myframe);
   }
@@ -268,21 +268,21 @@ frame os::current_frame() {
 
 bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
                                              ucontext_t* uc, JavaThread* thread) {
-  if (info == NULL || info->si_code <= 0 || info->si_code == SI_NOINFO) {
+  if (info == nullptr || info->si_code <= 0 || info->si_code == SI_NOINFO) {
     // can't decode this kind of signal
-    info = NULL;
+    info = nullptr;
   } else {
     assert(sig == info->si_signo, "bad siginfo");
   }
 
   // decide if this trap can be handled by a stub
-  address stub = NULL;
+  address stub = nullptr;
 
-  address pc          = NULL;
-  address npc         = NULL;
+  address pc          = nullptr;
+  address npc         = nullptr;
 
   //%note os_trap_1
-  if (info != NULL && uc != NULL && thread != NULL) {
+  if (info != nullptr && uc != nullptr && thread != nullptr) {
     // factor me: getPCfromContext
     pc  = (address) uc->uc_mcontext.gregs[REG_PC];
     npc = (address) uc->uc_mcontext.gregs[REG_nPC];
@@ -344,7 +344,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
         CodeBlob* cb = CodeCache::find_blob(pc);
         nmethod* nm = (cb != nullptr) ? cb->as_nmethod_or_null() : nullptr;
         bool is_unsafe_arraycopy = (thread->doing_unsafe_access() && UnsafeMemoryAccess::contains_pc(pc));
-        if ((nm != NULL && nm->has_unsafe_access()) || is_unsafe_arraycopy) {
+        if ((nm != nullptr && nm->has_unsafe_access()) || is_unsafe_arraycopy) {
           if (is_unsafe_arraycopy) {
             npc = UnsafeMemoryAccess::page_error_continue_pc(pc);
           }
@@ -393,7 +393,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
     }
   }
 
-  if (stub != NULL) {
+  if (stub != nullptr) {
     // save all thread context in case we need to restore it
 
     thread->set_saved_exception_pc(pc);
@@ -410,7 +410,7 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
 }
 
 void os::print_context(outputStream *st, const void *context) {
-  if (context == NULL) return;
+  if (context == nullptr) return;
 
   const ucontext_t *uc = (const ucontext_t*)context;
   st->print_cr("Registers:");

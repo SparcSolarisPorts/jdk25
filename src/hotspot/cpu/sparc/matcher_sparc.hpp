@@ -87,14 +87,14 @@
   static bool const_oop_prefer_decode() {
     // TODO: Check if loading ConP from TOC in heap-based mode is better:
     // Prefer ConN+DecodeN over ConP in simple compressed oops mode.
-    // return CompressedOops::base() == NULL;
+    // return CompressedOops::base() == nullptr;
     return true;
   }
 
   static bool const_klass_prefer_decode() {
     // TODO: Check if loading ConP from TOC in heap-based mode is better:
     // Prefer ConNKlass+DecodeNKlass over ConP in simple compressed klass mode.
-    // return CompressedKlassPointers::base() == NULL;
+    // return CompressedKlassPointers::base() == nullptr;
     return true;
   }
 

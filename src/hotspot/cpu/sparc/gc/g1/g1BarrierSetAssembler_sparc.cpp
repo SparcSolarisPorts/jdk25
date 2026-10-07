@@ -102,11 +102,11 @@ void G1BarrierSetAssembler::gen_write_ref_array_post_barrier(MacroAssembler* mas
 
 #undef __
 
-static address satb_log_enqueue_with_frame = NULL;
-static u_char* satb_log_enqueue_with_frame_end = NULL;
+static address satb_log_enqueue_with_frame = nullptr;
+static u_char* satb_log_enqueue_with_frame_end = nullptr;
 
-static address satb_log_enqueue_frameless = NULL;
-static u_char* satb_log_enqueue_frameless_end = NULL;
+static address satb_log_enqueue_frameless = nullptr;
+static u_char* satb_log_enqueue_frameless_end = nullptr;
 
 static int EnqueueCodeSize = 128 DEBUG_ONLY( + 256); // Instructions?
 

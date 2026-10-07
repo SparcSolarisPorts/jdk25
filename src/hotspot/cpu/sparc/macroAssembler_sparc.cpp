@@ -174,7 +174,7 @@ int MacroAssembler::branch_destination(int inst, int pos) {
 
 void MacroAssembler::resolve_jobject(Register value, Register tmp) {
   Label done, not_weak, weak_tagged;
-  br_null(value, false, Assembler::pn, done); // Use NULL as-is.
+  br_null(value, false, Assembler::pn, done); // Use nullptr as-is.
   delayed()->andcc(value, JNIHandles::tag_mask, G0); // Test for tagged handle
   brx(Assembler::zero, true, Assembler::pt, not_weak);
   delayed()->nop();
@@ -333,7 +333,7 @@ static Thread* reinitialize_thread() {
 #endif
 
 #ifdef ASSERT
-address last_get_thread = NULL;
+address last_get_thread = nullptr;
 #endif
 
 // call this when G2_thread is not known to be valid
@@ -443,7 +443,7 @@ void MacroAssembler::set_last_Java_frame(Register last_java_sp, Register last_Ja
 #endif /* ASSERT */
   //
   // When returning from calling out from Java mode the frame anchor's last_Java_pc
-  // will always be set to NULL. It is set here so that if we are doing a call to
+  // will always be set to nullptr. It is set here so that if we are doing a call to
   // native (not VM) that we capture the known pc and don't have to rely on the
   // native call having a standard frame linkage where we can find the pc.
 
@@ -716,7 +716,7 @@ void MacroAssembler::ic_call(address entry, bool emit_delay, jint method_index) 
 
 int MacroAssembler::ic_check_size() {
   // lduw|ldx (receiver klass) + ldx (speculated klass) + cmp + trap
-  return 4 * BytesPerInstWord;
+  return (UseCompactObjectHeaders ? 5 : 4) * BytesPerInstWord;
 }
 
 int MacroAssembler::ic_check(int end_alignment) {
@@ -739,7 +739,7 @@ int MacroAssembler::ic_check(int end_alignment) {
   // receiver when UseCompressedClassPointers is on, the full Klass*
   // otherwise (see CompiledICData::initialize).
   if (UseCompressedClassPointers) {
-    lduw(receiver, oopDesc::klass_offset_in_bytes(), tmp1);
+    load_narrow_klass(receiver, tmp1);
   } else {
     ld_ptr(receiver, oopDesc::klass_offset_in_bytes(), tmp1);
   }
@@ -839,7 +839,7 @@ int MacroAssembler::insts_for_sethi(address a, bool worst_case) {
 }
 
 int MacroAssembler::worst_case_insts_for_set() {
-  return insts_for_sethi(NULL, true) + 1;
+  return insts_for_sethi(nullptr, true) + 1;
 }
 
 
@@ -1069,14 +1069,14 @@ void MacroAssembler::save_frame_and_mov(int extraWords,
 
 
 AddressLiteral MacroAssembler::allocate_metadata_address(Metadata* obj) {
-  assert(oop_recorder() != NULL, "this assembler needs a Recorder");
+  assert(oop_recorder() != nullptr, "this assembler needs a Recorder");
   int index = oop_recorder()->allocate_metadata_index(obj);
   RelocationHolder rspec = metadata_Relocation::spec(index);
   return AddressLiteral((address)obj, rspec);
 }
 
 AddressLiteral MacroAssembler::constant_metadata_address(Metadata* obj) {
-  assert(oop_recorder() != NULL, "this assembler needs a Recorder");
+  assert(oop_recorder() != nullptr, "this assembler needs a Recorder");
   int index = oop_recorder()->find_index(obj);
   RelocationHolder rspec = metadata_Relocation::spec(index);
   return AddressLiteral((address)obj, rspec);
@@ -1096,7 +1096,7 @@ AddressLiteral MacroAssembler::constant_oop_address(jobject obj) {
 }
 
 void  MacroAssembler::set_narrow_oop(jobject obj, Register d) {
-  assert(oop_recorder() != NULL, "this assembler needs an OopRecorder");
+  assert(oop_recorder() != nullptr, "this assembler needs an OopRecorder");
   int oop_index = oop_recorder()->find_index(obj);
   RelocationHolder rspec = oop_Relocation::spec(oop_index);
 
@@ -1111,7 +1111,7 @@ void  MacroAssembler::set_narrow_oop(jobject obj, Register d) {
 }
 
 void  MacroAssembler::set_narrow_klass(Klass* k, Register d) {
-  assert(oop_recorder() != NULL, "this assembler needs an OopRecorder");
+  assert(oop_recorder() != nullptr, "this assembler needs an OopRecorder");
   int klass_index = oop_recorder()->find_index(k);
   RelocationHolder rspec = metadata_Relocation::spec(klass_index);
   narrowKlass encoded_k = CompressedKlassPointers::encode(k);
@@ -1232,7 +1232,7 @@ void MacroAssembler::_verify_oop(Register reg, const char* msg, const char * fil
   // plausibility check for oops
   if (!VerifyOops) return;
 
-  if (reg == G0)  return;       // always NULL, which is always an oop
+  if (reg == G0)  return;       // always nullptr, which is always an oop
 
   BLOCK_COMMENT("verify_oop {");
   char buffer[64];
@@ -1243,7 +1243,7 @@ void MacroAssembler::_verify_oop(Register reg, const char* msg, const char * fil
   }
 #endif
 
-  const char* real_msg = NULL;
+  const char* real_msg = nullptr;
   {
     ResourceMark rm;
     stringStream ss;
@@ -1281,7 +1281,7 @@ void MacroAssembler::_verify_oop_addr(Address addr, const char* msg, const char 
   // plausibility check for oops
   if (!VerifyOops) return;
 
-  const char* real_msg = NULL;
+  const char* real_msg = nullptr;
   {
     ResourceMark rm;
     stringStream ss;
@@ -1315,7 +1315,7 @@ void MacroAssembler::_verify_oop_addr(Address addr, const char* msg, const char 
 }
 
 // side-door communication with signalHandler in os_solaris.cpp
-address MacroAssembler::_verify_oop_implicit_branch[3] = { NULL };
+address MacroAssembler::_verify_oop_implicit_branch[3] = { nullptr };
 
 // This macro is expanded just once; it creates shared code.  Contract:
 // receives an oop in O0.  Must restore O0 & O7 from TLS.  Must not smash ANY
@@ -1351,7 +1351,7 @@ void MacroAssembler::verify_oop_subroutine() {
   Register O4_temp = O4;
 
   // mark lower end of faulting range
-  assert(_verify_oop_implicit_branch[0] == NULL, "set once");
+  assert(_verify_oop_implicit_branch[0] == nullptr, "set once");
   _verify_oop_implicit_branch[0] = pc();
 
   // We can't check the mark oop because it could be in the process of
@@ -1371,7 +1371,7 @@ void MacroAssembler::verify_oop_subroutine() {
   // Check the Klass* of this object for being in the right area of memory.
   // Cannot do the load in the delay above slot in case O0 is null
   load_klass(O0_obj, O0_obj);
-  // assert((klass != NULL)
+  // assert((klass != nullptr)
   br_null_short(O0_obj, pn, fail);
 
   wrccr( O5_save_flags ); // Restore CCR's
@@ -2262,13 +2262,13 @@ void MacroAssembler::check_klass_subtype(Register sub_klass,
   check_klass_subtype_fast_path(sub_klass, super_klass,
                                 temp_reg, temp2_reg,
                                 (did_save ? &L_pop_to_success : &L_success),
-                                (did_save ? &L_pop_to_failure : &L_failure), NULL);
+                                (did_save ? &L_pop_to_failure : &L_failure), nullptr);
 
   if (!did_save)
     save_frame_and_mov(0, sub_klass, sub_2, super_klass, sup_2);
   check_klass_subtype_slow_path(sub_2, sup_2,
                                 L2, L3, L4, L5,
-                                NULL, &L_pop_to_failure);
+                                nullptr, &L_pop_to_failure);
 
   // on success:
   bind(L_pop_to_success);
@@ -3088,14 +3088,25 @@ void MacroAssembler::load_klass(Register src_oop, Register klass) {
   // MachCallDynamicJavaNode::ret_addr_offset()
   // if this changes, change that.
   if (UseCompressedClassPointers) {
-    lduw(src_oop, oopDesc::klass_offset_in_bytes(), klass);
+    load_narrow_klass(src_oop, klass);
     decode_klass_not_null(klass);
   } else {
     ld_ptr(src_oop, oopDesc::klass_offset_in_bytes(), klass);
   }
 }
 
+void MacroAssembler::load_narrow_klass(Register src_oop, Register klass) {
+  assert(UseCompressedClassPointers, "narrow klass required");
+  if (UseCompactObjectHeaders) {
+    ldx(src_oop, oopDesc::mark_offset_in_bytes(), klass);
+    srlx(klass, markWord::klass_shift, klass);
+  } else {
+    lduw(src_oop, oopDesc::klass_offset_in_bytes(), klass);
+  }
+}
+
 void MacroAssembler::store_klass(Register klass, Register dst_oop) {
+  assert(!UseCompactObjectHeaders, "compact klass is initialized in the mark word");
   if (UseCompressedClassPointers) {
     assert(dst_oop != klass, "not enough registers");
     encode_klass_not_null(klass);
@@ -3106,7 +3117,7 @@ void MacroAssembler::store_klass(Register klass, Register dst_oop) {
 }
 
 void MacroAssembler::store_klass_gap(Register s, Register d) {
-  if (UseCompressedClassPointers) {
+  if (UseCompressedClassPointers && !UseCompactObjectHeaders) {
     assert(s != d, "not enough registers");
     st(s, d, oopDesc::klass_gap_offset_in_bytes());
   }
@@ -3177,10 +3188,10 @@ void MacroAssembler::store_heap_oop(Register d, const Address& a, int offset, Re
 
 void MacroAssembler::encode_heap_oop(Register src, Register dst) {
   assert (UseCompressedOops, "must be compressed");
-  assert (Universe::heap() != NULL, "java heap should be initialized");
+  assert (Universe::heap() != nullptr, "java heap should be initialized");
   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
   verify_oop(src);
-  if (CompressedOops::base() == NULL) {
+  if (CompressedOops::base() == nullptr) {
     srlx(src, LogMinObjAlignmentInBytes, dst);
     return;
   }
@@ -3205,20 +3216,20 @@ void MacroAssembler::encode_heap_oop(Register src, Register dst) {
 
 void MacroAssembler::encode_heap_oop_not_null(Register r) {
   assert (UseCompressedOops, "must be compressed");
-  assert (Universe::heap() != NULL, "java heap should be initialized");
+  assert (Universe::heap() != nullptr, "java heap should be initialized");
   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
   verify_oop(r);
-  if (CompressedOops::base() != NULL)
+  if (CompressedOops::base() != nullptr)
     sub(r, G6_heapbase, r);
   srlx(r, LogMinObjAlignmentInBytes, r);
 }
 
 void MacroAssembler::encode_heap_oop_not_null(Register src, Register dst) {
   assert (UseCompressedOops, "must be compressed");
-  assert (Universe::heap() != NULL, "java heap should be initialized");
+  assert (Universe::heap() != nullptr, "java heap should be initialized");
   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
   verify_oop(src);
-  if (CompressedOops::base() == NULL) {
+  if (CompressedOops::base() == nullptr) {
     srlx(src, LogMinObjAlignmentInBytes, dst);
   } else {
     sub(src, G6_heapbase, dst);
@@ -3229,7 +3240,7 @@ void MacroAssembler::encode_heap_oop_not_null(Register src, Register dst) {
 // Same algorithm as oops.inline.hpp decode_heap_oop.
 void  MacroAssembler::decode_heap_oop(Register src, Register dst) {
   assert (UseCompressedOops, "must be compressed");
-  assert (Universe::heap() != NULL, "java heap should be initialized");
+  assert (Universe::heap() != nullptr, "java heap should be initialized");
   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
   sllx(src, LogMinObjAlignmentInBytes, dst);
   if (CompressedOops::base() != nullptr) {
@@ -3246,10 +3257,10 @@ void MacroAssembler::decode_heap_oop_not_null(Register r) {
   // pd_code_size_limit.
   // Also do not verify_oop as this is called by verify_oop.
   assert (UseCompressedOops, "must be compressed");
-  assert (Universe::heap() != NULL, "java heap should be initialized");
+  assert (Universe::heap() != nullptr, "java heap should be initialized");
   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
   sllx(r, LogMinObjAlignmentInBytes, r);
-  if (CompressedOops::base() != NULL)
+  if (CompressedOops::base() != nullptr)
     add(r, G6_heapbase, r);
 }
 
@@ -3260,13 +3271,13 @@ void  MacroAssembler::decode_heap_oop_not_null(Register src, Register dst) {
   assert (UseCompressedOops, "must be compressed");
   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
   sllx(src, LogMinObjAlignmentInBytes, dst);
-  if (CompressedOops::base() != NULL)
+  if (CompressedOops::base() != nullptr)
     add(dst, G6_heapbase, dst);
 }
 
 void MacroAssembler::encode_klass_not_null(Register r) {
   assert (UseCompressedClassPointers, "must be compressed");
-  if (CompressedKlassPointers::base() != NULL) {
+  if (CompressedKlassPointers::base() != nullptr) {
     assert(r != G6_heapbase, "bad register choice");
     set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
     sub(r, G6_heapbase, r);
@@ -3284,7 +3295,7 @@ void MacroAssembler::encode_klass_not_null(Register src, Register dst) {
     encode_klass_not_null(src);
   } else {
     assert (UseCompressedClassPointers, "must be compressed");
-    if (CompressedKlassPointers::base() != NULL) {
+    if (CompressedKlassPointers::base() != nullptr) {
       set((intptr_t)CompressedKlassPointers::base(), dst);
       sub(src, dst, dst);
       if (CompressedKlassPointers::shift() != 0) {
@@ -3303,7 +3314,7 @@ void MacroAssembler::encode_klass_not_null(Register src, Register dst) {
 int MacroAssembler::instr_size_for_decode_klass_not_null() {
   assert (UseCompressedClassPointers, "only for compressed klass ptrs");
   int num_instrs = 1;  // shift src,dst or add
-  if (CompressedKlassPointers::base() != NULL) {
+  if (CompressedKlassPointers::base() != nullptr) {
     // set + add + set
     num_instrs += insts_for_internal_set((intptr_t)CompressedKlassPointers::base()) +
                   insts_for_internal_set((intptr_t)CompressedOops::base());
@@ -3320,7 +3331,7 @@ void  MacroAssembler::decode_klass_not_null(Register r) {
   // Do not add assert code to this unless you change vtableStubs_sparc.cpp
   // pd_code_size_limit.
   assert (UseCompressedClassPointers, "must be compressed");
-  if (CompressedKlassPointers::base() != NULL) {
+  if (CompressedKlassPointers::base() != nullptr) {
     assert(r != G6_heapbase, "bad register choice");
     set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
     if (CompressedKlassPointers::shift() != 0)
@@ -3339,7 +3350,7 @@ void  MacroAssembler::decode_klass_not_null(Register src, Register dst) {
     // Do not add assert code to this unless you change vtableStubs_sparc.cpp
     // pd_code_size_limit.
     assert (UseCompressedClassPointers, "must be compressed");
-    if (CompressedKlassPointers::base() != NULL) {
+    if (CompressedKlassPointers::base() != nullptr) {
       if (CompressedKlassPointers::shift() != 0) {
         assert((src != G6_heapbase) && (dst != G6_heapbase), "bad register choice");
         set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
@@ -3383,7 +3394,7 @@ void MacroAssembler::resolve_global_jobject(Register value, Register tmp) {
 
 void MacroAssembler::reinit_heapbase() {
   if (UseCompressedOops || UseCompressedClassPointers) {
-    if (Universe::heap() != NULL) {
+    if (Universe::heap() != nullptr) {
       set((intptr_t)CompressedOops::base(), G6_heapbase);
     } else {
       AddressLiteral base(CompressedOops::base_addr());
