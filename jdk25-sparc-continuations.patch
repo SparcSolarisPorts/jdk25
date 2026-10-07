@@ -2784,7 +2784,7 @@
    intptr_t* low = sp();
    intptr_t* high = is_interpreted()
 -      ? ContinuationHelper::InterpretedFrame::frame_bottom(to_frame())
-+      ? (to_frame().interpreter_frame_locals() + 1)
++      ? (to_frame().interpreter_frame_local_at(0) + 1)
        : unextended_sp() + _cb->frame_size() + stack_argsize();
    return p >= low && p < high;
  }
@@ -2816,7 +2816,7 @@
 -  if (next >= _end) {
 +  // Bottom-frame locals can extend above its FP into the entry's argument
 +  // area. That area has no Java register window for the stream to visit.
-+  if ((to_frame().interpreter_frame_locals() + 1) >= _end ||
++  if ((to_frame().interpreter_frame_local_at(0) + 1) >= _end ||
 +      next >= _end) {
      _unextended_sp = _end;
      _sp = _end;
@@ -2834,7 +2834,7 @@
    assert_is_interpreted_and_frame_type_mixed();
    frame f = to_frame();
 -  return (int)(ContinuationHelper::InterpretedFrame::frame_bottom(f)
-+  return (int)((f.interpreter_frame_locals() + 1)
++  return (int)((f.interpreter_frame_local_at(0) + 1)
                 - unextended_sp());
  }
  

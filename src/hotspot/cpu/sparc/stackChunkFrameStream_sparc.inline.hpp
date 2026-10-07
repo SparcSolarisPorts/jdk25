@@ -42,7 +42,7 @@ inline bool StackChunkFrameStream<frame_kind>::is_in_frame(void* p0) const {
   intptr_t* p = (intptr_t*)p0;
   intptr_t* low = sp();
   intptr_t* high = is_interpreted()
-      ? (to_frame().interpreter_frame_locals() + 1)
+      ? (to_frame().interpreter_frame_local_at(0) + 1)
       : unextended_sp() + _cb->frame_size() + stack_argsize();
   return p >= low && p < high;
 }
@@ -98,7 +98,7 @@ inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
   intptr_t* next = fp();
   // Bottom-frame locals can extend above its FP into the entry's argument
   // area. That area has no Java register window for the stream to visit.
-  if ((to_frame().interpreter_frame_locals() + 1) >= _end ||
+  if ((to_frame().interpreter_frame_local_at(0) + 1) >= _end ||
       next >= _end) {
     _unextended_sp = _end;
     _sp = _end;
@@ -112,7 +112,7 @@ template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
   assert_is_interpreted_and_frame_type_mixed();
   frame f = to_frame();
-  return (int)((f.interpreter_frame_locals() + 1)
+  return (int)((f.interpreter_frame_local_at(0) + 1)
                - unextended_sp());
 }
 

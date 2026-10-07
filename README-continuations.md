@@ -1,8 +1,19 @@
-# JDK 25 Solaris/SPARC continuation candidate (v26)
+# JDK 25 Solaris/SPARC continuation candidate (v27)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v27 corrects the access-control mistake in v26: interpreter_frame_locals()
+is private in frame.hpp. All three chunk-stream boundary uses now call the
+public interpreter_frame_local_at(0) plus one. Its out-of-line definition in
+frame.cpp returns interpreter_frame_locals() plus the offset of local zero
+(zero on SPARC). The declaration and definition are present in the supplied
+JDK 25 sources, avoiding both the missing inline definition and private access.
+The v26 build stopped during compilation; no continuation tests ran.
+Validation: audited public/private declarations, the implementation and the
+SPARC local-index offset; cumulative patch dry-run and ZIP verification passed.
+Native Solaris/SPARC compilation and execution are still pending.
 
 v26 fixes the v25 link failure reported for instanceStackChunkKlass.o. The SPARC
 chunk stream called ContinuationHelper::InterpretedFrame::frame_bottom with only
@@ -79,7 +90,7 @@ compiled the reflection-based ContinuationSmoke on host JDK 17; checked shell
 syntax. Native SPARC execution and actual continuation tests remain required.
 The host model does not validate OS register-window traps or freeze/thaw GC.
 
-Use v26 instead of v25 for the next rebuild. From the repository after extraction:
+Use v27 instead of v26 for the next rebuild. From the repository after extraction:
 
 ```bash
 gmake images test-image JOBS=8 && bash tests/run-continuation-repro.sh
