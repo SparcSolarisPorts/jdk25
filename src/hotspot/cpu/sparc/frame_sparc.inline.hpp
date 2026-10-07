@@ -194,8 +194,8 @@ inline void frame::set_offset_unextended_sp(int value) { assert_on_heap(); _offs
 // return address:
 
 inline address frame::sender_pc() const {
-  // Chunk own PCs live in the synthetic home slot; saved I7 retains
-  // the architectural (return-PC-minus-eight) representation.
+  // Saved I7 retains the architectural return-PC-minus-eight representation
+  // on both the native stack and in a chunk.
   return *I7_addr() + pc_return_offset;
 }
 

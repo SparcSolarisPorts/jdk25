@@ -64,7 +64,7 @@ inline Method* ContinuationHelper::Frame::frame_method(const frame& f) {
 
 inline address ContinuationHelper::Frame::return_pc(const frame& f) {
 #ifdef SPARC
-  return f.is_heap_frame() ? *return_pc_address(f)
+  return f.younger_sp_or_null() == nullptr ? f.raw_pc() + frame::pc_return_offset
                            : *return_pc_address(f) + frame::pc_return_offset;
 #else
   return return_address_at((intptr_t *)return_pc_address(f));
@@ -98,7 +98,7 @@ inline bool ContinuationHelper::InterpretedFrame::is_instance(const frame& f) {
 
 inline address ContinuationHelper::InterpretedFrame::return_pc(const frame& f) {
 #ifdef SPARC
-  return f.is_heap_frame() ? *return_pc_address(f)
+  return f.younger_sp_or_null() == nullptr ? f.raw_pc() + frame::pc_return_offset
                            : *return_pc_address(f) + frame::pc_return_offset;
 #else
   return return_address_at((intptr_t *)return_pc_address(f));

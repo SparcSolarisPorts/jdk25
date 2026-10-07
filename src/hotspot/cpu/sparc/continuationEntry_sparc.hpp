@@ -30,6 +30,14 @@
 // A flushw or an ABI callee must never overwrite continuation metadata.
 class ContinuationEntryPD {
   intptr_t _abi_save_area[22];
+  address _resume_pc;
+  intptr_t* _thaw_bottom;
+ public:
+  static ByteSize resume_pc_offset() { return byte_offset_of(ContinuationEntryPD, _resume_pc); }
+  static ByteSize thaw_bottom_offset() { return byte_offset_of(ContinuationEntryPD, _thaw_bottom); }
+  address resume_pc() const { return _resume_pc; }
+  void set_resume_pc(address pc) { _resume_pc = pc; }
+  void set_thaw_bottom(intptr_t* sp) { _thaw_bottom = sp; }
 };
 
 #endif // CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP

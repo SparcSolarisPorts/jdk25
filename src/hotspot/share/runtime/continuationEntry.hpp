@@ -88,6 +88,13 @@ class ContinuationEntry {
   uint32_t _pin_count;
 
  public:
+#ifdef SPARC
+  static ByteSize resume_pc_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::resume_pc_offset(); }
+  address resume_pc() const { return _pd.resume_pc(); }
+  void set_resume_pc(address pc) { _pd.set_resume_pc(pc); }
+  static ByteSize thaw_bottom_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::thaw_bottom_offset(); }
+  void set_thaw_bottom(intptr_t* sp) { _pd.set_thaw_bottom(sp); }
+#endif
   static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
   static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
   static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }

@@ -63,11 +63,7 @@ static inline void freeze_sparc_patch_link(const frame& f,
 }
 
 static inline void freeze_sparc_patch_pc(const frame& f, address pc) {
-  if (f.is_heap_frame()) {
-    // The saved I7 is the sender PC on SPARC, not this frame's own PC.
-    // Java frames do not use the outgoing argument home slot at word 16.
-    f.sp()[16] = (intptr_t)pc;
-  } else {
+  if (f.younger_sp_or_null() != nullptr) {
     f.younger_sp()[freeze_sparc_i7_slot] = (intptr_t)(pc - frame::pc_return_offset);
   }
 }
@@ -153,10 +149,10 @@ static inline void freeze_sparc_move_caller_window(frame& caller,
     return;
   }
   const bool interpreted = caller.is_interpreted_frame();
-  // Include the synthetic own-PC slot used by the chunk walker.
+  // Only the architectural L/I save area moves with the window.
   intptr_t* original_sp = interpreted
       ? caller.sp() + caller.callee_sp_adjustment() : caller.unextended_sp();
-  Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)new_sp, 17);
+  Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)new_sp, 16);
   caller.set_sp(new_sp);
   if (interpreted) {
     caller.set_sp_adjustment_by_callee(pointer_delta_as_int(original_sp, new_sp));
@@ -230,7 +226,7 @@ inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
 
 inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
   freeze_sparc_patch_link(hf, caller.sp());
-  freeze_sparc_patch_pc(hf, hf.pc());
+  hf.sp()[freeze_sparc_i7_slot] = (intptr_t)caller.raw_pc();
 }
 
 //// Thaw fast path

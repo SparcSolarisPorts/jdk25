@@ -50,6 +50,7 @@ template <ChunkFrames frame_kind>
 StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DEBUG_ONLY(: _chunk(chunk)) {
 #ifdef SPARC
   _pd_younger_sp = nullptr;
+  _pd_pc = chunk->pc();
 #endif
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
@@ -78,6 +79,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
   DEBUG_ONLY(: _chunk(chunk)) {
 #ifdef SPARC
   _pd_younger_sp = f.younger_sp_or_null();
+  _pd_pc = f.raw_pc() + frame::pc_return_offset;
 #endif
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
@@ -223,8 +225,23 @@ inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map, bool stop
   update_reg_map(map);
   bool is_runtime_stub = is_stub();
 #ifdef SPARC
+  const bool interpreted = is_interpreted();
+  intptr_t* sender_sp = fp();
+  intptr_t* sender_unextended_sp = sender_sp;
+  if (interpreted) {
+    // Saved I5 is relative to FP in a chunk and records the sender's
+    // original SP before an interpreted callee extended its window.
+    intptr_t raw = _sp[stack_chunk_sparc_i5_slot];
+    sender_unextended_sp = raw > -max_jint && raw < max_jint
+        ? sender_sp + raw : (intptr_t*)raw;
+  }
+  const bool bottom = sender_sp >= _end ||
+      (interpreted && to_frame().interpreter_frame_local_at(0) + 1 >= _end);
+  _pd_pc = (address)_sp[stack_chunk_sparc_i7_slot] + frame::pc_return_offset;
   _pd_younger_sp = _sp;
-#endif
+  _sp = bottom ? _end : sender_sp;
+  _unextended_sp = bottom ? _end : (is_interpreted() ? _sp : sender_unextended_sp);
+#else
   if (frame_kind == ChunkFrames::Mixed) {
     if (is_interpreted()) {
       next_for_interpreter_frame();
@@ -239,6 +256,7 @@ inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map, bool stop
   } else {
     _sp += cb()->frame_size();
   }
+#endif
   assert(!is_interpreted() || _unextended_sp == unextended_sp_for_interpreter_frame(), "");
 
   DEBUG_ONLY(_index++;)

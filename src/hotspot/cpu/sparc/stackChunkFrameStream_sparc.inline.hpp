@@ -65,7 +65,7 @@ inline frame StackChunkFrameStream<frame_kind>::to_frame() const {
 template <ChunkFrames frame_kind>
 inline address StackChunkFrameStream<frame_kind>::get_pc() const {
   assert(!is_done(), "stream is done");
-  return (address)_sp[16]; // synthetic own-PC slot in the unused Java argument home area
+  return _pd_pc; // top PC comes from the chunk; senders come from saved I7
 }
 
 template <ChunkFrames frame_kind>

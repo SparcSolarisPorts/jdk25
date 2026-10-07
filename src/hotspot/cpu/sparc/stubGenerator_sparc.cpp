@@ -5650,34 +5650,28 @@ class StubGenerator: public StubCodeGenerator {
     __ mov(O0, G5); // integer/oop result; no safepoints while rebuilding
     __ mov(L1, G4_scratch); // unbiased top frame SP
     __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
-    __ sub(G1, STACK_BIAS, SP);
-    // Match ContinuationEntry::bottom_sender_sp(), including stack arguments
-    // and alignment introduced by a partial thaw.
-    __ ld(G1, in_bytes(ContinuationEntry::argsize_offset()), G3_scratch);
-    __ sll_ptr(G3_scratch, LogBytesPerWord, G3_scratch);
-    __ sub(G1, G3_scratch, G1);
-    __ and3(G1, -16, G1);
+    // An interpreted bottom frame can extend the entry window below its
+    // canonical SP. The slow thaw records that physical boundary explicitly.
+    __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_bottom_offset()), G1);
     __ sub(G1, STACK_BIAS, SP);
 
-    // Build reverse links in an unused Java argument-home slot. This makes
-    // window reconstruction linear, even for a deep compiled continuation.
-    Label reverse_links, rebuild, windows_ready;
-    __ mov(G4_scratch, G1);
-    __ bind(reverse_links);
-    __ ld_ptr(G1, 14 * wordSize, G3_scratch);
-    __ add(G3_scratch, STACK_BIAS, G3_scratch);
-    __ st_ptr(G1, G3_scratch, 17 * wordSize);
-    __ sub(G3_scratch, STACK_BIAS, G1);
-    __ cmp_and_brx_short(G1, SP, Assembler::equal,
-                         Assembler::pt, rebuild);
-    __ mov(G3_scratch, G1);
-    __ ba(reverse_links);
-    __ delayed()->nop();
+    // Find each child using its saved I6. Do not borrow Java spill slots for
+    // reverse links: compiled frames may keep live values immediately above
+    // the 16-word architectural save area. No safepoint occurs in this loop.
+    Label rebuild, find_child, child_found, windows_ready;
     __ bind(rebuild);
     __ add(SP, STACK_BIAS, G3_scratch);
     __ cmp_and_brx_short(G3_scratch, G4_scratch, Assembler::equal,
                          Assembler::pt, windows_ready);
-    __ ld_ptr(SP, STACK_BIAS + 17 * wordSize, G1);
+    __ mov(G4_scratch, G1);
+    __ bind(find_child);
+    __ ld_ptr(G1, 14 * wordSize, G3_scratch);
+    __ cmp_and_brx_short(G3_scratch, SP, Assembler::equal,
+                         Assembler::pt, child_found);
+    __ add(G3_scratch, STACK_BIAS, G1);
+    __ ba(find_child);
+    __ delayed()->nop();
+    __ bind(child_found);
     __ sub(G1, STACK_BIAS, G3_scratch);
     __ sub(G3_scratch, SP, G3_scratch);
     __ save(SP, G3_scratch, SP);
@@ -5692,7 +5686,8 @@ class StubGenerator: public StubCodeGenerator {
 
     if (return_barrier_exception) {
       __ mov(O0, L3); // exception oop
-      __ ld_ptr(SP, STACK_BIAS + 16 * wordSize, L2);
+      __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+      __ ld_ptr(G1, in_bytes(ContinuationEntry::resume_pc_offset()), L2);
       __ call_VM_leaf(L7_thread_cache,
                       CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address),
                       G2_thread, L2);
@@ -5705,7 +5700,8 @@ class StubGenerator: public StubCodeGenerator {
 
     // The top frame is the caller of doYield. Resume after that call in
     // this window; I7 is its sender PC and would skip the suspended frame.
-    __ ld_ptr(SP, STACK_BIAS + 16 * wordSize, G1);
+    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+    __ ld_ptr(G1, in_bytes(ContinuationEntry::resume_pc_offset()), G1);
     __ jmp(G1, 0);
     __ delayed()->nop();
 

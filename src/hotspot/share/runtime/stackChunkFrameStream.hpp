@@ -52,6 +52,7 @@ private:
   // The younger register window supplies the saved values of this frame's
   // outgoing registers.  SPARC stack chunks need to retain it while walking.
   intptr_t* _pd_younger_sp;
+  address _pd_pc;
 #endif
   CodeBlob* _cb;
   mutable const ImmutableOopMap* _oopmap;
@@ -69,6 +70,7 @@ public:
   StackChunkFrameStream() {
 #ifdef SPARC
     _pd_younger_sp = nullptr;
+    _pd_pc = nullptr;
 #endif
     NOT_PRODUCT(_chunk = nullptr; _index = -1;) DEBUG_ONLY(_has_stub = false;) }
   inline StackChunkFrameStream(stackChunkOop chunk);

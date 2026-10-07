@@ -60,14 +60,6 @@ static inline intptr_t sparc_encode_saved_sp(const frame& f, intptr_t* target) {
                            : (intptr_t)target - STACK_BIAS;
 }
 
-static inline address sparc_decode_saved_pc(const frame& f, address raw) {
-  return f.is_heap_frame() ? raw : raw + frame::pc_return_offset;
-}
-
-static inline address sparc_encode_saved_pc(const frame& f, address pc) {
-  return f.is_heap_frame() ? pc : pc - frame::pc_return_offset;
-}
-
 template<typename FKind>
 static inline intptr_t** link_address(const frame& f) {
   assert(FKind::is_instance(f), "wrong frame kind");
@@ -129,8 +121,8 @@ inline intptr_t** ContinuationHelper::Frame::callee_link_address(
 
 inline address* ContinuationHelper::InterpretedFrame::return_pc_address(
     const frame& f) {
-  return f.is_heap_frame() || f.younger_sp_or_null() == nullptr
-      ? (address*)&f.sp()[16]
+  return f.younger_sp_or_null() == nullptr
+      ? f.continuation_pc_address()
       : (address*)&f.younger_sp()[sparc_i7_slot];
 }
 
@@ -147,21 +139,23 @@ inline void ContinuationHelper::InterpretedFrame::patch_sender_sp(
 }
 
 inline address* ContinuationHelper::Frame::return_pc_address(const frame& f) {
-  return f.is_heap_frame() || f.younger_sp_or_null() == nullptr
-      ? (address*)&f.sp()[16]
+  return f.younger_sp_or_null() == nullptr
+      ? f.continuation_pc_address()
       : (address*)&f.younger_sp()[sparc_i7_slot];
 }
 
 inline address ContinuationHelper::Frame::real_pc(const frame& f) {
   // Always used in assertions. Just strip it.
-  return f.is_heap_frame() || f.younger_sp_or_null() == nullptr
-      ? *return_pc_address(f) : *return_pc_address(f) + frame::pc_return_offset;
+  return f.younger_sp_or_null() == nullptr
+      ? f.raw_pc() + frame::pc_return_offset : *return_pc_address(f) + frame::pc_return_offset;
 }
 
 inline void ContinuationHelper::Frame::patch_pc(const frame& f, address pc) {
-  if (f.is_heap_frame() && f.is_empty()) return; // empty chunk has no frame home area
-  *return_pc_address(f) = f.is_heap_frame() || f.younger_sp_or_null() == nullptr
-      ? pc : pc - frame::pc_return_offset;
+  // A top frame has no younger window holding O7. Its resume PC lives in
+  // the chunk header / entry metadata, not in a Java spill slot or frame::_pc.
+  // Keep frame::_pc as the logical original PC for deoptimized oop-map lookup.
+  if (f.is_empty() || f.younger_sp_or_null() == nullptr) return;
+  *return_pc_address(f) = pc - frame::pc_return_offset;
 }
 
 static inline void patch_return_pc_with_preempt_stub(frame& f) {

@@ -1,8 +1,41 @@
-# JDK 25 Solaris/SPARC continuation candidate (v27)
+# JDK 25 Solaris/SPARC continuation candidate (v28)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v28 responds to continuation-test-results-20261007-021251:
+interpreter and mixed crashed in Cont thaw, compiled reported lost/duplicated
+resume, and compiled-GC crashed walking a frozen chunk in handle_deopted().
+
+* Remove the synthetic own-PC and reverse-window links from Java frame words
+  16/17. Those words are not reserved for continuation metadata and can contain
+  compiler spills. Move/copy only the 16 architectural L/I save words when
+  relocating a caller window.
+* Record the top resume PC and actual bottom window SP in ContinuationEntry,
+  above its ABI save/home area. Slow thaw records the relocated entry window,
+  which can differ from the canonical entry SP when interpreter locals extend
+  into the caller. The thaw stub follows saved I6 links to reconstruct windows
+  without overwriting live Java frame data.
+* Initialize the chunk walker PC from chunk->pc(); obtain each sender PC from
+  the younger frame's saved I7 plus eight. Follow saved I6 rather than assuming
+  that a CodeBlob frame size locates an extended caller window. Saved I5
+  recovers a compiled sender's unextended SP after an interpreted callee.
+* Correct the SPARC raw-PC convention at freeze/thaw patch and anchor sites.
+  frame::raw_pc() already subtracts eight; convert back to a resume address
+  before the patcher encodes I7. This removes a double subtraction that could
+  return to the suspended call again.
+
+Compiled bulk freeze/thaw remains enabled for eligible frames. Window rebuilding
+currently searches the forward chain for each child (quadratic with thawed depth);
+this candidate prioritizes correct frame contents and is not a performance claim.
+
+Validation: 516 relocation cases, 169 emitted-sequence/window-stream cases and
+8 normal/deoptimized PC patch cases passed with host AddressSanitizer and UBSan.
+The checks use extracted changed C++ and a model of emitted instructions; they
+do not execute SPARC instructions or Solaris register-window traps. Cumulative
+patch dry-run, ZIP CRC and source SHA-256 checks passed. Native build and all
+four continuation reproduction modes remain required; v28 is unverified there.
 
 v27 corrects the access-control mistake in v26: interpreter_frame_locals()
 is private in frame.hpp. All three chunk-stream boundary uses now call the

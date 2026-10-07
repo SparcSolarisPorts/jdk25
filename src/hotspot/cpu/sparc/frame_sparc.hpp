@@ -169,6 +169,7 @@
   }
   intptr_t* younger_sp_or_null() const { assert_absolute(); return _younger_sp; }
   void set_younger_sp(intptr_t* value) { _younger_sp = value; }
+  address* continuation_pc_address() const { return const_cast<address*>(&_pc); }
   int offset_younger_sp() const { assert_offset(); return _offset_younger_sp; }
   void set_offset_younger_sp(int value) { assert_on_heap(); _offset_younger_sp = value; }
 
