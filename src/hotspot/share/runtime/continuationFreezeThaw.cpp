@@ -2661,7 +2661,14 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 
 
   intptr_t* const stack_frame_top = f.sp() + frame::metadata_words_at_top;
+#ifdef SPARC
+  const int interpreter_padding = (hf.fp() - hf.unextended_sp()) & 1;
+  intptr_t* const stack_frame_bottom = stack_frame_top
+      + (ContinuationHelper::InterpretedFrame::frame_bottom(hf) - hf.unextended_sp())
+      + interpreter_padding;
+#else
   intptr_t* const stack_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
+#endif
   intptr_t* const heap_frame_top = hf.unextended_sp() + frame::metadata_words_at_top;
   intptr_t* const heap_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(hf);
 
@@ -2669,11 +2676,20 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   assert(!f.is_heap_frame(), "should not be");
 
   const int fsize = pointer_delta_as_int(heap_frame_bottom, heap_frame_top);
-  assert((stack_frame_bottom == stack_frame_top + fsize), "");
+  assert((stack_frame_bottom == stack_frame_top + fsize SPARC_ONLY(+ interpreter_padding)), "");
 
   // Some architectures (like AArch64/PPC64/RISC-V) add padding between the locals and the fixed_frame to keep the fp 16-byte-aligned.
   // On those architectures we freeze the padding in order to keep the same fp-relative offsets in the fixed_frame.
+#ifdef SPARC
+  assert(fsize >= frame::register_save_words, "complete interpreter window");
+  copy_from_chunk(heap_frame_top, stack_frame_top, frame::register_save_words);
+  if (interpreter_padding != 0) stack_frame_top[frame::register_save_words] = 0;
+  copy_from_chunk(heap_frame_top + frame::register_save_words,
+                  stack_frame_top + frame::register_save_words + interpreter_padding,
+                  fsize - frame::register_save_words);
+#else
   copy_from_chunk(heap_frame_top, stack_frame_top, fsize);
+#endif
 #ifdef SPARC
   if (preserve_caller_window) {
     Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 16);

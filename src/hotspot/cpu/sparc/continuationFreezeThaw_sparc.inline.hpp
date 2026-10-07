@@ -270,9 +270,15 @@ frame ThawBase::new_stack_frame(const frame& hf, frame& caller,
   if (FKind::interpreted && caller.is_interpreted_frame()) {
     fsize -= FKind::stack_argsize(hf);
   }
-  intptr_t* frame_sp = caller.unextended_sp() - fsize;
-  if (FKind::interpreted && !is_aligned(frame_sp, frame::frame_alignment)) {
-    --frame_sp;
+  // Compact chunk packing can leave an interpreted FP at an odd word
+  // displacement from SP. Native V9 windows need BOTH addresses aligned.
+  // Insert one word above the L/I save area when needed; pointer metadata
+  // and the interpreter payload retain their FP-relative offsets.
+  const int interpreter_padding = FKind::interpreted
+      ? ((hf.fp() - hf.unextended_sp()) & 1) : 0;
+  intptr_t* frame_sp = caller.unextended_sp() - fsize - interpreter_padding;
+  if (FKind::interpreted) {
+    frame_sp = align_down(frame_sp, frame::frame_alignment);
   }
 
   if (!FKind::interpreted &&
@@ -283,7 +289,9 @@ frame ThawBase::new_stack_frame(const frame& hf, frame& caller,
     frame_sp = align(hf, frame_sp, caller, bottom);
   }
 
-  intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp());
+  intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp())
+      + interpreter_padding;
+  assert(is_aligned(frame_fp, frame::frame_alignment), "native sender window alignment");
   intptr_t* extended_sp = frame_sp + (hf.sp() - hf.unextended_sp());
   freeze_sparc_move_caller_window(caller, frame_fp);
   frame result(extended_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
@@ -345,6 +353,13 @@ inline void ThawBase::derelativize_interpreted_frame_metadata(
   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llocals_slot, false);
   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_lmonitors_slot, false);
   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llast_sp_slot, true);
+  // Llast_SP is a native window address, not an interpreter payload pointer.
+  // It is restored by the interpreter's return entry after adapter cleanup.
+  intptr_t last_sp = f.sp()[freeze_sparc_llast_sp_slot];
+  if (last_sp != 0) {
+    f.sp()[freeze_sparc_llast_sp_slot] =
+        (intptr_t)align_down((intptr_t*)(last_sp + STACK_BIAS), frame::frame_alignment) - STACK_BIAS;
+  }
   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_i5_slot, true);
 
   freeze_sparc_patch_link(f, f.fp());

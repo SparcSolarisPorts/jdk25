@@ -663,7 +663,7 @@ void JavaFrameAnchor::capture_last_Java_pc(intptr_t* sp) {
       intptr_t* cursor = sp;
       for (int i = 0; i < 24 && cursor != nullptr; ++i) {
         if (!JavaThread::current()->is_in_full_stack((address)cursor) ||
-            !is_aligned(cursor, 2 * wordSize)) break;
+            !is_aligned(cursor, wordSize)) break;
         intptr_t raw_fp = SafeFetchN(cursor + FP->sp_offset_in_saved_window(), 0);
         intptr_t raw_pc = SafeFetchN(cursor + I7->sp_offset_in_saved_window(), 0);
         tty->print_cr("  window %d sp=" INTPTR_FORMAT " i6=" INTPTR_FORMAT

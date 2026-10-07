@@ -1,8 +1,48 @@
-# JDK 25 Solaris/SPARC continuation candidate (v30)
+# JDK 25 Solaris/SPARC continuation candidate (v31)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v31 adds a launcher that selects this JDK image explicitly and checks
+-XX:+UseCompactObjectHeaders before starting Forge. This option already exists
+in this 64-bit JDK 25 source; an "Unrecognized VM option" error indicates that
+the launched executable must be checked. The helper sets JAVA_HOME and PATH.
+If run.sh contains an absolute Java path, run with FORGE_TRACE=1 and correct
+that path in the server launcher. Compact-header VM tests still need to pass.
+
+The release-version helper reuses CONFIGURE_COMMAND_LINE from spec.gmk,
+keeps platform/toolchain/bootstrap settings and configures the source version
+with +1 and no -internal prerelease suffix. This is release-style metadata,
+not Oracle certification or an official upstream release. It uses the vendor
+name "OpenJDK Solaris SPARC". Review with --print-only if desired.
+
+Commands after extracting this archive in the source tree:
+
+```sh
+python3 tests/configure-release-version.py
+gmake images test-image JOBS=8
+bash tests/run-continuation-repro.sh
+bash tests/run-header-matrix.sh
+bash tests/run-forge-with-jdk25.sh "$HOME/Downloads/forge26.3servertest/forge26.3servertest"
+```
+
+Native v30 results: compiled and compiled-GC pass; interpreter and mixed abort
+when pass 8 starts, after passes 0 through 7 return. Both anchor and flushed
+stack addresses are eight bytes out of alignment for a V9 native window.
+v31 inserts padding above the interpreted register-save area when chunk
+packing leaves an odd FP/SP word displacement, preserving FP-relative payload
+pointers while aligning both native SP and FP. It reserves up to two words per
+frame and aligns the saved Llast_SP native window address. Diagnostic window
+walking accepts word alignment so a remaining failure can show the bad chain.
+The fatal anchor guarantee remains enabled. This correction is experimental.
+
+Validation: 1,160 cases using extracted layout and copy code passed an ASan /
+UBSan host model checking alignment, live payloads, save-area separation,
+FP-relative pointers and allocation bounds. The launcher passed a mock check
+of executable selection and argument forwarding. Prior host continuation
+checks pass. These checks do not execute Solaris/SPARC instructions; native
+interpreter/mixed and compact-header results remain required.
 
 v30 responds to continuation-test-results-20261007-033608. On native v29,
 compiled and compiled-GC both passed the full supplied reproduction test.

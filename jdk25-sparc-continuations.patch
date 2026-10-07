@@ -918,25 +918,36 @@
  }
  
  
-@@ -226,7 +267,13 @@
+@@ -226,7 +267,19 @@
    assert(FKind::is_instance(hf), "wrong frame kind");
  
    int fsize = FKind::size(hf);
+-  intptr_t* frame_sp = caller.unextended_sp() - fsize;
 +  if (FKind::interpreted && caller.is_interpreted_frame()) {
 +    fsize -= FKind::stack_argsize(hf);
 +  }
-   intptr_t* frame_sp = caller.unextended_sp() - fsize;
-+  if (FKind::interpreted && !is_aligned(frame_sp, frame::frame_alignment)) {
-+    --frame_sp;
++  // Compact chunk packing can leave an interpreted FP at an odd word
++  // displacement from SP. Native V9 windows need BOTH addresses aligned.
++  // Insert one word above the L/I save area when needed; pointer metadata
++  // and the interpreter payload retain their FP-relative offsets.
++  const int interpreter_padding = FKind::interpreted
++      ? ((hf.fp() - hf.unextended_sp()) & 1) : 0;
++  intptr_t* frame_sp = caller.unextended_sp() - fsize - interpreter_padding;
++  if (FKind::interpreted) {
++    frame_sp = align_down(frame_sp, frame::frame_alignment);
 +  }
  
    if (!FKind::interpreted &&
        (bottom || caller.is_interpreted_frame())) {
-@@ -237,9 +284,12 @@
+@@ -236,10 +289,15 @@
+     frame_sp = align(hf, frame_sp, caller, bottom);
    }
  
-   intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp());
+-  intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp());
 -  frame result(frame_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
++  intptr_t* frame_fp = frame_sp + (hf.fp() - hf.unextended_sp())
++      + interpreter_padding;
++  assert(is_aligned(frame_fp, frame::frame_alignment), "native sender window alignment");
 +  intptr_t* extended_sp = frame_sp + (hf.sp() - hf.unextended_sp());
 +  freeze_sparc_move_caller_window(caller, frame_fp);
 +  frame result(extended_sp, frame_sp, frame_fp, hf.pc(), hf.cb(), hf.oop_map(),
@@ -946,7 +957,7 @@
    return result;
  }
  
-@@ -257,8 +307,7 @@
+@@ -257,8 +315,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, const frame& caller) {
@@ -956,7 +967,17 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-@@ -299,7 +348,8 @@
+@@ -296,10 +353,18 @@
+   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llocals_slot, false);
+   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_lmonitors_slot, false);
+   freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llast_sp_slot, true);
++  // Llast_SP is a native window address, not an interpreter payload pointer.
++  // It is restored by the interpreter's return entry after adapter cleanup.
++  intptr_t last_sp = f.sp()[freeze_sparc_llast_sp_slot];
++  if (last_sp != 0) {
++    f.sp()[freeze_sparc_llast_sp_slot] =
++        (intptr_t)align_down((intptr_t*)(last_sp + STACK_BIAS), frame::frame_alignment) - STACK_BIAS;
++  }
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_i5_slot, true);
  
    freeze_sparc_patch_link(f, f.fp());
@@ -1304,7 +1325,7 @@
 +      intptr_t* cursor = sp;
 +      for (int i = 0; i < 24 && cursor != nullptr; ++i) {
 +        if (!JavaThread::current()->is_in_full_stack((address)cursor) ||
-+            !is_aligned(cursor, 2 * wordSize)) break;
++            !is_aligned(cursor, wordSize)) break;
 +        intptr_t raw_fp = SafeFetchN(cursor + FP->sp_offset_in_saved_window(), 0);
 +        intptr_t raw_pc = SafeFetchN(cursor + I7->sp_offset_in_saved_window(), 0);
 +        tty->print_cr("  window %d sp=" INTPTR_FORMAT " i6=" INTPTR_FORMAT
@@ -1329,6 +1350,15 @@
  }
 --- a/src/hotspot/cpu/sparc/frame_sparc.hpp
 +++ b/src/hotspot/cpu/sparc/frame_sparc.hpp
+@@ -123,7 +123,7 @@
+     metadata_words_at_bottom                     = metadata_words,
+     sender_sp_offset                              = 0,
+     frame_alignment                              = 16,
+-    align_wiggle                                 = 1,
++    align_wiggle                                 = 2,
+ 
+     // Fixed save-window slots used by continuation frame metadata.
+     interpreter_frame_last_sp_offset             = 13,
 @@ -164,11 +164,12 @@
    // matches this port: sparc does not emit post-call nops).
    intptr_t* younger_sp() const {
@@ -4410,7 +4440,7 @@
    JRT_BLOCK
      THROW(vmSymbols::java_lang_InterruptedException());
    JRT_BLOCK_END
-@@ -2533,6 +2648,17 @@
+@@ -2533,9 +2648,27 @@
    _align_size += frame::align_wiggle; // possible added alignment for internal interpreted frame alignment om AArch64
  
    frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, is_bottom_frame);
@@ -4427,11 +4457,36 @@
 +
  
    intptr_t* const stack_frame_top = f.sp() + frame::metadata_words_at_top;
++#ifdef SPARC
++  const int interpreter_padding = (hf.fp() - hf.unextended_sp()) & 1;
++  intptr_t* const stack_frame_bottom = stack_frame_top
++      + (ContinuationHelper::InterpretedFrame::frame_bottom(hf) - hf.unextended_sp())
++      + interpreter_padding;
++#else
    intptr_t* const stack_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
-@@ -2548,6 +2674,12 @@
++#endif
+   intptr_t* const heap_frame_top = hf.unextended_sp() + frame::metadata_words_at_top;
+   intptr_t* const heap_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(hf);
+ 
+@@ -2543,11 +2676,26 @@
+   assert(!f.is_heap_frame(), "should not be");
+ 
+   const int fsize = pointer_delta_as_int(heap_frame_bottom, heap_frame_top);
+-  assert((stack_frame_bottom == stack_frame_top + fsize), "");
++  assert((stack_frame_bottom == stack_frame_top + fsize SPARC_ONLY(+ interpreter_padding)), "");
+ 
    // Some architectures (like AArch64/PPC64/RISC-V) add padding between the locals and the fixed_frame to keep the fp 16-byte-aligned.
    // On those architectures we freeze the padding in order to keep the same fp-relative offsets in the fixed_frame.
++#ifdef SPARC
++  assert(fsize >= frame::register_save_words, "complete interpreter window");
++  copy_from_chunk(heap_frame_top, stack_frame_top, frame::register_save_words);
++  if (interpreter_padding != 0) stack_frame_top[frame::register_save_words] = 0;
++  copy_from_chunk(heap_frame_top + frame::register_save_words,
++                  stack_frame_top + frame::register_save_words + interpreter_padding,
++                  fsize - frame::register_save_words);
++#else
    copy_from_chunk(heap_frame_top, stack_frame_top, fsize);
++#endif
 +#ifdef SPARC
 +  if (preserve_caller_window) {
 +    Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 16);
@@ -4441,7 +4496,7 @@
  
    // Make sure the relativized locals is already set.
    assert(f.interpreter_frame_local_at(0) == stack_frame_bottom - 1, "invalid frame bottom");
-@@ -2638,7 +2770,7 @@
+@@ -2638,7 +2786,7 @@
  
      f.deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
      assert(f.is_deoptimized_frame(), "");
@@ -4450,7 +4505,7 @@
      maybe_set_fastpath(f.sp());
    }
  
-@@ -2774,6 +2906,7 @@
+@@ -2774,6 +2922,7 @@
      assert(f.is_interpreted_frame(), "");
      f.set_sp(align_down(f.sp(), frame::frame_alignment));
    }
@@ -4458,7 +4513,7 @@
    push_return_frame(f);
    chunk->fix_thawed_frame(f, SmallRegisterMap::instance()); // can only fix caller after push_return_frame (due to callee saved regs)
  
-@@ -2790,8 +2923,8 @@
+@@ -2790,8 +2939,8 @@
  }
  
  void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
@@ -4469,7 +4524,7 @@
  
    LogTarget(Trace, continuations) lt;
    if (lt.develop_is_enabled()) {
-@@ -2802,7 +2935,7 @@
+@@ -2802,7 +2951,7 @@
  
    assert(f.sp() - frame::metadata_words_at_bottom >= _top_stack_address, "overwrote past thawing space"
      " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(f.sp() - frame::metadata_words), p2i(_top_stack_address));
@@ -4478,7 +4533,7 @@
    ContinuationHelper::push_pd(f);
  
    assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
-@@ -2985,7 +3118,8 @@
+@@ -2985,7 +3134,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;

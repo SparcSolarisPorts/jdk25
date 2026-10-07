@@ -123,7 +123,7 @@
     metadata_words_at_bottom                     = metadata_words,
     sender_sp_offset                              = 0,
     frame_alignment                              = 16,
-    align_wiggle                                 = 1,
+    align_wiggle                                 = 2,
 
     // Fixed save-window slots used by continuation frame metadata.
     interpreter_frame_last_sp_offset             = 13,
