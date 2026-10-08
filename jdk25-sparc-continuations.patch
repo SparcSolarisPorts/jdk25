@@ -1880,18 +1880,19 @@
    btst(JVM_ACC_SYNCHRONIZED, G3_scratch);
    br(zero, false, pt, unlocked);
    delayed()->nop();
-@@ -1138,7 +1138,9 @@
+@@ -1138,7 +1138,10 @@
      // testing if Stack Reserved Area needs to be re-enabled
      Label no_reserved_zone_enabling;
      ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G3_scratch);
 -    cmp_and_brx_short(SP, G3_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
-+    // Match the unbiased address recorded by the shared stack-overflow handler.
-+    add(SP, STACK_BIAS, G4_scratch);
++    // The handler records the activation's unbiased caller boundary. FP
++    // remains stable when expression-stack or c2i adapter space changes SP.
++    add(FP, STACK_BIAS, G4_scratch);
 +    cmp_and_brx_short(G4_scratch, G3_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
  
      call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
      call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::throw_delayed_StackOverflowError), G2_thread);
-@@ -1171,6 +1173,16 @@
+@@ -1171,6 +1174,16 @@
  // Argument - lock_reg points to the BasicObjectLock to be used for locking,
  //            it must be initialized with the object to lock
  void InterpreterMacroAssembler::lock_object(Register lock_reg, Register Object) {
@@ -1908,7 +1909,7 @@
    if (LockingMode == LM_MONITOR) {
      call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter), lock_reg);
    }
-@@ -1241,6 +1253,18 @@
+@@ -1241,6 +1254,18 @@
  // Argument - lock_reg points to the BasicObjectLock for lock
  // Throw IllegalMonitorException if object is not locked by current thread
  void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
@@ -2319,18 +2320,19 @@
     cas_ptr(Rmark, G0, Rscratch);
     cmp(Rscratch, G0);
     // invert icc.zf and goto done
-@@ -2926,7 +3057,9 @@
+@@ -2926,7 +3057,10 @@
    Label no_reserved_zone_enabling;
  
    ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G4_scratch);
 -  cmp_and_brx_short(SP, G4_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
-+  // The activation is an unbiased C++ stack address; architectural SP is biased.
-+  add(SP, STACK_BIAS, G3_scratch);
++  // Match the unbiased caller boundary recorded by the shared handler.
++  // Check before RESTORE, while this activation's FP is still current.
++  add(FP, STACK_BIAS, G3_scratch);
 +  cmp_and_brx_short(G3_scratch, G4_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
  
    call_VM_leaf(L0, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
  
-@@ -2958,14 +3091,25 @@
+@@ -2958,14 +3092,25 @@
    // MachCallDynamicJavaNode::ret_addr_offset()
    // if this changes, change that.
    if (UseCompressedClassPointers) {
@@ -2357,7 +2359,7 @@
    if (UseCompressedClassPointers) {
      assert(dst_oop != klass, "not enough registers");
      encode_klass_not_null(klass);
-@@ -2976,7 +3120,7 @@
+@@ -2976,7 +3121,7 @@
  }
  
  void MacroAssembler::store_klass_gap(Register s, Register d) {
@@ -2366,7 +2368,7 @@
      assert(s != d, "not enough registers");
      st(s, d, oopDesc::klass_gap_offset_in_bytes());
    }
-@@ -3045,13 +3189,16 @@
+@@ -3045,13 +3190,16 @@
  }
  
  
@@ -2387,7 +2389,7 @@
      return;
    }
    Label done;
-@@ -3060,14 +3207,14 @@
+@@ -3060,14 +3208,14 @@
      bpr(rc_nz, true, Assembler::pt, src, done);
      delayed() -> sub(src, G6_heapbase, dst); // annulled if not taken
      bind(done);
@@ -2404,7 +2406,7 @@
      bind(done);
    }
  }
-@@ -3075,33 +3222,36 @@
+@@ -3075,33 +3223,36 @@
  
  void MacroAssembler::encode_heap_oop_not_null(Register r) {
    assert (UseCompressedOops, "must be compressed");
@@ -2453,7 +2455,7 @@
    if (CompressedOops::base() != nullptr) {
      Label done;
      bpr(rc_nz, true, Assembler::pt, dst, done);
-@@ -3116,10 +3266,11 @@
+@@ -3116,10 +3267,11 @@
    // pd_code_size_limit.
    // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
@@ -2469,7 +2471,7 @@
      add(r, G6_heapbase, r);
  }
  
-@@ -3128,15 +3279,16 @@
+@@ -3128,15 +3280,16 @@
    // pd_code_size_limit.
    // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
@@ -2490,7 +2492,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      sub(r, G6_heapbase, r);
-@@ -3154,7 +3306,7 @@
+@@ -3154,7 +3307,7 @@
      encode_klass_not_null(src);
    } else {
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2499,7 +2501,7 @@
        set((intptr_t)CompressedKlassPointers::base(), dst);
        sub(src, dst, dst);
        if (CompressedKlassPointers::shift() != 0) {
-@@ -3173,7 +3325,7 @@
+@@ -3173,7 +3326,7 @@
  int MacroAssembler::instr_size_for_decode_klass_not_null() {
    assert (UseCompressedClassPointers, "only for compressed klass ptrs");
    int num_instrs = 1;  // shift src,dst or add
@@ -2508,7 +2510,7 @@
      // set + add + set
      num_instrs += insts_for_internal_set((intptr_t)CompressedKlassPointers::base()) +
                    insts_for_internal_set((intptr_t)CompressedOops::base());
-@@ -3190,7 +3342,7 @@
+@@ -3190,7 +3343,7 @@
    // Do not add assert code to this unless you change vtableStubs_sparc.cpp
    // pd_code_size_limit.
    assert (UseCompressedClassPointers, "must be compressed");
@@ -2517,7 +2519,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      if (CompressedKlassPointers::shift() != 0)
-@@ -3209,7 +3361,7 @@
+@@ -3209,7 +3362,7 @@
      // Do not add assert code to this unless you change vtableStubs_sparc.cpp
      // pd_code_size_limit.
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2526,7 +2528,7 @@
        if (CompressedKlassPointers::shift() != 0) {
          assert((src != G6_heapbase) && (dst != G6_heapbase), "bad register choice");
          set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
-@@ -3253,7 +3405,7 @@
+@@ -3253,7 +3406,7 @@
  
  void MacroAssembler::reinit_heapbase() {
    if (UseCompressedOops || UseCompressedClassPointers) {
@@ -4265,6 +4267,28 @@
        if (++fail_count == 1000){
          return false;
        }
+@@ -1203,6 +1203,13 @@
+             SharedRuntime::look_for_reserved_stack_annotated_method(thread, fr);
+           if (activation.sp() != nullptr) {
+             overflow_state->disable_stack_reserved_zone();
++#ifdef SPARC
++            // SPARC returns while the activation's register window is still
++            // current. Match its caller boundary, not its mutable physical SP
++            // or the interpreter's FP-relative payload area. Nested callees
++            // have lower caller boundaries, even across c2i adapters.
++            overflow_state->set_reserved_stack_activation((address)activation.fp());
++#else
+             if (activation.is_interpreted_frame()) {
+               overflow_state->set_reserved_stack_activation((address)(activation.fp()
+                 // Some platforms use frame pointers for interpreter frames, others use initial sp.
+@@ -1213,6 +1220,7 @@
+             } else {
+               overflow_state->set_reserved_stack_activation((address)activation.unextended_sp());
+             }
++#endif
+             return true; // just continue
+           }
+         }
 --- a/src/hotspot/os/solaris/dtrace/jhelper.d
 +++ b/src/hotspot/os/solaris/dtrace/jhelper.d
 @@ -83,12 +83,12 @@

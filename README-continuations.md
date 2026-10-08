@@ -1,4 +1,55 @@
-# JDK 25 Solaris/SPARC continuation candidate (v44)
+# JDK 25 Solaris/SPARC continuation candidate (v45)
+
+
+## v45: reserved-stack return boundary candidate
+
+Native v44 evidence confirms the Unsafe smoke test in interpreter, C1, mixed
+and C2 modes. The 25-case selection reports 14 passed, 3 failed, 2 errors and
+6 skipped by platform requirements. The skips include vm.flagless cases
+because the old runner injected LogCompilation. The corrected runner removes
+those global flags; the compact collector excludes compilation XML and cores.
+
+The shared handler now records SPARC activation.fp(), the unbiased caller
+boundary, for both interpreted and compiled reserved-stack activations. The
+interpreter and the C1/C2 shared epilogue compare unbiased architectural FP
+against that boundary before popping the activation. Previously the shared
+interpreter rule recorded fp()+6 words, while SPARC compared SP; even the
+protected activation's exit could miss that threshold, leaving a delayed
+StackOverflowError armed for later unrelated methods. The frame boundary
+also remains stable across interpreter expression-stack and c2i extensions.
+Other architectures retain their existing activation representation.
+
+This is a candidate fix, not a native PASS claim. The host comparison model
+checks biased/unbiased addresses with independent SP displacement. Build and
+rerun the unchanged reserved-stack jtreg tests on Solaris to establish whether
+this also resolves the reported lock corruption.
+
+The UnexpectedDeoptimizationAllTest crash is still unresolved: its compiled
+VirtualThread.parkNanos resumes after the yield0 call with L2=0x24, then faults
+on ldub [L2]. Its normal instruction sequence constructs a process address
+in L2 before the call. This points to investigation of register preservation
+across mixed interpreted/compiled continuation yield/thaw and deoptimization;
+the crash log alone does not establish which path corrupted the value.
+Neither continuation fast paths nor compiler modes are disabled here.
+
+The two timeout errors are also unresolved. TestStackBangMonitorOwned prints
+TEST PASSED before hanging during process completion; GetCreatedJavaVMs
+requires a native child stack capture to locate its JNI startup/shutdown hang.
+Do not count either as a PASS or simply increase the timeout.
+
+Build quietly, then run all 25 selected cases with the corrected runner:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-unsafe-alignment-repro.sh
+  bash tests/run-continuation-repro.sh
+  bash tests/rerun-priority-1-2.sh
+else
+  ggrep -n -B 4 -A 8 'error:' /tmp/jdk25-build.log
+fi
+```
+
 
 v44 corrects a v43 build error in os_solaris.cpp: the usable-page-size
 logging line used SIZE_FORMAT, which JDK 25 no longer defines. Use %zu

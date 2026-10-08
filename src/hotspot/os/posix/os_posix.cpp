@@ -1203,6 +1203,13 @@ bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address 
             SharedRuntime::look_for_reserved_stack_annotated_method(thread, fr);
           if (activation.sp() != nullptr) {
             overflow_state->disable_stack_reserved_zone();
+#ifdef SPARC
+            // SPARC returns while the activation's register window is still
+            // current. Match its caller boundary, not its mutable physical SP
+            // or the interpreter's FP-relative payload area. Nested callees
+            // have lower caller boundaries, even across c2i adapters.
+            overflow_state->set_reserved_stack_activation((address)activation.fp());
+#else
             if (activation.is_interpreted_frame()) {
               overflow_state->set_reserved_stack_activation((address)(activation.fp()
                 // Some platforms use frame pointers for interpreter frames, others use initial sp.
@@ -1213,6 +1220,7 @@ bool os::Posix::handle_stack_overflow(JavaThread* thread, address addr, address 
             } else {
               overflow_state->set_reserved_stack_activation((address)activation.unextended_sp());
             }
+#endif
             return true; // just continue
           }
         }

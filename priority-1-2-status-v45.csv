@@ -1,0 +1,26 @@
+test,native_v44_status,v45_disposition
+applications/ctw/modules/java_base_2.java,Passed. Execution successful,Native v44 PASS
+applications/ctw/modules/jdk_javadoc.java,Passed. Execution successful,Native v44 PASS
+compiler/c1/TestLargeMonitorOffset.java,Passed. Execution successful,Native v44 PASS
+compiler/c2/TestCastX2P.java,Passed. Execution successful,Native v44 PASS
+compiler/c2/TestMergeStoresUnsafeArrayPointer.java,Passed. Execution successful,Native v44 PASS
+compiler/c2/irTests/TestLongRangeChecks.java,Passed. Execution successful,Native v44 PASS
+compiler/codecache/stress/UnexpectedDeoptimizationAllTest.java,Failed. Unexpected exit from test [exit code: 6],Unresolved failure
+compiler/rangechecks/TestLongRangeCheck.java,Passed. Execution successful,Native v44 PASS
+compiler/runtime/TestConstantDynamic.java,Passed. Execution successful,Native v44 PASS
+compiler/uncommontrap/TestStackBangMonitorOwned.java,Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 490736 ms),Unresolved timeout; native process stacks required
+compiler/unsafe/AlignmentGapAccess.java,Passed. Execution successful,Native v44 PASS
+compiler/unsafe/MismatchedUnsafeAccessTest.java,Passed. Execution successful,Native v44 PASS
+gc/TestAllocateHeapAtMultiple.java,Passed. Execution successful,Native v44 PASS
+gc/g1/TestLargePageUseForAuxMemory.java,Passed. Execution successful,Native v44 PASS
+runtime/ClassInitErrors/TestStackOverflowDuringInit.java,Did not meet platform requirements (vm.flagless with injected logging flags),Skipped; rerun with corrected flagless runner
+runtime/CompressedOops/CompressedClassPointers.java,Did not meet platform requirements (vm.flagless with injected logging flags),Skipped; rerun with corrected flagless runner
+runtime/Monitor/StressWrapper_TestRecursiveLocking_36M.java#C2_alternate_AB,Did not meet platform requirements (vm.flagless with injected logging flags),Skipped; rerun with corrected flagless runner
+runtime/Monitor/StressWrapper_TestRecursiveLocking_36M.java#C2_outer_inner,Did not meet platform requirements (vm.flagless with injected logging flags),Skipped; rerun with corrected flagless runner
+runtime/Monitor/TestRecursiveLocking.java#C2_alternate_AB,Did not meet platform requirements (vm.flagless with injected logging flags),Skipped; rerun with corrected flagless runner
+runtime/Monitor/TestRecursiveLocking.java#C2_outer_inner,Did not meet platform requirements (vm.flagless with injected logging flags),Skipped; rerun with corrected flagless runner
+runtime/ReservedStack/ReservedStackTest.java,Failed. Execution failed: `main' threw exception: java.lang.Error: FAILED: ReentrantLock 473 looks corrupted,v45 return-boundary candidate; native validation required
+runtime/ReservedStack/ReservedStackTestCompiler.java,Failed. Execution failed: `main' threw exception: java.lang.StackOverflowError: Delayed StackOverflowError due to ReservedStackAccess annotated method,v45 return-boundary candidate; native validation required
+runtime/Thread/TestAlwaysPreTouchStacks.java,Passed. Execution successful,Native v44 PASS
+runtime/jni/getCreatedJavaVMs/TestGetCreatedJavaVMs.java,"Error. ""driver"" action timed out with a timeout of 480 seconds on agent 19",Unresolved timeout; native process stacks required
+runtime/jni/nativeStack/TestNativeStack.java,Passed. Execution successful,Native v44 PASS

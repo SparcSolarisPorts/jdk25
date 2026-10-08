@@ -12,8 +12,19 @@ mkdir -p "$stage/results" "$stage/source"
 while IFS= read -r -d '' file; do
   rel=${file#"$results/"}
   mkdir -p "$stage/results/$(dirname "$rel")"
-  cp "$file" "$stage/results/$rel"
-done < <(find "$results" -type f \( -name '*.jtr' -o -name '*.log' -o -name '*.xml' -o -name 'summary.txt' -o -name 'tests.txt' \) -print0)
+  # Bound noisy text logs while retaining both the start and failure tail.
+  # XML compilation logs and core dumps are excluded by the find filter.
+  bytes=$(ls -ln "$file" | gawk '{print $5}')
+  if ((bytes > 4194304)); then
+    {
+      head -c 1048576 "$file"
+      printf '\n--- middle omitted: original %s bytes; first/last 1 MiB retained ---\n' "$bytes"
+      tail -c 1048576 "$file"
+    } > "$stage/results/$rel"
+  else
+    cp "$file" "$stage/results/$rel"
+  fi
+done < <(find "$results" -type f \( -name '*.jtr' -o -name '*.log' -o -name 'summary.txt' -o -name 'tests.txt' \) -print0)
 while IFS= read -r test; do
   test=${test%$'\r'}
   test=${test#jtreg:}

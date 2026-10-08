@@ -3057,8 +3057,9 @@ void MacroAssembler::reserved_stack_check() {
   Label no_reserved_zone_enabling;
 
   ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G4_scratch);
-  // The activation is an unbiased C++ stack address; architectural SP is biased.
-  add(SP, STACK_BIAS, G3_scratch);
+  // Match the unbiased caller boundary recorded by the shared handler.
+  // Check before RESTORE, while this activation's FP is still current.
+  add(FP, STACK_BIAS, G3_scratch);
   cmp_and_brx_short(G3_scratch, G4_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
 
   call_VM_leaf(L0, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
