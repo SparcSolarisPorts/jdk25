@@ -4,7 +4,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 jdk=${JDK25_IMAGE:-"$root/build/solaris-sparcv9-server-release/images/jdk"}
 out="$root/condy-null-results-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$out/classes"
-"$jdk/bin/javac" --add-exports java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED -d "$out/classes" "$root/tests/ConstantDynamicNullSmoke.java" > "$out/compile.log" 2>&1 || {
+"$jdk/bin/javac" -d "$out/classes" "$root/tests/ConstantDynamicNullSmoke.java" > "$out/compile.log" 2>&1 || {
   tail -40 "$out/compile.log"
   exit 1
 }
@@ -19,7 +19,6 @@ for mode in interpreter c1 mixed c2; do
   echo "Running $mode"
   # Bound hangs during startup, constant resolution, compilation and shutdown.
   "$jdk/bin/java" "${flags[@]}" -Xmx256m \
-    --add-exports java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED \
     "-XX:ErrorFile=$out/hs_err_${mode}_pid%p.log" \
     -cp "$out/classes" ConstantDynamicNullSmoke > "$out/$mode.log" 2>&1 &
   vm_pid=$!

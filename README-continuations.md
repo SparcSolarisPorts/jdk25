@@ -1,4 +1,34 @@
-# JDK 25 Solaris/SPARC continuation candidate (v39)
+# JDK 25 Solaris/SPARC continuation candidate (v40)
+
+v40 corrects the v39 smoke-test compilation failure. The test previously
+imported jdk.internal.org.objectweb.asm, which is unavailable in the user's
+JDK 25 image. ConstantDynamicNullSmoke now writes a minimal Java 11 class
+file using only public java.io APIs. The generated methods still use real
+CONSTANT_Dynamic entries and ldc_w, with the same null/non-null identity,
+bootstrap-cache and GC checks. The runner no longer needs ASM exports or
+an external library. This changes the test and runner, not HotSpot sources.
+All cumulative v39 source fixes remain included.
+
+Validation: the self-contained test passed in host interpreter, C1, mixed
+and C2 modes, each checking 80000 null/non-null pairs and GC. The generated
+class is verified and loaded by the host JVM; these checks do not prove
+native SPARC execution passes. Shell syntax, cumulative patch dry run,
+ZIP CRC and source SHA-256 checks passed.
+
+Replace tests/ConstantDynamicNullSmoke.java and tests/run-condy-null-repro.sh
+from this ZIP and rerun:
+
+```bash
+cd ~/git/jdk25
+bash tests/run-condy-null-repro.sh
+```
+
+No further JDK rebuild is needed for this test correction if the v39 image
+was already rebuilt. The five-minute watchdog per mode remains enabled.
+After the smoke test, use tests/rerun-priority-1-2.sh and the evidence collector
+as described below for native jtreg validation of the null-sentinel fix.
+
+## Included v39 changes
 
 v39 responds to priority-1-2-rerun-20261008-015735-evidence.zip. Native v38
 results are 10 passes, 13 failures and 2 timeout errors. TestLargeMonitorOffset
