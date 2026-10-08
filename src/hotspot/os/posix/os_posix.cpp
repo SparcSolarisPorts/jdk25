@@ -167,7 +167,7 @@ void os::check_core_dump_prerequisites(char* buffer, size_t bufferSize, bool che
 
 bool os::committed_in_range(address start, size_t size, address& committed_start, size_t& committed_size) {
 
-#ifndef LINUX
+#if !defined(LINUX) && !defined(SOLARIS)
   committed_start = start;
   committed_size = size;
   return true;
@@ -200,7 +200,7 @@ bool os::committed_in_range(address start, size_t size, address& committed_start
 
     // Get stable read
     int fail_count = 0;
-    while ((mincore_return_value = mincore(loop_base, pages_to_query * page_sz, vec)) == -1 && errno == EAGAIN){
+    while ((mincore_return_value = mincore((char*)loop_base, pages_to_query * page_sz, vec)) == -1 && errno == EAGAIN){
       if (++fail_count == 1000){
         return false;
       }

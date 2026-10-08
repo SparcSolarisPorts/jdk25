@@ -24,23 +24,13 @@
 #include "oops/compressedKlass.hpp"
 #include "utilities/globalDefinitions.hpp"
 
-// SPARC has no small-immediate advantages for any particular base address
-// range (the narrow-klass base is always materialized with a full 64-bit
-// set). On Solaris, let Metaspace use its OS-selected mapping fallback:
-// explicitly probing the low address range can place class space immediately
-// above the brk-based native heap and prevent subsequent malloc growth.
-// Other systems can attempt zero-based encoding with a plain shift.
+// Prefer a zero-based encoding above the brk heap. Do not probe below 4G:
+// reserving class space there can obstruct later Solaris malloc growth.
 char* CompressedKlassPointers::reserve_address_space_for_compressed_classes(size_t size, bool aslr, bool optimize_for_zero_base) {
-
-  char* result = nullptr;
-
-#ifndef SOLARIS
   if (optimize_for_zero_base) {
-    // Failing that, if we are running without CDS, attempt to allocate below 32G.
-    // This allows us to use zero-based encoding with a non-zero shift.
-    result = reserve_address_space_for_zerobased_encoding(size, aslr);
+    // This helper probes [4G, 32G), preserving native-heap headroom while
+    // allowing zero-based klass decoding independently of compressed oops.
+    return reserve_address_space_for_zerobased_encoding(size, aslr);
   }
-#endif
-
-  return result;
+  return nullptr;
 }

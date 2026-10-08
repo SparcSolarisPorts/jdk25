@@ -818,29 +818,31 @@
  }
 --- a/src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
-@@ -26,17 +26,21 @@
+@@ -24,19 +24,13 @@
+ #include "oops/compressedKlass.hpp"
+ #include "utilities/globalDefinitions.hpp"
  
- // SPARC has no small-immediate advantages for any particular base address
- // range (the narrow-klass base is always materialized with a full 64-bit
+-// SPARC has no small-immediate advantages for any particular base address
+-// range (the narrow-klass base is always materialized with a full 64-bit
 -// set), so we only attempt the zero-based encoding reservation, which
 -// allows the base to be zero and the encoding to be a plain shift.
-+// set). On Solaris, let Metaspace use its OS-selected mapping fallback:
-+// explicitly probing the low address range can place class space immediately
-+// above the brk-based native heap and prevent subsequent malloc growth.
-+// Other systems can attempt zero-based encoding with a plain shift.
++// Prefer a zero-based encoding above the brk heap. Do not probe below 4G:
++// reserving class space there can obstruct later Solaris malloc growth.
  char* CompressedKlassPointers::reserve_address_space_for_compressed_classes(size_t size, bool aslr, bool optimize_for_zero_base) {
- 
-   char* result = nullptr;
- 
-+#ifndef SOLARIS
+-
+-  char* result = nullptr;
+-
    if (optimize_for_zero_base) {
-     // Failing that, if we are running without CDS, attempt to allocate below 32G.
-     // This allows us to use zero-based encoding with a non-zero shift.
-     result = reserve_address_space_for_zerobased_encoding(size, aslr);
+-    // Failing that, if we are running without CDS, attempt to allocate below 32G.
+-    // This allows us to use zero-based encoding with a non-zero shift.
+-    result = reserve_address_space_for_zerobased_encoding(size, aslr);
++    // This helper probes [4G, 32G), preserving native-heap headroom while
++    // allowing zero-based klass decoding independently of compressed oops.
++    return reserve_address_space_for_zerobased_encoding(size, aslr);
    }
-+#endif
- 
-   return result;
+-
+-  return result;
++  return nullptr;
  }
 --- a/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 +++ b/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
@@ -3221,7 +3223,94 @@
    ins_pipe(ialu_reg);
  %}
  
-@@ -9551,6 +9573,19 @@
+@@ -6502,6 +6524,86 @@
+   ins_pipe(ialu_reg);
+ %}
+ 
++
++// Conditional moves consuming unsigned 64-bit comparisons use XCC.
++instruct cmovIIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegI dst, iRegI src) %{
++  match(Set dst (CMoveI (Binary cmp xcc) (Binary dst src)));
++  ins_cost(150);
++  size(4);
++  format %{ "MOV$cmp  $xcc,$src,$dst" %}
++  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(ialu_reg);
++%}
++
++instruct cmovIIu_imm_ul(cmpOpU cmp, flagsRegUL xcc, iRegI dst, immI11 src) %{
++  match(Set dst (CMoveI (Binary cmp xcc) (Binary dst src)));
++  ins_cost(140);
++  size(4);
++  format %{ "MOV$cmp  $xcc,$src,$dst" %}
++  ins_encode( enc_cmov_imm(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(ialu_imm);
++%}
++
++instruct cmovNIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegN dst, iRegN src) %{
++  match(Set dst (CMoveN (Binary cmp xcc) (Binary dst src)));
++  ins_cost(150);
++  size(4);
++  format %{ "MOV$cmp  $xcc,$src,$dst" %}
++  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(ialu_reg);
++%}
++
++instruct cmovPIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegP dst, iRegP src) %{
++  match(Set dst (CMoveP (Binary cmp xcc) (Binary dst src)));
++  ins_cost(150);
++
++  size(4);
++  format %{ "MOV$cmp  $xcc,$src,$dst\t! ptr" %}
++  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(ialu_reg);
++%}
++
++instruct cmovPIu_imm_ul(cmpOpU cmp, flagsRegUL xcc, iRegP dst, immP0 src) %{
++  match(Set dst (CMoveP (Binary cmp xcc) (Binary dst src)));
++  ins_cost(140);
++
++  size(4);
++  format %{ "MOV$cmp  $xcc,$src,$dst\t! ptr" %}
++  ins_encode( enc_cmov_imm(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(ialu_imm);
++%}
++
++instruct cmovFIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, regF dst, regF src) %{
++  match(Set dst (CMoveF (Binary cmp xcc) (Binary dst src)));
++  ins_cost(150);
++
++  size(4);
++  format %{ "FMOVS$cmp $xcc,$src,$dst" %}
++  opcode(0x101);
++  ins_encode( enc_cmovf_reg(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(int_conditional_float_move);
++%}
++
++instruct cmovDIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, regD dst, regD src) %{
++  match(Set dst (CMoveD (Binary cmp xcc) (Binary dst src)));
++  ins_cost(150);
++
++  size(4);
++  format %{ "FMOVD$cmp $xcc,$src,$dst" %}
++  opcode(0x102);
++  ins_encode( enc_cmovf_reg(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(int_conditional_double_move);
++%}
++
++instruct cmovLIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegL dst, iRegL src) %{
++  match(Set dst (CMoveL (Binary cmp xcc) (Binary dst src)));
++  ins_cost(150);
++
++  size(4);
++  format %{ "MOV$cmp  $xcc,$src,$dst\t! long" %}
++  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
++  ins_pipe(ialu_reg);
++%}
+ 
+ //----------OS and Locking Instructions----------------------------------------
+ 
+@@ -9551,6 +9653,19 @@
    // The hack duplicates the exception oop into G3, so that CreateEx can use it there.
    // ins_encode( form3_rs1_simm13_rd( jump_target, 0x00, R_G0 ), move_return_pc_to_o1() );
    ins_avoid_back_to_back(AVOID_BEFORE);
@@ -4156,6 +4245,26 @@
    // exception that should translate into an AbstractMethodError.  We need the
    // window count to be correct at that time.
    __ restore(L5_method, 0, G5_method);
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -167,7 +167,7 @@
+ 
+ bool os::committed_in_range(address start, size_t size, address& committed_start, size_t& committed_size) {
+ 
+-#ifndef LINUX
++#if !defined(LINUX) && !defined(SOLARIS)
+   committed_start = start;
+   committed_size = size;
+   return true;
+@@ -200,7 +200,7 @@
+ 
+     // Get stable read
+     int fail_count = 0;
+-    while ((mincore_return_value = mincore(loop_base, pages_to_query * page_sz, vec)) == -1 && errno == EAGAIN){
++    while ((mincore_return_value = mincore((char*)loop_base, pages_to_query * page_sz, vec)) == -1 && errno == EAGAIN){
+       if (++fail_count == 1000){
+         return false;
+       }
 --- a/src/hotspot/os/solaris/dtrace/jhelper.d
 +++ b/src/hotspot/os/solaris/dtrace/jhelper.d
 @@ -83,12 +83,12 @@
@@ -4201,7 +4310,25 @@
 +}
 --- a/src/hotspot/os/solaris/os_solaris.cpp
 +++ b/src/hotspot/os/solaris/os_solaris.cpp
-@@ -2411,6 +2411,13 @@
+@@ -1784,6 +1784,17 @@
+   if (UseLargePages) {
+     UseLargePages = Solaris::mpss_sanity_check(&_large_page_size);
+   }
++  // Include intermediate sizes: Solaris can choose 64K even when the
++  // largest page (normally 4M) does not fit an auxiliary allocation.
++  if (log_is_enabled(Info, pagesize)) {
++    LogStream st(Log(pagesize)::info());
++    st.print("Usable page sizes (bytes):");
++    for (size_t page = _page_sizes.smallest(); page != 0;
++         page = _page_sizes.next_larger(page)) {
++      st.print(" " SIZE_FORMAT, page);
++    }
++    st.cr();
++  }
+ }
+ 
+ bool os::Solaris::is_valid_page_size(size_t bytes) {
+@@ -2411,6 +2422,13 @@
    // initialize synchronization primitives
    Solaris::synchronization_init();
    DEBUG_ONLY(os::set_mutex_init_done();)
@@ -4308,7 +4435,18 @@
    }
  
    return epc;
-@@ -260,7 +260,7 @@
+@@ -238,7 +238,9 @@
+   // Register window not yet rotated (happens at SAVE after stack bang), so there is no new
+   // frame to go with the faulting PC. Using caller SP that is still in SP, and caller PC
+   // that was written to O7 at call.
+-  address pc = (address)uc->uc_mcontext.gregs[REG_O7];
++  // O7 contains the CALL instruction address, not the return PC used by
++  // frame walking and nmethod scope descriptions (CALL + delay slot).
++  address pc = (address)uc->uc_mcontext.gregs[REG_O7] + frame::pc_return_offset;
+   return frame(fr.sp(), frame::unpatchable, pc);
+ }
+ 
+@@ -260,7 +262,7 @@
                  CAST_FROM_FN_PTR(address, os::current_frame));
    if (os::is_first_C_frame(&myframe)) {
      // stack is not walkable
@@ -4317,7 +4455,7 @@
    } else {
      return os::get_sender_for_C_frame(&myframe);
    }
-@@ -268,21 +268,21 @@
+@@ -268,21 +270,21 @@
  
  bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
                                               ucontext_t* uc, JavaThread* thread) {
@@ -4346,7 +4484,21 @@
      // factor me: getPCfromContext
      pc  = (address) uc->uc_mcontext.gregs[REG_PC];
      npc = (address) uc->uc_mcontext.gregs[REG_nPC];
-@@ -344,7 +344,7 @@
+@@ -291,7 +293,12 @@
+     if (sig == SIGSEGV && info->si_code == SEGV_ACCERR) {
+       address addr = (address) info->si_addr;
+       if (thread->is_in_full_stack(addr)) {
+-        // stack overflow
++        // A guard-page fault can leave windows buffered in the signal
++        // context. The reserved-stack search follows saved I6/I7 links;
++        // materialize these windows before constructing or walking frames.
++        if (uc->uc_mcontext.gwins != nullptr) {
++          handle_unflushed_register_windows(uc->uc_mcontext.gwins);
++        }
+         if (os::Posix::handle_stack_overflow(thread, addr, pc, uc, &stub)) {
+           return true; // continue
+         }
+@@ -344,7 +351,7 @@
          CodeBlob* cb = CodeCache::find_blob(pc);
          nmethod* nm = (cb != nullptr) ? cb->as_nmethod_or_null() : nullptr;
          bool is_unsafe_arraycopy = (thread->doing_unsafe_access() && UnsafeMemoryAccess::contains_pc(pc));
@@ -4355,7 +4507,7 @@
            if (is_unsafe_arraycopy) {
              npc = UnsafeMemoryAccess::page_error_continue_pc(pc);
            }
-@@ -393,7 +393,7 @@
+@@ -393,7 +400,7 @@
      }
    }
  
@@ -4364,7 +4516,7 @@
      // save all thread context in case we need to restore it
  
      thread->set_saved_exception_pc(pc);
-@@ -410,7 +410,7 @@
+@@ -410,7 +417,7 @@
  }
  
  void os::print_context(outputStream *st, const void *context) {
@@ -4472,6 +4624,104 @@
    }
  };
  
+--- a/src/hotspot/share/c1/c1_LIRGenerator.cpp
++++ b/src/hotspot/share/c1/c1_LIRGenerator.cpp
+@@ -2053,6 +2053,52 @@
+   }
+ 
+   LIR_Opr result = rlock_result(x, type);
++#ifdef SPARC
++  // Plain primitive Unsafe offsets need not be naturally aligned. Keep the
++  // ordinary load on the aligned path; assemble bytes only on the slow path.
++  if (!x->is_raw() && !x->is_volatile() &&
++      (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
++       type == T_FLOAT || type == T_DOUBLE)) {
++    const int width = type2aelembytes(type);
++    const BasicType bits_type = width == 8 ? T_LONG : T_INT;
++    LabelObj* slow = new LabelObj();
++    LabelObj* done = new LabelObj();
++    LIR_Opr alignment = new_register(T_LONG);
++    __ logical_and(off.result(), LIR_OprFact::longConst(width - 1), alignment);
++    __ cmp(lir_cond_notEqual, alignment, LIR_OprFact::longConst(0));
++    __ branch(lir_cond_notEqual, slow->label());
++    access_load_at(decorators, type, src, off.result(), result);
++    __ branch(lir_cond_always, done->label());
++    __ branch_destination(slow->label());
++    LIR_Opr bits = new_register(bits_type);
++    __ move(width == 8 ? LIR_OprFact::longConst(0) : LIR_OprFact::intConst(0), bits);
++    for (int i = 0; i < width; ++i) {
++      LIR_Opr byte_offset = new_register(T_LONG);
++      __ add(off.result(), LIR_OprFact::longConst(i), byte_offset);
++      LIR_Opr byte_value = new_register(T_INT);
++      access_load_at(decorators, T_BYTE, src, byte_offset, byte_value);
++      __ logical_and(byte_value, LIR_OprFact::intConst(255), byte_value);
++      LIR_Opr part = byte_value;
++      if (width == 8) {
++        part = new_register(T_LONG);
++        __ convert(Bytecodes::_i2l, byte_value, part);
++      }
++      __ shift_left(bits, 8, bits);
++      __ logical_or(bits, part, bits);
++    }
++    if (type == T_SHORT) {
++      __ shift_left(bits, 16, bits);
++      __ shift_right(bits, LIR_OprFact::intConst(16), bits, LIR_OprFact::illegalOpr);
++    }
++    if (is_floating_point_type(type)) {
++      __ move(force_to_spill(bits, type), result);
++    } else {
++      __ move(bits, result);
++    }
++    __ branch_destination(done->label());
++    return;
++  }
++#endif
+   if (!x->is_raw()) {
+     access_load_at(decorators, type, src, off.result(), result);
+   } else {
+@@ -2097,6 +2143,42 @@
+   if (x->is_volatile()) {
+     decorators |= MO_SEQ_CST;
+   }
++#ifdef SPARC
++  if (!x->is_volatile() &&
++      (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
++       type == T_FLOAT || type == T_DOUBLE)) {
++    const int width = type2aelembytes(type);
++    const BasicType bits_type = width == 8 ? T_LONG : T_INT;
++    LabelObj* slow = new LabelObj();
++    LabelObj* done = new LabelObj();
++    LIR_Opr alignment = new_register(T_LONG);
++    __ logical_and(off.result(), LIR_OprFact::longConst(width - 1), alignment);
++    __ cmp(lir_cond_notEqual, alignment, LIR_OprFact::longConst(0));
++    __ branch(lir_cond_notEqual, slow->label());
++    access_store_at(decorators, type, src, off.result(), data.result());
++    __ branch(lir_cond_always, done->label());
++    __ branch_destination(slow->label());
++    LIR_Opr bits = data.result();
++    if (is_floating_point_type(type)) {
++      bits = new_register(bits_type);
++      __ move(force_to_spill(data.result(), bits_type), bits);
++    }
++    for (int i = 0; i < width; ++i) {
++      LIR_Opr part = new_register(bits_type);
++      __ unsigned_shift_right(bits, LIR_OprFact::intConst((width - 1 - i) * 8), part, LIR_OprFact::illegalOpr);
++      LIR_Opr byte_value = part;
++      if (width == 8) {
++        byte_value = new_register(T_INT);
++        __ convert(Bytecodes::_l2i, part, byte_value);
++      }
++      LIR_Opr byte_offset = new_register(T_LONG);
++      __ add(off.result(), LIR_OprFact::longConst(i), byte_offset);
++      access_store_at(decorators, T_BYTE, src, byte_offset, byte_value);
++    }
++    __ branch_destination(done->label());
++    return;
++  }
++#endif
+   access_store_at(decorators, type, src, off.result(), data.result());
+ }
+ 
 --- a/src/hotspot/share/c1/c1_Runtime1.cpp
 +++ b/src/hotspot/share/c1/c1_Runtime1.cpp
 @@ -1228,13 +1228,13 @@
@@ -4578,7 +4828,74 @@
  
 --- a/src/hotspot/share/opto/library_call.cpp
 +++ b/src/hotspot/share/opto/library_call.cpp
-@@ -7124,7 +7124,7 @@
+@@ -2483,6 +2483,66 @@
+   if (stopped()) {
+     return true;
+   }
++#ifdef SPARC
++  if (kind == Relaxed &&
++      (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
++       type == T_FLOAT || type == T_DOUBLE)) {
++    const int width = type2aelembytes(type);
++    const bool wide = width == 8;
++    IdealKit ideal(this, false, true);
++    IdealVariable result(ideal);
++    ideal.declarations_done();
++    Node* misalignment = _gvn.transform(new AndXNode(offset, MakeConX(width - 1)));
++    ideal.if_then(misalignment, BoolTest::ne, MakeConX(0), PROB_UNLIKELY(0.99)); {
++      sync_kit(ideal);
++      Node* bits = is_store ? val : (wide ? longcon(0) : intcon(0));
++      if (is_store && type == T_FLOAT) bits = _gvn.transform(new MoveF2INode(bits));
++      if (is_store && type == T_DOUBLE) bits = _gvn.transform(new MoveD2LNode(bits));
++      for (int i = 0; i < width; ++i) {
++        Node* byte_adr = basic_plus_adr(heap_base_oop, adr, MakeConX(i));
++        const TypePtr* byte_type = _gvn.type(byte_adr)->is_ptr();
++        DecoratorSet byte_decorators = (decorators & ~C2_UNALIGNED) | C2_MISMATCHED;
++        if (is_store) {
++          Node* part = wide
++              ? _gvn.transform(new URShiftLNode(bits, intcon((width - 1 - i) * 8)))
++              : _gvn.transform(new URShiftINode(bits, intcon((width - 1 - i) * 8)));
++          if (wide) part = _gvn.transform(new ConvL2INode(part));
++          access_store_at(heap_base_oop, byte_adr, byte_type, part, TypeInt::BYTE, T_BYTE, byte_decorators);
++        } else {
++          Node* part = access_load_at(heap_base_oop, byte_adr, byte_type, TypeInt::BYTE, T_BYTE, byte_decorators);
++          part = _gvn.transform(new AndINode(part, intcon(255)));
++          if (wide) {
++            part = _gvn.transform(new ConvI2LNode(part));
++            bits = _gvn.transform(new OrLNode(_gvn.transform(new LShiftLNode(bits, intcon(8))), part));
++          } else {
++            bits = _gvn.transform(new OrINode(_gvn.transform(new LShiftINode(bits, intcon(8))), part));
++          }
++        }
++      }
++      if (!is_store) {
++        if (type == T_SHORT) bits = _gvn.transform(new RShiftINode(_gvn.transform(new LShiftINode(bits, intcon(16))), intcon(16)));
++        if (type == T_FLOAT) bits = _gvn.transform(new MoveI2FNode(bits));
++        if (type == T_DOUBLE) bits = _gvn.transform(new MoveL2DNode(bits));
++      }
++      ideal.sync_kit(this);
++      ideal.set(result, is_store ? intcon(0) : bits);
++    } ideal.else_(); {
++      sync_kit(ideal);
++      // This path retains the regular load/store and its normal aliasing.
++      if (is_store) {
++        access_store_at(heap_base_oop, adr, adr_type, val, value_type, type, decorators);
++      } else {
++        Node* value = access_load_at(heap_base_oop, adr, adr_type, value_type, type, decorators);
++        ideal.set(result, value);
++      }
++      ideal.sync_kit(this);
++      if (is_store) ideal.set(result, intcon(0));
++    } ideal.end_if();
++    final_sync(ideal);
++    if (!is_store) set_result(ideal.value(result));
++    return true;
++  }
++#endif
+   // Heap pointers get a null-check from the interpreter,
+   // as a courtesy.  However, this is not guaranteed by Unsafe,
+   // and it is not possible to fully distinguish unintended nulls
+@@ -7124,7 +7184,7 @@
      // on SPARC we need to pass the original key since key expansion needs to happen in intrinsics due to
      // compatibility issues between Java key expansion and SPARC crypto instructions
      Node* original_k_start = get_original_key_start_from_aescrypt_object(aescrypt_object);
@@ -4587,6 +4904,42 @@
  
      // Call the stub.
      make_runtime_call(RC_LEAF|RC_NO_FP, OptoRuntime::aescrypt_block_Type(),
+--- a/src/hotspot/share/prims/unsafe.cpp
++++ b/src/hotspot/share/prims/unsafe.cpp
+@@ -239,6 +239,16 @@
+ 
+   T get() {
+     GuardUnsafeAccess guard(_thread);
++#ifdef SPARC
++    volatile T* p = addr();
++    if (!is_aligned((uintptr_t)p, sizeof(T))) {
++      T value;
++      u1* bytes = reinterpret_cast<u1*>(&value);
++      volatile u1* source = reinterpret_cast<volatile u1*>(p);
++      for (size_t i = 0; i < sizeof(T); ++i) bytes[i] = source[i];
++      return normalize_for_read(value);
++    }
++#endif
+     return normalize_for_read(*addr());
+   }
+ 
+@@ -247,6 +257,16 @@
+   ATTRIBUTE_NO_UBSAN
+   void put(T x) {
+     GuardUnsafeAccess guard(_thread);
++#ifdef SPARC
++    volatile T* p = addr();
++    if (!is_aligned((uintptr_t)p, sizeof(T))) {
++      T value = normalize_for_write(x);
++      const u1* bytes = reinterpret_cast<const u1*>(&value);
++      volatile u1* destination = reinterpret_cast<volatile u1*>(p);
++      for (size_t i = 0; i < sizeof(T); ++i) destination[i] = bytes[i];
++      return;
++    }
++#endif
+     *addr() = normalize_for_write(x);
+   }
+ 
 --- a/src/hotspot/share/runtime/arguments.cpp
 +++ b/src/hotspot/share/runtime/arguments.cpp
 @@ -1854,7 +1854,7 @@
@@ -5207,3 +5560,44 @@
  	        -classpath $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc \
  	        build.tools.symbolgenerator.JavadocElementList \
  	        $(ELEMENT_LISTS_DIR)/element-list-$(JDK_SOURCE_TARGET_VERSION).txt \
+--- a/test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
++++ b/test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
+@@ -117,17 +117,33 @@
+                        "-version");
+     }
+ 
+-    static void testVM(String what, long heapsize, boolean cardsShouldUseLargePages, boolean bitmapShouldUseLargePages) throws Exception {
+-        System.out.println(what + " heapsize " + heapsize + " card table should use large pages " + cardsShouldUseLargePages + " " +
+-                           "bitmaps should use large pages " + bitmapShouldUseLargePages);
++    // Choose the largest usable page that fits the allocation, including
++    // intermediate sizes on platforms supporting more than two page sizes.
++    static long expectedPageSize(OutputAnalyzer output, long allocationSize) {
++        String sizes = output.firstMatch("Usable page sizes \\(bytes\\): ([0-9 ]+)", 1);
++        if (sizes == null) {
++            // Platforms exposing only the conventional small/large pair.
++            return allocationSize >= largePageSize ? largePageSize : smallPageSize;
++        }
++        long expected = smallPageSize;
++        for (String value : sizes.trim().split(" +")) {
++            long page = Long.parseLong(value);
++            if (page <= allocationSize) expected = Math.max(expected, page);
++        }
++        return expected;
++    }
++
++    static void testVM(String what, long heapsize, boolean cardsFitLargestPage, boolean bitmapFitsLargestPage) throws Exception {
++        System.out.println(what + " heapsize " + heapsize + " card table fits largest page " + cardsFitLargestPage + " " +
++                           "bitmap fits largest page " + bitmapFitsLargestPage);
+ 
+         // Test with large page enabled.
+         OutputAnalyzer output = ProcessTools.executeLimitedTestJava(getOpts(heapsize, true));
+ 
+         // Only expect large page size if large pages are enabled.
+         if (largePagesEnabled(output)) {
+-            checkSmallTables(output, (cardsShouldUseLargePages ? largePageSize : smallPageSize));
+-            checkBitmap(output, (bitmapShouldUseLargePages ? largePageSize : smallPageSize));
++            checkSmallTables(output, expectedPageSize(output, heapsize / 512));
++            checkBitmap(output, expectedPageSize(output, heapsize / 64));
+         } else {
+             checkSmallTables(output, smallPageSize);
+             checkBitmap(output, smallPageSize);

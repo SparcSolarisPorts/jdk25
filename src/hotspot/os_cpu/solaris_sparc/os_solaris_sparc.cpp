@@ -238,7 +238,9 @@ frame os::fetch_compiled_frame_from_context(const void* ucVoid) {
   // Register window not yet rotated (happens at SAVE after stack bang), so there is no new
   // frame to go with the faulting PC. Using caller SP that is still in SP, and caller PC
   // that was written to O7 at call.
-  address pc = (address)uc->uc_mcontext.gregs[REG_O7];
+  // O7 contains the CALL instruction address, not the return PC used by
+  // frame walking and nmethod scope descriptions (CALL + delay slot).
+  address pc = (address)uc->uc_mcontext.gregs[REG_O7] + frame::pc_return_offset;
   return frame(fr.sp(), frame::unpatchable, pc);
 }
 
@@ -291,7 +293,12 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
     if (sig == SIGSEGV && info->si_code == SEGV_ACCERR) {
       address addr = (address) info->si_addr;
       if (thread->is_in_full_stack(addr)) {
-        // stack overflow
+        // A guard-page fault can leave windows buffered in the signal
+        // context. The reserved-stack search follows saved I6/I7 links;
+        // materialize these windows before constructing or walking frames.
+        if (uc->uc_mcontext.gwins != nullptr) {
+          handle_unflushed_register_windows(uc->uc_mcontext.gwins);
+        }
         if (os::Posix::handle_stack_overflow(thread, addr, pc, uc, &stub)) {
           return true; // continue
         }

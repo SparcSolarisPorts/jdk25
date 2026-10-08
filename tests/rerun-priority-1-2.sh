@@ -24,6 +24,7 @@ printf '%s\n' "${tests[@]}" > "$out/tests.txt"
 echo "Running ${#tests[@]} selected cases; log: $out/run.log"
 "$runner" -Xmx512m -jar "$jtreg_home/lib/jtreg.jar" \
   -jdk:"$jdk" -agentvm -conc:"${JDK25_TEST_JOBS:-16}" \
+  -javaoptions:"-XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=$out/hotspot_pid%p.xml" \
   -timeoutFactor:4 -retain:fail,error -verbose:summary \
   -nativepath:"$build/images/test/hotspot/jtreg/native" \
   -w:"$out/work" -r:"$out/report" \

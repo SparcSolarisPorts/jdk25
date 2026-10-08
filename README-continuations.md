@@ -1,4 +1,84 @@
-# JDK 25 Solaris/SPARC continuation candidate (v42)
+# JDK 25 Solaris/SPARC continuation candidate (v43)
+
+The user confirms Gradle works with v42. The latest native 25-case rerun
+has 13 passed, 10 failed, and 2 errors; v43 does not claim those failures
+have passed until the new image has been built and rerun on Solaris/SPARC.
+
+This cumulative ZIP includes candidate fixes for all six requested groups:
+
+* Unsafe memory access: native plain primitive operations check alignment
+  before dereferencing a wide pointer. Misaligned reads/writes use volatile
+  bytes within GuardUnsafeAccess. C1 and C2 plain primitive intrinsics keep
+  their normal aligned access and branch to a byte assembly/disassembly
+  path only for misaligned offsets. Float/double paths preserve bit patterns.
+  Reference barriers, volatile operations and atomic operations retain their
+  existing semantics; this change does not synthesize misaligned atomics.
+* C2 long range checks: eight new conditional-move rules consume flagsRegUL
+  using XCC, covering integer, long, narrow/reference and float/double results.
+  The existing unsigned-long comparison/branch rules remain in use. This
+  closes a matcher coverage gap; the two native long-range tests must still
+  confirm it resolves their failed compilation/deoptimization assertions.
+* Compiled reserved-stack handling (RSH): materialize buffered register
+  windows before the Solaris guard-fault stack walk. Normalize O7 to CALL+8
+  when constructing the caller frame at a compiled stack bang, consistent
+  with other SPARC frame return PCs and scope descriptions. Reserved-stack
+  protection and delayed StackOverflowError remain enabled.
+* Compressed klass placement: restore zero-based reservation attempts in
+  [4G,32G), independently of compressed oops. Avoid probing the brk heap's
+  low range, preserving native malloc headroom. OS-selected fallback remains
+  available when the preferred range cannot be reserved.
+* G1 auxiliary page sizes: retain Solaris's valid intermediate page sizes.
+  Log the usable page-size set and correct TestLargePageUseForAuxMemory to
+  require the largest fitting usable size, rather than assuming only 8K and
+  4M exist. Large-page allocation-failure handling and small-page checks stay
+  intact. This is a test portability correction, not a reduction of G1 pages.
+* Stack pretouch: enable the existing mincore residency scan on Solaris for
+  NMT thread-stack accounting, instead of reporting the entire mapping as
+  committed. Pretouch continues to touch stack pages. The scan distinguishes
+  untouched pages and resident ranges, using the same accounting approach
+  as Linux; residency can vary under memory pressure.
+
+Local validation: ADLC accepts the SPARC v43 description with _LP64/SPARC
+and generates all eight added rules. Extracted native Unsafe methods pass
+UBSan checks at every alignment for six primitive types. The extracted
+residency scan passes untouched-page, stripe-boundary, gap and unmapped-range
+checks on Linux with a Solaris-signature mincore adapter. UnsafeAlignmentSmoke
+passes interpreter, C1, mixed and C2 on host Java 17. These host checks do not
+compile or execute the modified SPARC VM. Native build and regression checks
+remain required, especially C1/C2 graph/code emission and reserved-stack walks.
+
+The two JNI/uncommon-trap shutdown timeouts are still unresolved. The 25-case
+rerun now saves LogCompilation XML, and the evidence collector includes it,
+so any remaining C2 compilation failures retain their bailout diagnostics.
+
+Extract this cumulative ZIP over ~/git/jdk25, then run a quiet build followed
+by the four-mode alignment probe and the full existing priority selection:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-unsafe-alignment-repro.sh
+  bash tests/run-small-stack-repro.sh
+  bash tests/run-compressed-oops-repro.sh
+  bash tests/rerun-priority-1-2.sh
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+The alignment probe has a 300-second watchdog per mode (override with
+JDK25_SMOKE_TIMEOUT). The jtreg runner retains TIMEOUT_FACTOR=4, 16 jobs,
+and failure/error output. Inspect its real test summary; make exit status
+alone was previously a no-op and is not evidence of a pass.
+
+For remaining failures, run the existing collector with the result directory
+printed by the priority runner. Include the new alignment results too.
+Oracle's Solaris mincore documentation describes the residency query:
+https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/prog-interfaces/using-mincore.html
+
+## Prior cumulative changes
+
+### v42
 
 v42 targets the Gradle 9.2.1 daemon crash in hs_err_pid22207.log from
 Texto pegado(20261008-033802).txt. The failing process is explicitly running

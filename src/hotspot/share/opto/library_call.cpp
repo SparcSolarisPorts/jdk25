@@ -2483,6 +2483,66 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
   if (stopped()) {
     return true;
   }
+#ifdef SPARC
+  if (kind == Relaxed &&
+      (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
+       type == T_FLOAT || type == T_DOUBLE)) {
+    const int width = type2aelembytes(type);
+    const bool wide = width == 8;
+    IdealKit ideal(this, false, true);
+    IdealVariable result(ideal);
+    ideal.declarations_done();
+    Node* misalignment = _gvn.transform(new AndXNode(offset, MakeConX(width - 1)));
+    ideal.if_then(misalignment, BoolTest::ne, MakeConX(0), PROB_UNLIKELY(0.99)); {
+      sync_kit(ideal);
+      Node* bits = is_store ? val : (wide ? longcon(0) : intcon(0));
+      if (is_store && type == T_FLOAT) bits = _gvn.transform(new MoveF2INode(bits));
+      if (is_store && type == T_DOUBLE) bits = _gvn.transform(new MoveD2LNode(bits));
+      for (int i = 0; i < width; ++i) {
+        Node* byte_adr = basic_plus_adr(heap_base_oop, adr, MakeConX(i));
+        const TypePtr* byte_type = _gvn.type(byte_adr)->is_ptr();
+        DecoratorSet byte_decorators = (decorators & ~C2_UNALIGNED) | C2_MISMATCHED;
+        if (is_store) {
+          Node* part = wide
+              ? _gvn.transform(new URShiftLNode(bits, intcon((width - 1 - i) * 8)))
+              : _gvn.transform(new URShiftINode(bits, intcon((width - 1 - i) * 8)));
+          if (wide) part = _gvn.transform(new ConvL2INode(part));
+          access_store_at(heap_base_oop, byte_adr, byte_type, part, TypeInt::BYTE, T_BYTE, byte_decorators);
+        } else {
+          Node* part = access_load_at(heap_base_oop, byte_adr, byte_type, TypeInt::BYTE, T_BYTE, byte_decorators);
+          part = _gvn.transform(new AndINode(part, intcon(255)));
+          if (wide) {
+            part = _gvn.transform(new ConvI2LNode(part));
+            bits = _gvn.transform(new OrLNode(_gvn.transform(new LShiftLNode(bits, intcon(8))), part));
+          } else {
+            bits = _gvn.transform(new OrINode(_gvn.transform(new LShiftINode(bits, intcon(8))), part));
+          }
+        }
+      }
+      if (!is_store) {
+        if (type == T_SHORT) bits = _gvn.transform(new RShiftINode(_gvn.transform(new LShiftINode(bits, intcon(16))), intcon(16)));
+        if (type == T_FLOAT) bits = _gvn.transform(new MoveI2FNode(bits));
+        if (type == T_DOUBLE) bits = _gvn.transform(new MoveL2DNode(bits));
+      }
+      ideal.sync_kit(this);
+      ideal.set(result, is_store ? intcon(0) : bits);
+    } ideal.else_(); {
+      sync_kit(ideal);
+      // This path retains the regular load/store and its normal aliasing.
+      if (is_store) {
+        access_store_at(heap_base_oop, adr, adr_type, val, value_type, type, decorators);
+      } else {
+        Node* value = access_load_at(heap_base_oop, adr, adr_type, value_type, type, decorators);
+        ideal.set(result, value);
+      }
+      ideal.sync_kit(this);
+      if (is_store) ideal.set(result, intcon(0));
+    } ideal.end_if();
+    final_sync(ideal);
+    if (!is_store) set_result(ideal.value(result));
+    return true;
+  }
+#endif
   // Heap pointers get a null-check from the interpreter,
   // as a courtesy.  However, this is not guaranteed by Unsafe,
   // and it is not possible to fully distinguish unintended nulls

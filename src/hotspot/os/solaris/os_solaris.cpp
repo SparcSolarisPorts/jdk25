@@ -1784,6 +1784,17 @@ void os::large_page_init() {
   if (UseLargePages) {
     UseLargePages = Solaris::mpss_sanity_check(&_large_page_size);
   }
+  // Include intermediate sizes: Solaris can choose 64K even when the
+  // largest page (normally 4M) does not fit an auxiliary allocation.
+  if (log_is_enabled(Info, pagesize)) {
+    LogStream st(Log(pagesize)::info());
+    st.print("Usable page sizes (bytes):");
+    for (size_t page = _page_sizes.smallest(); page != 0;
+         page = _page_sizes.next_larger(page)) {
+      st.print(" " SIZE_FORMAT, page);
+    }
+    st.cr();
+  }
 }
 
 bool os::Solaris::is_valid_page_size(size_t bytes) {

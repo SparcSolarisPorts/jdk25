@@ -1,0 +1,26 @@
+test,native_v42_result,v43_status
+applications/ctw/modules/java_base_2.java,Passed. Execution successful,Native v42 PASS; regression retained
+applications/ctw/modules/jdk_javadoc.java,Passed. Execution successful,Native v42 PASS; regression retained
+compiler/c1/TestLargeMonitorOffset.java,Passed. Execution successful,Native v42 PASS; regression retained
+compiler/c2/TestCastX2P.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Candidate fix; native v43 rerun required
+compiler/c2/TestMergeStoresUnsafeArrayPointer.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Candidate fix; native v43 rerun required
+compiler/c2/irTests/TestLongRangeChecks.java,Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.,Candidate fix; native v43 rerun required
+compiler/codecache/stress/UnexpectedDeoptimizationAllTest.java,Passed. Execution successful,Native v42 PASS; regression retained
+compiler/rangechecks/TestLongRangeCheck.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: should still be compiled,Candidate fix; native v43 rerun required
+compiler/runtime/TestConstantDynamic.java,Passed. Execution successful,Native v42 PASS; regression retained
+compiler/uncommontrap/TestStackBangMonitorOwned.java,Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 490781 ms),Timeout remains unresolved; compiler logs added
+compiler/unsafe/AlignmentGapAccess.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Candidate fix; native v43 rerun required
+compiler/unsafe/MismatchedUnsafeAccessTest.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Candidate fix; native v43 rerun required
+gc/TestAllocateHeapAtMultiple.java,Passed. Execution successful,Native v42 PASS; regression retained
+gc/g1/TestLargePageUseForAuxMemory.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Match from 'Block Offset Table: .* page_size=(\d+[BKMG])' got 65536 expected: 8192,Candidate fix; native v43 rerun required
+runtime/ClassInitErrors/TestStackOverflowDuringInit.java,Passed. Execution successful,Native v42 PASS; regression retained
+runtime/CompressedOops/CompressedClassPointers.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'Narrow klass base: 0x0000000000000000' missing from stdout/stderr,Candidate fix; native v43 rerun required
+runtime/Monitor/StressWrapper_TestRecursiveLocking_36M.java\#C2_alternate_AB,Passed. Execution successful,Native v42 PASS; regression retained
+runtime/Monitor/StressWrapper_TestRecursiveLocking_36M.java\#C2_outer_inner,Passed. Execution successful,Native v42 PASS; regression retained
+runtime/Monitor/TestRecursiveLocking.java\#C2_alternate_AB,Passed. Execution successful,Native v42 PASS; regression retained
+runtime/Monitor/TestRecursiveLocking.java\#C2_outer_inner,Passed. Execution successful,Native v42 PASS; regression retained
+runtime/ReservedStack/ReservedStackTest.java,Passed. Execution successful,Native v42 PASS; regression retained
+runtime/ReservedStack/ReservedStackTestCompiler.java,Failed. Execution failed: `main' threw exception: java.lang.StackOverflowError: Delayed StackOverflowError due to ReservedStackAccess annotated method,Candidate fix; native v43 rerun required
+runtime/Thread/TestAlwaysPreTouchStacks.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected a higher amount of committed with pretouch stacksPreTouch amount: 147849216NoPreTouch amount: 231735296,Candidate fix; native v43 rerun required
+runtime/jni/getCreatedJavaVMs/TestGetCreatedJavaVMs.java,"Error. ""driver"" action timed out with a timeout of 480 seconds on agent 30",Timeout remains unresolved; compiler logs added
+runtime/jni/nativeStack/TestNativeStack.java,Passed. Execution successful,Native v42 PASS; regression retained

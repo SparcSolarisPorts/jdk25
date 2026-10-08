@@ -13,7 +13,7 @@ while IFS= read -r -d '' file; do
   rel=${file#"$results/"}
   mkdir -p "$stage/results/$(dirname "$rel")"
   cp "$file" "$stage/results/$rel"
-done < <(find "$results" -type f \( -name '*.jtr' -o -name '*.log' -o -name 'summary.txt' -o -name 'tests.txt' \) -print0)
+done < <(find "$results" -type f \( -name '*.jtr' -o -name '*.log' -o -name '*.xml' -o -name 'summary.txt' -o -name 'tests.txt' \) -print0)
 while IFS= read -r test; do
   test=${test%$'\r'}
   test=${test#jtreg:}
@@ -27,7 +27,7 @@ while IFS= read -r test; do
     cp "$file" "$stage/source/$(dirname "$test")/"
   done
 done < "$root/jdk25-priority-1-2-remaining.txt"
-for rel in src/hotspot/cpu/sparc/frame_sparc.cpp src/hotspot/cpu/sparc/frame_sparc.hpp src/hotspot/cpu/sparc/frame_sparc.inline.hpp src/hotspot/share/runtime/continuation.cpp src/hotspot/cpu/sparc/macroAssembler_sparc.cpp src/hotspot/cpu/sparc/interp_masm_sparc.cpp src/hotspot/os/solaris/os_solaris.cpp src/hotspot/share/jfr/jni/jfrJavaSupport.cpp src/hotspot/share/jfr/dcmd/jfrDcmds.cpp; do
+for rel in src/hotspot/cpu/sparc/frame_sparc.cpp src/hotspot/cpu/sparc/frame_sparc.hpp src/hotspot/cpu/sparc/frame_sparc.inline.hpp src/hotspot/share/runtime/continuation.cpp src/hotspot/cpu/sparc/macroAssembler_sparc.cpp src/hotspot/cpu/sparc/interp_masm_sparc.cpp src/hotspot/os/solaris/os_solaris.cpp src/hotspot/share/jfr/jni/jfrJavaSupport.cpp src/hotspot/share/jfr/dcmd/jfrDcmds.cpp src/hotspot/share/prims/unsafe.cpp src/hotspot/share/c1/c1_LIRGenerator.cpp src/hotspot/share/opto/library_call.cpp src/hotspot/os/posix/os_posix.cpp src/hotspot/os_cpu/solaris_sparc/os_solaris_sparc.cpp src/hotspot/cpu/sparc/compressedKlass_sparc.cpp src/hotspot/cpu/sparc/sparc.ad; do
   [[ -f "$root/$rel" ]] || continue
   mkdir -p "$stage/source/$(dirname "$rel")"
   cp "$root/$rel" "$stage/source/$rel"

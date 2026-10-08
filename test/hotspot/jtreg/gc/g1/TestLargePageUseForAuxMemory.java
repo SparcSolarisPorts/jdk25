@@ -117,17 +117,33 @@ public class TestLargePageUseForAuxMemory {
                        "-version");
     }
 
-    static void testVM(String what, long heapsize, boolean cardsShouldUseLargePages, boolean bitmapShouldUseLargePages) throws Exception {
-        System.out.println(what + " heapsize " + heapsize + " card table should use large pages " + cardsShouldUseLargePages + " " +
-                           "bitmaps should use large pages " + bitmapShouldUseLargePages);
+    // Choose the largest usable page that fits the allocation, including
+    // intermediate sizes on platforms supporting more than two page sizes.
+    static long expectedPageSize(OutputAnalyzer output, long allocationSize) {
+        String sizes = output.firstMatch("Usable page sizes \\(bytes\\): ([0-9 ]+)", 1);
+        if (sizes == null) {
+            // Platforms exposing only the conventional small/large pair.
+            return allocationSize >= largePageSize ? largePageSize : smallPageSize;
+        }
+        long expected = smallPageSize;
+        for (String value : sizes.trim().split(" +")) {
+            long page = Long.parseLong(value);
+            if (page <= allocationSize) expected = Math.max(expected, page);
+        }
+        return expected;
+    }
+
+    static void testVM(String what, long heapsize, boolean cardsFitLargestPage, boolean bitmapFitsLargestPage) throws Exception {
+        System.out.println(what + " heapsize " + heapsize + " card table fits largest page " + cardsFitLargestPage + " " +
+                           "bitmap fits largest page " + bitmapFitsLargestPage);
 
         // Test with large page enabled.
         OutputAnalyzer output = ProcessTools.executeLimitedTestJava(getOpts(heapsize, true));
 
         // Only expect large page size if large pages are enabled.
         if (largePagesEnabled(output)) {
-            checkSmallTables(output, (cardsShouldUseLargePages ? largePageSize : smallPageSize));
-            checkBitmap(output, (bitmapShouldUseLargePages ? largePageSize : smallPageSize));
+            checkSmallTables(output, expectedPageSize(output, heapsize / 512));
+            checkBitmap(output, expectedPageSize(output, heapsize / 64));
         } else {
             checkSmallTables(output, smallPageSize);
             checkBitmap(output, smallPageSize);

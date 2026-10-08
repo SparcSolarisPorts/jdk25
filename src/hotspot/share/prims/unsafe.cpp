@@ -239,6 +239,16 @@ public:
 
   T get() {
     GuardUnsafeAccess guard(_thread);
+#ifdef SPARC
+    volatile T* p = addr();
+    if (!is_aligned((uintptr_t)p, sizeof(T))) {
+      T value;
+      u1* bytes = reinterpret_cast<u1*>(&value);
+      volatile u1* source = reinterpret_cast<volatile u1*>(p);
+      for (size_t i = 0; i < sizeof(T); ++i) bytes[i] = source[i];
+      return normalize_for_read(value);
+    }
+#endif
     return normalize_for_read(*addr());
   }
 
@@ -247,6 +257,16 @@ public:
   ATTRIBUTE_NO_UBSAN
   void put(T x) {
     GuardUnsafeAccess guard(_thread);
+#ifdef SPARC
+    volatile T* p = addr();
+    if (!is_aligned((uintptr_t)p, sizeof(T))) {
+      T value = normalize_for_write(x);
+      const u1* bytes = reinterpret_cast<const u1*>(&value);
+      volatile u1* destination = reinterpret_cast<volatile u1*>(p);
+      for (size_t i = 0; i < sizeof(T); ++i) destination[i] = bytes[i];
+      return;
+    }
+#endif
     *addr() = normalize_for_write(x);
   }
 

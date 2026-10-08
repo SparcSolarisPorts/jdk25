@@ -2053,6 +2053,52 @@ void LIRGenerator::do_UnsafeGet(UnsafeGet* x) {
   }
 
   LIR_Opr result = rlock_result(x, type);
+#ifdef SPARC
+  // Plain primitive Unsafe offsets need not be naturally aligned. Keep the
+  // ordinary load on the aligned path; assemble bytes only on the slow path.
+  if (!x->is_raw() && !x->is_volatile() &&
+      (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
+       type == T_FLOAT || type == T_DOUBLE)) {
+    const int width = type2aelembytes(type);
+    const BasicType bits_type = width == 8 ? T_LONG : T_INT;
+    LabelObj* slow = new LabelObj();
+    LabelObj* done = new LabelObj();
+    LIR_Opr alignment = new_register(T_LONG);
+    __ logical_and(off.result(), LIR_OprFact::longConst(width - 1), alignment);
+    __ cmp(lir_cond_notEqual, alignment, LIR_OprFact::longConst(0));
+    __ branch(lir_cond_notEqual, slow->label());
+    access_load_at(decorators, type, src, off.result(), result);
+    __ branch(lir_cond_always, done->label());
+    __ branch_destination(slow->label());
+    LIR_Opr bits = new_register(bits_type);
+    __ move(width == 8 ? LIR_OprFact::longConst(0) : LIR_OprFact::intConst(0), bits);
+    for (int i = 0; i < width; ++i) {
+      LIR_Opr byte_offset = new_register(T_LONG);
+      __ add(off.result(), LIR_OprFact::longConst(i), byte_offset);
+      LIR_Opr byte_value = new_register(T_INT);
+      access_load_at(decorators, T_BYTE, src, byte_offset, byte_value);
+      __ logical_and(byte_value, LIR_OprFact::intConst(255), byte_value);
+      LIR_Opr part = byte_value;
+      if (width == 8) {
+        part = new_register(T_LONG);
+        __ convert(Bytecodes::_i2l, byte_value, part);
+      }
+      __ shift_left(bits, 8, bits);
+      __ logical_or(bits, part, bits);
+    }
+    if (type == T_SHORT) {
+      __ shift_left(bits, 16, bits);
+      __ shift_right(bits, LIR_OprFact::intConst(16), bits, LIR_OprFact::illegalOpr);
+    }
+    if (is_floating_point_type(type)) {
+      __ move(force_to_spill(bits, type), result);
+    } else {
+      __ move(bits, result);
+    }
+    __ branch_destination(done->label());
+    return;
+  }
+#endif
   if (!x->is_raw()) {
     access_load_at(decorators, type, src, off.result(), result);
   } else {
@@ -2097,6 +2143,42 @@ void LIRGenerator::do_UnsafePut(UnsafePut* x) {
   if (x->is_volatile()) {
     decorators |= MO_SEQ_CST;
   }
+#ifdef SPARC
+  if (!x->is_volatile() &&
+      (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
+       type == T_FLOAT || type == T_DOUBLE)) {
+    const int width = type2aelembytes(type);
+    const BasicType bits_type = width == 8 ? T_LONG : T_INT;
+    LabelObj* slow = new LabelObj();
+    LabelObj* done = new LabelObj();
+    LIR_Opr alignment = new_register(T_LONG);
+    __ logical_and(off.result(), LIR_OprFact::longConst(width - 1), alignment);
+    __ cmp(lir_cond_notEqual, alignment, LIR_OprFact::longConst(0));
+    __ branch(lir_cond_notEqual, slow->label());
+    access_store_at(decorators, type, src, off.result(), data.result());
+    __ branch(lir_cond_always, done->label());
+    __ branch_destination(slow->label());
+    LIR_Opr bits = data.result();
+    if (is_floating_point_type(type)) {
+      bits = new_register(bits_type);
+      __ move(force_to_spill(data.result(), bits_type), bits);
+    }
+    for (int i = 0; i < width; ++i) {
+      LIR_Opr part = new_register(bits_type);
+      __ unsigned_shift_right(bits, LIR_OprFact::intConst((width - 1 - i) * 8), part, LIR_OprFact::illegalOpr);
+      LIR_Opr byte_value = part;
+      if (width == 8) {
+        byte_value = new_register(T_INT);
+        __ convert(Bytecodes::_l2i, part, byte_value);
+      }
+      LIR_Opr byte_offset = new_register(T_LONG);
+      __ add(off.result(), LIR_OprFact::longConst(i), byte_offset);
+      access_store_at(decorators, T_BYTE, src, byte_offset, byte_value);
+    }
+    __ branch_destination(done->label());
+    return;
+  }
+#endif
   access_store_at(decorators, type, src, off.result(), data.result());
 }
 

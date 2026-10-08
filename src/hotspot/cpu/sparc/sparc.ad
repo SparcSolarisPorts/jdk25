@@ -6525,6 +6525,86 @@ instruct cmovLF_reg(cmpOpF cmp, flagsRegF fcc, iRegL dst, iRegL src) %{
 %}
 
 
+// Conditional moves consuming unsigned 64-bit comparisons use XCC.
+instruct cmovIIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegI dst, iRegI src) %{
+  match(Set dst (CMoveI (Binary cmp xcc) (Binary dst src)));
+  ins_cost(150);
+  size(4);
+  format %{ "MOV$cmp  $xcc,$src,$dst" %}
+  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(ialu_reg);
+%}
+
+instruct cmovIIu_imm_ul(cmpOpU cmp, flagsRegUL xcc, iRegI dst, immI11 src) %{
+  match(Set dst (CMoveI (Binary cmp xcc) (Binary dst src)));
+  ins_cost(140);
+  size(4);
+  format %{ "MOV$cmp  $xcc,$src,$dst" %}
+  ins_encode( enc_cmov_imm(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(ialu_imm);
+%}
+
+instruct cmovNIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegN dst, iRegN src) %{
+  match(Set dst (CMoveN (Binary cmp xcc) (Binary dst src)));
+  ins_cost(150);
+  size(4);
+  format %{ "MOV$cmp  $xcc,$src,$dst" %}
+  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(ialu_reg);
+%}
+
+instruct cmovPIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegP dst, iRegP src) %{
+  match(Set dst (CMoveP (Binary cmp xcc) (Binary dst src)));
+  ins_cost(150);
+
+  size(4);
+  format %{ "MOV$cmp  $xcc,$src,$dst\t! ptr" %}
+  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(ialu_reg);
+%}
+
+instruct cmovPIu_imm_ul(cmpOpU cmp, flagsRegUL xcc, iRegP dst, immP0 src) %{
+  match(Set dst (CMoveP (Binary cmp xcc) (Binary dst src)));
+  ins_cost(140);
+
+  size(4);
+  format %{ "MOV$cmp  $xcc,$src,$dst\t! ptr" %}
+  ins_encode( enc_cmov_imm(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(ialu_imm);
+%}
+
+instruct cmovFIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, regF dst, regF src) %{
+  match(Set dst (CMoveF (Binary cmp xcc) (Binary dst src)));
+  ins_cost(150);
+
+  size(4);
+  format %{ "FMOVS$cmp $xcc,$src,$dst" %}
+  opcode(0x101);
+  ins_encode( enc_cmovf_reg(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(int_conditional_float_move);
+%}
+
+instruct cmovDIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, regD dst, regD src) %{
+  match(Set dst (CMoveD (Binary cmp xcc) (Binary dst src)));
+  ins_cost(150);
+
+  size(4);
+  format %{ "FMOVD$cmp $xcc,$src,$dst" %}
+  opcode(0x102);
+  ins_encode( enc_cmovf_reg(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(int_conditional_double_move);
+%}
+
+instruct cmovLIu_reg_ul(cmpOpU cmp, flagsRegUL xcc, iRegL dst, iRegL src) %{
+  match(Set dst (CMoveL (Binary cmp xcc) (Binary dst src)));
+  ins_cost(150);
+
+  size(4);
+  format %{ "MOV$cmp  $xcc,$src,$dst\t! long" %}
+  ins_encode( enc_cmov_reg(cmp,dst,src, (Assembler::xcc)) );
+  ins_pipe(ialu_reg);
+%}
+
 //----------OS and Locking Instructions----------------------------------------
 
 // This name is KNOWN by the ADLC and cannot be changed.
