@@ -1251,7 +1251,35 @@
      return second_word + (address)&_window[reg->sp_offset_in_saved_window()];
    }
    // Only the window'd GPRs get handled this way; not the globals.
-@@ -323,18 +325,18 @@
+@@ -229,6 +231,17 @@
+     address   sender_pc = (address)younger_sp[I7->sp_offset_in_saved_window()] + pc_return_offset;
+ 
+ 
++    const bool return_barrier = Continuation::is_return_barrier_entry(sender_pc);
++    frame continuation_sender;
++    if (return_barrier) {
++      if (!Continuation::is_frame_in_continuation(thread, *this)) {
++        return false;
++      }
++      continuation_sender = Continuation::continuation_bottom_sender(thread, *this, _SENDER_SP);
++      _SENDER_SP = continuation_sender.sp();
++      sender_pc = continuation_sender.pc();
++    }
++
+     // We must always be able to find a recognizable pc
+     CodeBlob* sender_blob = CodeCache::find_blob(sender_pc);
+     if (sender_pc == nullptr ||  sender_blob == nullptr) {
+@@ -243,7 +256,8 @@
+ 
+     // It should be safe to construct the sender though it might not be valid
+ 
+-    frame sender(_SENDER_SP, younger_sp, adjusted_stack);
++    frame sender = return_barrier ? continuation_sender
++                                 : frame(_SENDER_SP, younger_sp, adjusted_stack);
+ 
+     // Do we have a valid fp?
+     address sender_fp = (address) sender.fp();
+@@ -323,18 +337,18 @@
  void frame::init(intptr_t* sp, address pc, CodeBlob* cb) {
    assert( (((intptr_t)sp & (wordSize-1)) == 0), "frame constructor passed an invalid sp");
    _sp = sp;
@@ -1274,7 +1302,7 @@
      _cb = CodeCache::find_blob(_pc);
    }
    _deopt_state = unknown;
-@@ -351,13 +353,13 @@
+@@ -351,13 +365,13 @@
    _sp_adjustment_by_callee(0) {
    _on_heap = false;
    DEBUG_ONLY(_frame_index = -1;)
@@ -1292,7 +1320,7 @@
    } else {
      _pc = (address)younger_sp[I7->sp_offset_in_saved_window()] + pc_return_offset;
      assert( (intptr_t*)younger_sp[FP->sp_offset_in_saved_window()] == (intptr_t*)((intptr_t)sp - STACK_BIAS), "younger_sp must be valid");
-@@ -368,7 +370,7 @@
+@@ -368,7 +382,7 @@
      // So do not put add any asserts on the _pc here.
    }
  
@@ -1301,7 +1329,7 @@
      _cb = CodeCache::find_blob(_pc);
  
    // Check for MethodHandle call sites.
-@@ -394,9 +396,9 @@
+@@ -394,9 +408,9 @@
    // It is important that the frame is fully constructed when we do
    // this lookup as get_deopt_original_pc() needs a correct value for
    // unextended_sp() which uses _sp_adjustment_by_callee.
@@ -1313,7 +1341,7 @@
        _pc = original_pc;
        _deopt_state = is_deoptimized;
      } else {
-@@ -408,7 +410,7 @@
+@@ -408,7 +422,7 @@
  #ifndef PRODUCT
  // This is a generic constructor which is only used by pns() in debug.cpp.
  frame::frame(void* sp, void* fp, void* pc) {
@@ -1322,7 +1350,7 @@
  }
  
  extern "C" void findpc(intptr_t x);
-@@ -445,7 +447,6 @@
+@@ -445,7 +459,6 @@
    sp()[I5_savedSP->sp_offset_in_saved_window()] = is_heap_frame()
        ? (intptr_t)(sender_sp - fp())
        : (intptr_t)sender_sp - STACK_BIAS;
@@ -1330,7 +1358,7 @@
  }
  
  JavaThread** frame::saved_thread_address(const frame& f) {
-@@ -459,7 +460,7 @@
+@@ -459,7 +472,7 @@
  }
  
  frame frame::sender_for_entry_frame(RegisterMap *map) const {
@@ -1339,7 +1367,7 @@
    // Java frame called from C; skip all C frames and return top C
    // frame of that chunk as the sender
    JavaFrameAnchor* jfa = entry_frame_call_wrapper()->anchor();
-@@ -472,10 +473,10 @@
+@@ -472,10 +485,10 @@
      // Capture _last_Java_pc (if needed) and mark anchor walkable.
      jfa->capture_last_Java_pc(_sp);
    }
@@ -1352,7 +1380,7 @@
    assert(map->include_argument_oops(), "should be set by clear");
    return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
  }
-@@ -496,7 +497,7 @@
+@@ -496,7 +509,7 @@
  }
  
  frame frame::sender_for_upcall_stub_frame(RegisterMap* map) const {
@@ -1361,7 +1389,7 @@
    assert(is_upcall_stub_frame(), "must be upcall stub frame");
    UpcallStub* blob = _cb->as_upcall_stub();
    JavaFrameAnchor* jfa = blob->jfa_for_frame(*this);
-@@ -507,11 +508,11 @@
+@@ -507,11 +520,11 @@
      // SPARC needs the register-window state materialized before stack walking.
      jfa->capture_last_Java_pc(_sp);
    }
@@ -1375,7 +1403,7 @@
    return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
  }
  
-@@ -555,11 +556,11 @@
+@@ -555,11 +568,11 @@
  
  /*
    Find the (biased) sp that is just younger than old_sp starting at sp.
@@ -1389,7 +1417,7 @@
    intptr_t* orig_sp = sp;
  
    int max_frames = (old_sp - sp) / 16; // Minimum frame size is 16
-@@ -573,7 +574,7 @@
+@@ -573,7 +586,7 @@
      sp = (intptr_t*)((intptr_t)sp + STACK_BIAS);
    }
  
@@ -1398,7 +1426,7 @@
  }
  
  /*
-@@ -583,7 +584,7 @@
+@@ -583,7 +596,7 @@
    thread stack in question are flushed.
  */
  bool frame::is_valid_stack_pointer(intptr_t* valid_sp, intptr_t* sp) {
@@ -1407,7 +1435,7 @@
  }
  
  bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
-@@ -648,12 +649,31 @@
+@@ -648,12 +661,31 @@
  // in the bad old _post_Java_state days.
  //
  void JavaFrameAnchor::capture_last_Java_pc(intptr_t* sp) {
@@ -1441,7 +1469,7 @@
      _last_Java_pc = (address) _post_Java_sp[ I7->sp_offset_in_saved_window()] + frame::pc_return_offset;
  
    }
-@@ -668,7 +688,7 @@
+@@ -668,7 +700,7 @@
    // We always flush in case the profiler wants it but we won't mark
    // the windows as flushed unless we have a last_Java_frame
    intptr_t* sp = StubRoutines::Sparc::flush_callers_register_windows_func()();
@@ -1461,7 +1489,16 @@
  
      // Fixed save-window slots used by continuation frame metadata.
      interpreter_frame_last_sp_offset             = 13,
-@@ -164,11 +164,12 @@
+@@ -157,6 +157,8 @@
+   // saved register-window link can be represented as a relative offset.
+ 
+  public:
++  inline frame sender_raw(RegisterMap* map) const;
++
+   // Accessors
+ 
+   // get_oop_map() is declared in shared frame.hpp and defined in
+@@ -164,11 +166,12 @@
    // matches this port: sparc does not emit post-call nops).
    intptr_t* younger_sp() const {
      assert_absolute();
@@ -1475,7 +1512,7 @@
    int offset_younger_sp() const { assert_offset(); return _offset_younger_sp; }
    void set_offset_younger_sp(int value) { assert_on_heap(); _offset_younger_sp = value; }
  
-@@ -190,7 +191,7 @@
+@@ -190,7 +193,7 @@
  
    // make a deficient frame which doesn't know where its PC is:
    enum unpatchable_t { unpatchable };
@@ -1486,15 +1523,18 @@
  
 --- a/src/hotspot/cpu/sparc/frame_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/frame_sparc.inline.hpp
-@@ -28,6 +28,7 @@
+@@ -28,6 +28,10 @@
  #include "asm/macroAssembler.hpp"
  #include "code/vmreg.inline.hpp"
  #include "code/codeCache.hpp"
 +#include "runtime/os.hpp"
++#include "runtime/continuation.hpp"
++#include "oops/stackChunkOop.inline.hpp"
++#include "runtime/stackWatermarkSet.hpp"
  #include "utilities/align.hpp"
  
  // Inline functions for SPARC frames:
-@@ -35,11 +36,11 @@
+@@ -35,11 +39,11 @@
  // Constructors
  
  inline frame::frame() {
@@ -1511,7 +1551,7 @@
      _cb = nullptr;
    _oop_map = nullptr;
    _deopt_state = unknown;
-@@ -181,9 +182,22 @@
+@@ -181,9 +185,22 @@
    return (intptr_t*)(raw + STACK_BIAS);
  }
  
@@ -1536,7 +1576,7 @@
  }
  
  inline intptr_t* frame::unextended_sp() const { assert_absolute(); return _unextended_sp; }
-@@ -194,7 +208,9 @@
+@@ -194,7 +211,9 @@
  // return address:
  
  inline address frame::sender_pc() const {
@@ -1547,6 +1587,62 @@
  }
  
  inline address* frame::I7_addr() const  { return (address*) &sp()[ I7->sp_offset_in_saved_window()]; }
+@@ -327,18 +346,23 @@
+ // JDK 21 declares frame::sender() inline in share/runtime/frame.hpp (Oracle
+ // de-SPARAC'd the declaration in JDK 21; in JDK 20 it was a plain out-of-line
+ // member defined in frame_sparc.cpp). The body is Oracle's JDK 20 SPARC
+-// implementation, moved here unchanged: SPARC needs no interpreted/compiled
++// implementation, extended for continuation chunks and return barriers.
++// SPARC needs no interpreted/compiled
+ // distinction in the sender path because all callee-save registers are
+ // preserved via the register-window save area, which RegisterMap::shift_window
+ // accounts for.
+ 
+-inline frame frame::sender(RegisterMap* map) const {
++inline frame frame::sender_raw(RegisterMap* map) const {
+   assert(map != nullptr, "map must be set");
+-
+-  assert(CodeCache::find_blob(_pc) == _cb, "inconsistent");
+ 
+   // Default is not to follow arguments; update it accordingly below
+   map->set_include_argument_oops(false);
++
++  if (map->in_cont()) {
++    return map->stack_chunk()->sender(*this, map);
++  }
++
++  assert(CodeCache::find_blob(_pc) == _cb, "inconsistent");
+ 
+   if (is_entry_frame())       return sender_for_entry_frame(map);
+   if (is_upcall_stub_frame()) return sender_for_upcall_stub_frame(map);
+@@ -383,7 +407,27 @@
+       }
+     }
+   }
++  // A partial thaw installs a return barrier in the bottom Java frame.
++  // It is a synthetic return PC, not a frame whose saved window can be
++  // traversed. Follow the chunk or recover the real continuation entry.
++  if (Continuation::is_return_barrier_entry(sender_pc())) {
++    if (map->walk_cont()) {
++      return Continuation::top_frame(*this, map);
++    }
++    frame entry = Continuation::continuation_bottom_sender(map->thread(), *this, sp);
++    entry.set_younger_sp(younger_sp);
++    map->shift_window(entry.sp(), younger_sp);
++    return entry;
++  }
+   return frame(sp, younger_sp, frame_is_interpreted);
++}
++
++inline frame frame::sender(RegisterMap* map) const {
++  frame result = sender_raw(map);
++  if (map->process_frames() && !map->in_cont()) {
++    StackWatermarkSet::on_iteration(map->thread(), result);
++  }
++  return result;
+ }
+ 
+ // SPARC routes interpreted and compiled frames through the unified sender
 --- a/src/hotspot/cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/gc/g1/g1BarrierSetAssembler_sparc.cpp
 @@ -102,11 +102,11 @@
@@ -1729,7 +1825,18 @@
    btst(JVM_ACC_SYNCHRONIZED, G3_scratch);
    br(zero, false, pt, unlocked);
    delayed()->nop();
-@@ -1171,6 +1171,16 @@
+@@ -1138,7 +1138,9 @@
+     // testing if Stack Reserved Area needs to be re-enabled
+     Label no_reserved_zone_enabling;
+     ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G3_scratch);
+-    cmp_and_brx_short(SP, G3_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
++    // Match the unbiased address recorded by the shared stack-overflow handler.
++    add(SP, STACK_BIAS, G4_scratch);
++    cmp_and_brx_short(G4_scratch, G3_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
+ 
+     call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
+     call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::throw_delayed_StackOverflowError), G2_thread);
+@@ -1171,6 +1173,16 @@
  // Argument - lock_reg points to the BasicObjectLock to be used for locking,
  //            it must be initialized with the object to lock
  void InterpreterMacroAssembler::lock_object(Register lock_reg, Register Object) {
@@ -1746,7 +1853,7 @@
    if (LockingMode == LM_MONITOR) {
      call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter), lock_reg);
    }
-@@ -1241,6 +1251,18 @@
+@@ -1241,6 +1253,18 @@
  // Argument - lock_reg points to the BasicObjectLock for lock
  // Throw IllegalMonitorException if object is not locked by current thread
  void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
@@ -2145,7 +2252,18 @@
     cas_ptr(Rmark, G0, Rscratch);
     cmp(Rscratch, G0);
     // invert icc.zf and goto done
-@@ -2958,14 +3088,25 @@
+@@ -2926,7 +3056,9 @@
+   Label no_reserved_zone_enabling;
+ 
+   ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G4_scratch);
+-  cmp_and_brx_short(SP, G4_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
++  // The activation is an unbiased C++ stack address; architectural SP is biased.
++  add(SP, STACK_BIAS, G3_scratch);
++  cmp_and_brx_short(G3_scratch, G4_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
+ 
+   call_VM_leaf(L0, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
+ 
+@@ -2958,14 +3090,25 @@
    // MachCallDynamicJavaNode::ret_addr_offset()
    // if this changes, change that.
    if (UseCompressedClassPointers) {
@@ -2172,7 +2290,7 @@
    if (UseCompressedClassPointers) {
      assert(dst_oop != klass, "not enough registers");
      encode_klass_not_null(klass);
-@@ -2976,7 +3117,7 @@
+@@ -2976,7 +3119,7 @@
  }
  
  void MacroAssembler::store_klass_gap(Register s, Register d) {
@@ -2181,7 +2299,7 @@
      assert(s != d, "not enough registers");
      st(s, d, oopDesc::klass_gap_offset_in_bytes());
    }
-@@ -3045,13 +3186,16 @@
+@@ -3045,13 +3188,16 @@
  }
  
  
@@ -2202,7 +2320,7 @@
      return;
    }
    Label done;
-@@ -3060,14 +3204,14 @@
+@@ -3060,14 +3206,14 @@
      bpr(rc_nz, true, Assembler::pt, src, done);
      delayed() -> sub(src, G6_heapbase, dst); // annulled if not taken
      bind(done);
@@ -2219,7 +2337,7 @@
      bind(done);
    }
  }
-@@ -3075,33 +3219,36 @@
+@@ -3075,33 +3221,36 @@
  
  void MacroAssembler::encode_heap_oop_not_null(Register r) {
    assert (UseCompressedOops, "must be compressed");
@@ -2268,7 +2386,7 @@
    if (CompressedOops::base() != nullptr) {
      Label done;
      bpr(rc_nz, true, Assembler::pt, dst, done);
-@@ -3116,10 +3263,11 @@
+@@ -3116,10 +3265,11 @@
    // pd_code_size_limit.
    // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
@@ -2284,7 +2402,7 @@
      add(r, G6_heapbase, r);
  }
  
-@@ -3128,15 +3276,16 @@
+@@ -3128,15 +3278,16 @@
    // pd_code_size_limit.
    // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
@@ -2305,7 +2423,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      sub(r, G6_heapbase, r);
-@@ -3154,7 +3303,7 @@
+@@ -3154,7 +3305,7 @@
      encode_klass_not_null(src);
    } else {
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2314,7 +2432,7 @@
        set((intptr_t)CompressedKlassPointers::base(), dst);
        sub(src, dst, dst);
        if (CompressedKlassPointers::shift() != 0) {
-@@ -3173,7 +3322,7 @@
+@@ -3173,7 +3324,7 @@
  int MacroAssembler::instr_size_for_decode_klass_not_null() {
    assert (UseCompressedClassPointers, "only for compressed klass ptrs");
    int num_instrs = 1;  // shift src,dst or add
@@ -2323,7 +2441,7 @@
      // set + add + set
      num_instrs += insts_for_internal_set((intptr_t)CompressedKlassPointers::base()) +
                    insts_for_internal_set((intptr_t)CompressedOops::base());
-@@ -3190,7 +3339,7 @@
+@@ -3190,7 +3341,7 @@
    // Do not add assert code to this unless you change vtableStubs_sparc.cpp
    // pd_code_size_limit.
    assert (UseCompressedClassPointers, "must be compressed");
@@ -2332,7 +2450,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      if (CompressedKlassPointers::shift() != 0)
-@@ -3209,7 +3358,7 @@
+@@ -3209,7 +3360,7 @@
      // Do not add assert code to this unless you change vtableStubs_sparc.cpp
      // pd_code_size_limit.
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2341,7 +2459,7 @@
        if (CompressedKlassPointers::shift() != 0) {
          assert((src != G6_heapbase) && (dst != G6_heapbase), "bad register choice");
          set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
-@@ -3253,7 +3402,7 @@
+@@ -3253,7 +3404,7 @@
  
  void MacroAssembler::reinit_heapbase() {
    if (UseCompressedOops || UseCompressedClassPointers) {
@@ -4306,6 +4424,19 @@
    if (LockingMode == LM_MONITOR) {
      jio_fprintf(defaultStream::error_stream(),
                  "LockingMode == 0 (LM_MONITOR) is not fully implemented on this architecture\n");
+--- a/src/hotspot/share/runtime/continuation.cpp
++++ b/src/hotspot/share/runtime/continuation.cpp
+@@ -342,6 +342,10 @@
+ 
+ #if (defined(X86) || defined(AARCH64) || defined(RISCV64) || defined(PPC64)) && !defined(ZERO)
+   frame sender(cont.entrySP(), cont.entryFP(), cont.entryPC());
++#elif defined(SPARC) && !defined(ZERO)
++  // SPARC's three-void-pointer constructor is debug-only. Keep both the
++  // physical and unextended SP and the cached register-window FP explicit.
++  frame sender(cont.entrySP(), cont.entrySP(), cont.entryFP(), cont.entryPC());
+ #else
+   frame sender = frame();
+   Unimplemented();
 --- a/src/hotspot/share/runtime/continuationEntry.hpp
 +++ b/src/hotspot/share/runtime/continuationEntry.hpp
 @@ -88,6 +88,13 @@

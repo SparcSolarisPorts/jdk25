@@ -342,6 +342,10 @@ frame Continuation::continuation_parent_frame(RegisterMap* map) {
 
 #if (defined(X86) || defined(AARCH64) || defined(RISCV64) || defined(PPC64)) && !defined(ZERO)
   frame sender(cont.entrySP(), cont.entryFP(), cont.entryPC());
+#elif defined(SPARC) && !defined(ZERO)
+  // SPARC's three-void-pointer constructor is debug-only. Keep both the
+  // physical and unextended SP and the cached register-window FP explicit.
+  frame sender(cont.entrySP(), cont.entrySP(), cont.entryFP(), cont.entryPC());
 #else
   frame sender = frame();
   Unimplemented();

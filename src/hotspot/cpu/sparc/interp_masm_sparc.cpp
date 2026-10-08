@@ -1138,7 +1138,9 @@ void InterpreterMacroAssembler::remove_activation(TosState state,
     // testing if Stack Reserved Area needs to be re-enabled
     Label no_reserved_zone_enabling;
     ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G3_scratch);
-    cmp_and_brx_short(SP, G3_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
+    // Match the unbiased address recorded by the shared stack-overflow handler.
+    add(SP, STACK_BIAS, G4_scratch);
+    cmp_and_brx_short(G4_scratch, G3_scratch, Assembler::lessUnsigned, Assembler::pt, no_reserved_zone_enabling);
 
     call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
     call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::throw_delayed_StackOverflowError), G2_thread);

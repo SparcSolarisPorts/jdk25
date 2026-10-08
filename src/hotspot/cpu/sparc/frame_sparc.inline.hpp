@@ -29,6 +29,9 @@
 #include "code/vmreg.inline.hpp"
 #include "code/codeCache.hpp"
 #include "runtime/os.hpp"
+#include "runtime/continuation.hpp"
+#include "oops/stackChunkOop.inline.hpp"
+#include "runtime/stackWatermarkSet.hpp"
 #include "utilities/align.hpp"
 
 // Inline functions for SPARC frames:
@@ -343,18 +346,23 @@ inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
 // JDK 21 declares frame::sender() inline in share/runtime/frame.hpp (Oracle
 // de-SPARAC'd the declaration in JDK 21; in JDK 20 it was a plain out-of-line
 // member defined in frame_sparc.cpp). The body is Oracle's JDK 20 SPARC
-// implementation, moved here unchanged: SPARC needs no interpreted/compiled
+// implementation, extended for continuation chunks and return barriers.
+// SPARC needs no interpreted/compiled
 // distinction in the sender path because all callee-save registers are
 // preserved via the register-window save area, which RegisterMap::shift_window
 // accounts for.
 
-inline frame frame::sender(RegisterMap* map) const {
+inline frame frame::sender_raw(RegisterMap* map) const {
   assert(map != nullptr, "map must be set");
-
-  assert(CodeCache::find_blob(_pc) == _cb, "inconsistent");
 
   // Default is not to follow arguments; update it accordingly below
   map->set_include_argument_oops(false);
+
+  if (map->in_cont()) {
+    return map->stack_chunk()->sender(*this, map);
+  }
+
+  assert(CodeCache::find_blob(_pc) == _cb, "inconsistent");
 
   if (is_entry_frame())       return sender_for_entry_frame(map);
   if (is_upcall_stub_frame()) return sender_for_upcall_stub_frame(map);
@@ -399,7 +407,27 @@ inline frame frame::sender(RegisterMap* map) const {
       }
     }
   }
+  // A partial thaw installs a return barrier in the bottom Java frame.
+  // It is a synthetic return PC, not a frame whose saved window can be
+  // traversed. Follow the chunk or recover the real continuation entry.
+  if (Continuation::is_return_barrier_entry(sender_pc())) {
+    if (map->walk_cont()) {
+      return Continuation::top_frame(*this, map);
+    }
+    frame entry = Continuation::continuation_bottom_sender(map->thread(), *this, sp);
+    entry.set_younger_sp(younger_sp);
+    map->shift_window(entry.sp(), younger_sp);
+    return entry;
+  }
   return frame(sp, younger_sp, frame_is_interpreted);
+}
+
+inline frame frame::sender(RegisterMap* map) const {
+  frame result = sender_raw(map);
+  if (map->process_frames() && !map->in_cont()) {
+    StackWatermarkSet::on_iteration(map->thread(), result);
+  }
+  return result;
 }
 
 // SPARC routes interpreted and compiled frames through the unified sender

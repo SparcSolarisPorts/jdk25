@@ -157,6 +157,8 @@
   // saved register-window link can be represented as a relative offset.
 
  public:
+  inline frame sender_raw(RegisterMap* map) const;
+
   // Accessors
 
   // get_oop_map() is declared in shared frame.hpp and defined in

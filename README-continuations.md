@@ -1,3 +1,84 @@
+# JDK 25 Solaris/SPARC continuation candidate (v36)
+
+v36 responds to jdk25-priority-v35-evidence.zip. Native v35 confirms both
+new fixes: TestAllocateHeapAtMultiple and TestNativeStack pass, and all six
+small-heap compressed-oop smoke modes pass at the expected 3 GB/unscaled
+and 5 GB/scaled addresses. The selected jtreg run still has seven passes,
+16 failures and two timeout errors because CTW java_base_2 and virtual-thread
+code-cache stress failed again after passing in the previous run.
+
+The CTW crash is now in JavaThread::deoptimize_marked_methods on VM Thread,
+not in native diagnostic printing. The register-window constructor receives
+a null SP and faults at address 0x70. Source review found that frame::sender
+still used its pre-continuation implementation: it had no chunk dispatch or
+return-barrier handling. That omission can walk a synthetic return barrier
+as an ordinary native frame. The crash report does not prove that this is
+the CTW failure's complete cause; native reruns are required.
+
+v36 adds the continuation dispatch used by the other ports while retaining
+SPARC register-window map updates:
+* Frames already in a chunk use stackChunkOopDesc::sender.
+* At a mounted return barrier, continuation-aware walks enter the remaining
+  chunk; carrier-only walks recover the real ContinuationEntry frame.
+* Carrier entry recovery keeps younger_sp for SPARC's saved O7/PC location
+  and shifts the register map to the actual entry window.
+* Native stack iteration calls StackWatermarkSet::on_iteration when requested
+  and outside a chunk, matching other supported continuation ports.
+* safe_for_sender resolves return barriers to the actual continuation entry
+  instead of treating them as ordinary compiled frames.
+* Returning from a mounted chunk to its carrier uses SPARC's explicit
+  SP/unextended-SP/FP/PC constructor in shared continuation.cpp. The generic
+  three-void-pointer constructor is debug-only on this port.
+
+A second correction makes the interpreter and compiled reserved-stack return
+checks compare unbiased SP (architectural SP + STACK_BIAS) with the shared
+runtime's reserved_stack_activation address. Previously the 2047-byte bias
+could delay re-enabling the guard and throwing the deferred overflow. This
+corrects an address-representation mismatch, without changing guard sizes
+or disabling ReservedStackAccess. It does not claim all overflow tests fixed.
+
+Validation: 32 extracted reserved-stack comparison cases passed under
+ASan/UBSan at, below and above the activation address, including high stack
+addresses. 14 cases from the edited sender_raw/sender functions passed a
+host ASan/UBSan model covering native/entry/upcall frames, barrier-to-entry,
+barrier-to-chunk, in-chunk traversal, chunk exit and stack iteration hooks.
+The tests check that a return barrier never takes the normal window
+constructor. These are dispatch checks, not native register-window or GC
+validation. Leak detection is disabled for sandbox process inspection limits.
+Cumulative patch dry run, ZIP CRC and source SHA-256 validation passed.
+
+The unchanged direct runner retains all 25 selections with timeout factor 4.
+priority-1-2-status-v36.csv records the v35 native results. No failures are
+claimed fixed until native reruns pass. The C1 GC crash is still the same
+invalid G1 oop location; virtual-thread stress still has corrupted L2=0x24
+in compiled parkNanos after a continuation return. The stack-walk correction
+addresses a definite integration omission, but is not proof of their cause.
+Unsafe-access, reserved-stack, constant-dynamic, range-check, memory-layout
+and timeout failures remain open. No features or test assertions are disabled.
+
+```sh
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-continuation-repro.sh
+  bash tests/rerun-priority-1-2.sh
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+After the rerun, collect its evidence using the result directory printed by
+jtreg:
+
+```sh
+bash tests/collect-priority-evidence.sh /path/to/priority-1-2-rerun-results
+```
+
+The collector includes logs/reports and the selected Java test sources plus
+native JNI companions and edited sources. It excludes cores,
+compiled classes and executables. Attach the printed evidence ZIP.
+
+Prior changes and historical evidence follow.
+
 # JDK 25 Solaris/SPARC continuation candidate (v35)
 
 v35 responds to jdk25-priority-v34-evidence.zip. The native v34 rerun has

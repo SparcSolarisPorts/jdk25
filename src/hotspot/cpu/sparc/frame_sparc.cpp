@@ -231,6 +231,17 @@ bool frame::safe_for_sender(JavaThread *thread) {
     address   sender_pc = (address)younger_sp[I7->sp_offset_in_saved_window()] + pc_return_offset;
 
 
+    const bool return_barrier = Continuation::is_return_barrier_entry(sender_pc);
+    frame continuation_sender;
+    if (return_barrier) {
+      if (!Continuation::is_frame_in_continuation(thread, *this)) {
+        return false;
+      }
+      continuation_sender = Continuation::continuation_bottom_sender(thread, *this, _SENDER_SP);
+      _SENDER_SP = continuation_sender.sp();
+      sender_pc = continuation_sender.pc();
+    }
+
     // We must always be able to find a recognizable pc
     CodeBlob* sender_blob = CodeCache::find_blob(sender_pc);
     if (sender_pc == nullptr ||  sender_blob == nullptr) {
@@ -245,7 +256,8 @@ bool frame::safe_for_sender(JavaThread *thread) {
 
     // It should be safe to construct the sender though it might not be valid
 
-    frame sender(_SENDER_SP, younger_sp, adjusted_stack);
+    frame sender = return_barrier ? continuation_sender
+                                 : frame(_SENDER_SP, younger_sp, adjusted_stack);
 
     // Do we have a valid fp?
     address sender_fp = (address) sender.fp();
