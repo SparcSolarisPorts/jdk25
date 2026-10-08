@@ -1,3 +1,57 @@
+# JDK 25 Solaris/SPARC continuation candidate (v35)
+
+v35 responds to jdk25-priority-v34-evidence.zip. The native v34 rerun has
+seven passes, 16 failures and two timeout errors among 25 selected cases.
+All four recursive-locking selections, both CTW selections and code-cache
+stress passed. TestNativeStack now exits normally instead of crashing, but
+its output lacks native frames, so that jtreg test is still failed.
+
+Two new source corrections:
+* Compressed object pointers: all six SPARC assembler encode/decode overloads
+  use CompressedOops::shift() instead of LogMinObjAlignmentInBytes. A heap
+  below 4 GB can select shift=0. Previously generated code divided the
+  reference by eight while shared C++ decoded it without scaling. The
+  TestAllocateHeapAtMultiple report shows heap c0000000..c2000000 and the
+  malformed pointer 183a0415 in java_lang_Thread::set_thread_status. Null
+  handling, scaled heaps, nonzero bases and optimized compiler paths remain.
+* Native stack walking: link_or_null reads the caller's saved FP from the
+  caller's register-save window, after a readability/alignment check.
+  Returning link() repeated the current FP, so os::is_first_C_frame always
+  rejected an otherwise valid chain. Native and continuation link() behavior
+  is unchanged. The previous empty-frame crash correction is retained.
+
+Validation: 280 cases from the actual edited assembler functions passed a
+host emission model under ASan/UBSan: shift 0/3/4, null/non-null, aliased and
+separate registers, zero/nonzero bases. Extracted link_or_null and shared
+is_first_C_frame code passed valid-chain, root and unreadable-slot checks.
+Leak detection was disabled because the host sandbox cannot inspect process
+threads; address and undefined-behavior sanitizers remained enabled.
+The Java smoke program also passed locally in Java 17 source-launch mode.
+These checks do not replace a Solaris/SPARC build and native execution.
+
+New tests/run-compressed-oops-repro.sh exercises 32 MB heaps in interpreter,
+C1 and C2 modes at requested heap bases 3 GB and 5 GB, logging the selected
+compressed-oop mode, with reference identity, object payloads and full GC.
+Heap placement is a request; inspect the logged actual base and mode.
+
+The direct jtreg runner retains all 25 cases, including the seven passes as
+regressions. priority-1-2-status-v35.csv records the new results and unresolved
+cases. The other unsafe, C1 GC, constant-dynamic, range-check compilation,
+reserved-stack, page-size, compression-layout, pretouch and timeout failures
+are not claimed fixed by this archive. No jtreg assertions are weakened.
+
+```sh
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-compressed-oops-repro.sh
+  bash tests/rerun-priority-1-2.sh
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+Prior changes and historical evidence follow.
+
 # JDK 25 Solaris/SPARC continuation candidate (v34)
 
 This is an experimental source candidate for the attached JDK 25 tree. It

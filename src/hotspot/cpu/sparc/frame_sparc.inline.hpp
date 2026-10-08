@@ -28,6 +28,7 @@
 #include "asm/macroAssembler.hpp"
 #include "code/vmreg.inline.hpp"
 #include "code/codeCache.hpp"
+#include "runtime/os.hpp"
 #include "utilities/align.hpp"
 
 // Inline functions for SPARC frames:
@@ -181,9 +182,22 @@ inline intptr_t* frame::link() const {
   return (intptr_t*)(raw + STACK_BIAS);
 }
 
-//TODO do we need to wrap with is_readable_pointer() on sparc?
 inline intptr_t* frame::link_or_null() const {
-  return link();
+  if (is_heap_frame()) {
+    return link();
+  }
+  // os::is_first_C_frame needs the caller's FP.  On SPARC, fp() is
+  // already the caller's SP, so link() would simply return fp() again.
+  // Read the next saved window, checking it before dereferencing it.
+  if (fp() == nullptr) {
+    return nullptr;
+  }
+  intptr_t* slot = reinterpret_cast<intptr_t*>(reinterpret_cast<uintptr_t>(fp())
+      + FP->sp_offset_in_saved_window() * sizeof(intptr_t));
+  if (!is_aligned(slot, sizeof(intptr_t)) || !os::is_readable_pointer(slot)) {
+    return nullptr;
+  }
+  return reinterpret_cast<intptr_t*>(static_cast<uintptr_t>(*slot) + STACK_BIAS);
 }
 
 inline intptr_t* frame::unextended_sp() const { assert_absolute(); return _unextended_sp; }

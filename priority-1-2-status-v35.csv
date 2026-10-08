@@ -1,0 +1,26 @@
+test,observed_v34_result,v35_status
+applications/ctw/modules/java_base_2.java,Passed. Execution successful,Native v34 PASS; retain as regression
+applications/ctw/modules/jdk_javadoc.java,Passed. Execution successful,Native v34 PASS; retain as regression
+compiler/c1/TestLargeMonitorOffset.java,Failed. Unexpected exit from test [exit code: 6],Unresolved; retain for native diagnosis
+compiler/c2/TestCastX2P.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Unresolved; retain for native diagnosis
+compiler/c2/TestMergeStoresUnsafeArrayPointer.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Unresolved; retain for native diagnosis
+compiler/c2/irTests/TestLongRangeChecks.java,Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.,Unresolved; retain for native diagnosis
+compiler/codecache/stress/UnexpectedDeoptimizationAllTest.java,Passed. Execution successful,Native v34 PASS; retain as regression
+compiler/rangechecks/TestLongRangeCheck.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: should still be compiled,Unresolved; retain for native diagnosis
+compiler/runtime/TestConstantDynamic.java,"Failed. Execution failed: `main' threw exception: java.lang.NullPointerException: Cannot invoke ""Object.toString()"" because ""<parameter1>"" is null",Unresolved; retain for native diagnosis
+compiler/uncommontrap/TestStackBangMonitorOwned.java,Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 490731 ms),Unresolved; retain for native diagnosis
+compiler/unsafe/AlignmentGapAccess.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Unresolved; retain for native diagnosis
+compiler/unsafe/MismatchedUnsafeAccessTest.java,Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation,Unresolved; retain for native diagnosis
+gc/TestAllocateHeapAtMultiple.java,"Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected to get exit value of [0], exit value is: [6]",v35 actual compressed-oop shift correction; native rerun required
+gc/g1/TestLargePageUseForAuxMemory.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Match from 'Block Offset Table: .* page_size=(d+[BKMG])' got 65536 expected: 8192,Unresolved; retain for native diagnosis
+runtime/ClassInitErrors/TestStackOverflowDuringInit.java,"Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected to get exit value of [0], exit value is: [1]",Unresolved; retain for native diagnosis
+runtime/CompressedOops/CompressedClassPointers.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'Narrow klass base: 0x0000000000000000' missing from stdout/stderr,Unresolved; retain for native diagnosis
+runtime/Monitor/StressWrapper_TestRecursiveLocking_36M.java#C2_alternate_AB,Passed. Execution successful,Native v34 PASS; retain as regression
+runtime/Monitor/StressWrapper_TestRecursiveLocking_36M.java#C2_outer_inner,Passed. Execution successful,Native v34 PASS; retain as regression
+runtime/Monitor/TestRecursiveLocking.java#C2_alternate_AB,Passed. Execution successful,Native v34 PASS; retain as regression
+runtime/Monitor/TestRecursiveLocking.java#C2_outer_inner,Passed. Execution successful,Native v34 PASS; retain as regression
+runtime/ReservedStack/ReservedStackTest.java,Failed. Execution failed: `main' threw exception: java.lang.Error: FAILED: ReentrantLock 476 looks corrupted,Unresolved; retain for native diagnosis
+runtime/ReservedStack/ReservedStackTestCompiler.java,Failed. Execution failed: `main' threw exception: java.lang.StackOverflowError: Delayed StackOverflowError due to ReservedStackAccess annotated method,Unresolved; retain for native diagnosis
+runtime/Thread/TestAlwaysPreTouchStacks.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected a higher amount of committed with pretouch stacksPreTouch amount: 147849216NoPreTouch amount: 231735296,Unresolved; retain for native diagnosis
+runtime/jni/getCreatedJavaVMs/TestGetCreatedJavaVMs.java,"Error. ""driver"" action timed out with a timeout of 480 seconds on agent 30",Unresolved; retain for native diagnosis
+runtime/jni/nativeStack/TestNativeStack.java,Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'thread_start' missing from stdout/stderr,v34 child exits 0; missing native frames. v35 caller FP correction; native rerun required

@@ -1486,7 +1486,15 @@
  
 --- a/src/hotspot/cpu/sparc/frame_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/frame_sparc.inline.hpp
-@@ -35,11 +35,11 @@
+@@ -28,6 +28,7 @@
+ #include "asm/macroAssembler.hpp"
+ #include "code/vmreg.inline.hpp"
+ #include "code/codeCache.hpp"
++#include "runtime/os.hpp"
+ #include "utilities/align.hpp"
+ 
+ // Inline functions for SPARC frames:
+@@ -35,11 +36,11 @@
  // Constructors
  
  inline frame::frame() {
@@ -1503,7 +1511,32 @@
      _cb = nullptr;
    _oop_map = nullptr;
    _deopt_state = unknown;
-@@ -194,7 +194,9 @@
+@@ -181,9 +182,22 @@
+   return (intptr_t*)(raw + STACK_BIAS);
+ }
+ 
+-//TODO do we need to wrap with is_readable_pointer() on sparc?
+ inline intptr_t* frame::link_or_null() const {
+-  return link();
++  if (is_heap_frame()) {
++    return link();
++  }
++  // os::is_first_C_frame needs the caller's FP.  On SPARC, fp() is
++  // already the caller's SP, so link() would simply return fp() again.
++  // Read the next saved window, checking it before dereferencing it.
++  if (fp() == nullptr) {
++    return nullptr;
++  }
++  intptr_t* slot = reinterpret_cast<intptr_t*>(reinterpret_cast<uintptr_t>(fp())
++      + FP->sp_offset_in_saved_window() * sizeof(intptr_t));
++  if (!is_aligned(slot, sizeof(intptr_t)) || !os::is_readable_pointer(slot)) {
++    return nullptr;
++  }
++  return reinterpret_cast<intptr_t*>(static_cast<uintptr_t>(*slot) + STACK_BIAS);
+ }
+ 
+ inline intptr_t* frame::unextended_sp() const { assert_absolute(); return _unextended_sp; }
+@@ -194,7 +208,9 @@
  // return address:
  
  inline address frame::sender_pc() const {
@@ -2148,71 +2181,119 @@
      assert(s != d, "not enough registers");
      st(s, d, oopDesc::klass_gap_offset_in_bytes());
    }
-@@ -3047,10 +3188,10 @@
+@@ -3045,13 +3186,16 @@
+ }
  
+ 
++// The heap may use unscaled narrow oops below 4 GB.  Use the encoding
++// selected by CompressedOops, rather than always shifting by object alignment.
  void MacroAssembler::encode_heap_oop(Register src, Register dst) {
    assert (UseCompressedOops, "must be compressed");
 -  assert (Universe::heap() != NULL, "java heap should be initialized");
+-  assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
 +  assert (Universe::heap() != nullptr, "java heap should be initialized");
-   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
++  assert (CompressedOops::shift() == 0 ||
++          CompressedOops::shift() == LogMinObjAlignmentInBytes, "decode alg wrong");
    verify_oop(src);
 -  if (CompressedOops::base() == NULL) {
+-    srlx(src, LogMinObjAlignmentInBytes, dst);
 +  if (CompressedOops::base() == nullptr) {
-     srlx(src, LogMinObjAlignmentInBytes, dst);
++    srlx(src, CompressedOops::shift(), dst);
      return;
    }
-@@ -3075,20 +3216,20 @@
+   Label done;
+@@ -3060,14 +3204,14 @@
+     bpr(rc_nz, true, Assembler::pt, src, done);
+     delayed() -> sub(src, G6_heapbase, dst); // annulled if not taken
+     bind(done);
+-    srlx(src, LogMinObjAlignmentInBytes, dst);
++    srlx(src, CompressedOops::shift(), dst);
+   } else {
+     bpr(rc_z, false, Assembler::pn, src, done);
+     delayed() -> mov(G0, dst);
+     // could be moved before branch, and annulate delay,
+     // but may add some unneeded work decoding null
+     sub(src, G6_heapbase, dst);
+-    srlx(dst, LogMinObjAlignmentInBytes, dst);
++    srlx(dst, CompressedOops::shift(), dst);
+     bind(done);
+   }
+ }
+@@ -3075,33 +3219,36 @@
  
  void MacroAssembler::encode_heap_oop_not_null(Register r) {
    assert (UseCompressedOops, "must be compressed");
 -  assert (Universe::heap() != NULL, "java heap should be initialized");
+-  assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
 +  assert (Universe::heap() != nullptr, "java heap should be initialized");
-   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
++  assert (CompressedOops::shift() == 0 ||
++          CompressedOops::shift() == LogMinObjAlignmentInBytes, "decode alg wrong");
    verify_oop(r);
 -  if (CompressedOops::base() != NULL)
 +  if (CompressedOops::base() != nullptr)
      sub(r, G6_heapbase, r);
-   srlx(r, LogMinObjAlignmentInBytes, r);
+-  srlx(r, LogMinObjAlignmentInBytes, r);
++  srlx(r, CompressedOops::shift(), r);
  }
  
  void MacroAssembler::encode_heap_oop_not_null(Register src, Register dst) {
    assert (UseCompressedOops, "must be compressed");
 -  assert (Universe::heap() != NULL, "java heap should be initialized");
+-  assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
 +  assert (Universe::heap() != nullptr, "java heap should be initialized");
-   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
++  assert (CompressedOops::shift() == 0 ||
++          CompressedOops::shift() == LogMinObjAlignmentInBytes, "decode alg wrong");
    verify_oop(src);
 -  if (CompressedOops::base() == NULL) {
+-    srlx(src, LogMinObjAlignmentInBytes, dst);
 +  if (CompressedOops::base() == nullptr) {
-     srlx(src, LogMinObjAlignmentInBytes, dst);
++    srlx(src, CompressedOops::shift(), dst);
    } else {
      sub(src, G6_heapbase, dst);
-@@ -3099,7 +3240,7 @@
+-    srlx(dst, LogMinObjAlignmentInBytes, dst);
++    srlx(dst, CompressedOops::shift(), dst);
+   }
+ }
+ 
  // Same algorithm as oops.inline.hpp decode_heap_oop.
  void  MacroAssembler::decode_heap_oop(Register src, Register dst) {
    assert (UseCompressedOops, "must be compressed");
 -  assert (Universe::heap() != NULL, "java heap should be initialized");
+-  assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+-  sllx(src, LogMinObjAlignmentInBytes, dst);
 +  assert (Universe::heap() != nullptr, "java heap should be initialized");
-   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
-   sllx(src, LogMinObjAlignmentInBytes, dst);
++  assert (CompressedOops::shift() == 0 ||
++          CompressedOops::shift() == LogMinObjAlignmentInBytes, "decode alg wrong");
++  sllx(src, CompressedOops::shift(), dst);
    if (CompressedOops::base() != nullptr) {
-@@ -3116,10 +3257,10 @@
+     Label done;
+     bpr(rc_nz, true, Assembler::pt, dst, done);
+@@ -3116,10 +3263,11 @@
    // pd_code_size_limit.
    // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
 -  assert (Universe::heap() != NULL, "java heap should be initialized");
-+  assert (Universe::heap() != nullptr, "java heap should be initialized");
-   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
-   sllx(r, LogMinObjAlignmentInBytes, r);
+-  assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+-  sllx(r, LogMinObjAlignmentInBytes, r);
 -  if (CompressedOops::base() != NULL)
++  assert (Universe::heap() != nullptr, "java heap should be initialized");
++  assert (CompressedOops::shift() == 0 ||
++          CompressedOops::shift() == LogMinObjAlignmentInBytes, "decode alg wrong");
++  sllx(r, CompressedOops::shift(), r);
 +  if (CompressedOops::base() != nullptr)
      add(r, G6_heapbase, r);
  }
  
-@@ -3130,13 +3271,13 @@
+@@ -3128,15 +3276,16 @@
+   // pd_code_size_limit.
+   // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
-   assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
-   sllx(src, LogMinObjAlignmentInBytes, dst);
+-  assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
+-  sllx(src, LogMinObjAlignmentInBytes, dst);
 -  if (CompressedOops::base() != NULL)
++  assert (CompressedOops::shift() == 0 ||
++          CompressedOops::shift() == LogMinObjAlignmentInBytes, "decode alg wrong");
++  sllx(src, CompressedOops::shift(), dst);
 +  if (CompressedOops::base() != nullptr)
      add(dst, G6_heapbase, dst);
  }
@@ -2224,7 +2305,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      sub(r, G6_heapbase, r);
-@@ -3154,7 +3295,7 @@
+@@ -3154,7 +3303,7 @@
      encode_klass_not_null(src);
    } else {
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2233,7 +2314,7 @@
        set((intptr_t)CompressedKlassPointers::base(), dst);
        sub(src, dst, dst);
        if (CompressedKlassPointers::shift() != 0) {
-@@ -3173,7 +3314,7 @@
+@@ -3173,7 +3322,7 @@
  int MacroAssembler::instr_size_for_decode_klass_not_null() {
    assert (UseCompressedClassPointers, "only for compressed klass ptrs");
    int num_instrs = 1;  // shift src,dst or add
@@ -2242,7 +2323,7 @@
      // set + add + set
      num_instrs += insts_for_internal_set((intptr_t)CompressedKlassPointers::base()) +
                    insts_for_internal_set((intptr_t)CompressedOops::base());
-@@ -3190,7 +3331,7 @@
+@@ -3190,7 +3339,7 @@
    // Do not add assert code to this unless you change vtableStubs_sparc.cpp
    // pd_code_size_limit.
    assert (UseCompressedClassPointers, "must be compressed");
@@ -2251,7 +2332,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      if (CompressedKlassPointers::shift() != 0)
-@@ -3209,7 +3350,7 @@
+@@ -3209,7 +3358,7 @@
      // Do not add assert code to this unless you change vtableStubs_sparc.cpp
      // pd_code_size_limit.
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2260,7 +2341,7 @@
        if (CompressedKlassPointers::shift() != 0) {
          assert((src != G6_heapbase) && (dst != G6_heapbase), "bad register choice");
          set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
-@@ -3253,7 +3394,7 @@
+@@ -3253,7 +3402,7 @@
  
  void MacroAssembler::reinit_heapbase() {
    if (UseCompressedOops || UseCompressedClassPointers) {
