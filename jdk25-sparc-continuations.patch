@@ -3933,7 +3933,14 @@
  #include "oops/oop.inline.hpp"
  #include "oops/resolvedFieldEntry.hpp"
  #include "oops/resolvedIndyEntry.hpp"
-@@ -370,7 +371,7 @@
+@@ -366,11 +367,14 @@
+     // but it's harmless to retry.
+     Label notNull;
+     __ set(ExternalAddress((address)Universe::the_null_sentinel_addr()), G3_scratch);
++    // Universe stores an OopHandle, not an oop. Load its storage slot and
++    // resolve that slot with the native-root barrier before comparing.
+     __ ld_ptr(G3_scratch, 0, G3_scratch);
++    __ resolve_oop_handle(G3_scratch, Lscratch);
      __ cmp(G3_scratch, Otos_i);
      __ br(Assembler::notEqual, true, Assembler::pt, notNull);
      __ delayed()->nop();
@@ -3942,7 +3949,7 @@
      __ bind(notNull);
    }
  
-@@ -2305,7 +2306,7 @@
+@@ -2305,7 +2309,7 @@
        }
        __ verify_oop(Otos_i);
      }
@@ -3951,7 +3958,7 @@
      // Rcache: field entry pointer
      __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_access),
                 Otos_i, Rcache);
-@@ -2326,7 +2327,9 @@
+@@ -2326,7 +2330,9 @@
    Register Rclass = Rcache;
    Register Roffset= G4_scratch;
    Register Rflags = G1_scratch;
@@ -3962,7 +3969,7 @@
  
    resolve_cache_and_index_for_field(byte_no, Rcache, index);
    jvmti_post_field_access(Rcache, index, is_static, false);
-@@ -2671,7 +2674,7 @@
+@@ -2671,7 +2677,7 @@
      }
      // setup pointer to jvalue object
      __ mov(Lesp, G1_scratch);  __ inc(G1_scratch, wordSize);
@@ -3971,7 +3978,7 @@
      // G3_scratch: field entry pointer
      // G1_scratch: jvalue object on the stack
      __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_modification),
-@@ -2694,7 +2697,9 @@
+@@ -2694,7 +2700,9 @@
    Register Rclass = Rcache;
    Register Roffset= G4_scratch;
    Register Rflags = G1_scratch;
@@ -3982,7 +3989,7 @@
  
    resolve_cache_and_index_for_field(byte_no, Rcache, index);
    jvmti_post_field_mod(Rcache, index, is_static);
-@@ -3151,7 +3156,7 @@
+@@ -3151,7 +3159,7 @@
    __ lduh(G4_scratch, in_bytes(ConstMethod::size_of_parameters_offset()), G4_scratch);
    __ load_receiver(G4_scratch, O0);
  
@@ -3991,7 +3998,7 @@
    __ null_check(O0);
  
    __ profile_final_call(O4);
-@@ -3559,9 +3564,9 @@
+@@ -3559,9 +3567,9 @@
    if (UseTLAB) {
      // clear object fields
      __ bind(initialize_object);
@@ -4003,7 +4010,7 @@
  
      // initialize remaining object fields
      if (UseBlockZeroing) {
-@@ -3591,10 +3596,15 @@
+@@ -3591,10 +3599,15 @@
    // Initialize the header: mark, klass
    __ bind(initialize_header);
  
@@ -4023,7 +4030,7 @@
  
    {
      SkipIfEqual skip_if(
-@@ -3645,7 +3655,7 @@
+@@ -3645,7 +3658,7 @@
    Register RobjKlass = O5;
    Register RspecifiedKlass = O4;
  
@@ -4032,7 +4039,7 @@
    __ br_null(Otos_i, false, Assembler::pn, is_null);
    __ delayed()->nop();
  
-@@ -3703,7 +3713,7 @@
+@@ -3703,7 +3716,7 @@
    Register RobjKlass = O5;
    Register RspecifiedKlass = O4;
  
@@ -4041,7 +4048,7 @@
    __ br_null(Otos_i, false, Assembler::pt, is_null);
    __ delayed()->nop();
  
-@@ -3813,7 +3823,7 @@
+@@ -3813,7 +3826,7 @@
  
  
    // initialize entry pointer

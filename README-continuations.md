@@ -1,4 +1,62 @@
-# JDK 25 Solaris/SPARC continuation candidate (v38)
+# JDK 25 Solaris/SPARC continuation candidate (v39)
+
+v39 responds to priority-1-2-rerun-20261008-015735-evidence.zip. Native v38
+results are 10 passes, 13 failures and 2 timeout errors. TestLargeMonitorOffset
+now passes after v37's OSR displacement correction. All four continuation
+smoke modes pass. The separately pasted native run confirms all four process
+reaper modes (400 subprocess completions) pass and Forge exits at its EULA
+check without the previous process-reaper StackOverflowError. Full server
+startup/gameplay remains untested. UnexpectedDeoptimizationAllTest passes this
+run, but CTW java_base_2 crashes again while deoptimizing on a handshake.
+Neither intermittent issue is declared fully fixed.
+
+v39 corrects the cached interpreter reference-constant path in
+TemplateTable::fast_aldc. Universe::the_null_sentinel_addr() now points at an
+OopHandle. Loading its first pointer yields the OopStorage slot address,
+not the sentinel object. The old comparison therefore failed to translate a
+cached null constant into Java null and could return the sentinel object.
+The first runtime-resolved load already returns null, so the defect appears
+when later loads reuse the interpreter cache. The jtreg validateResult error
+message itself dereferences the expected null and masks the mismatch with a
+NullPointerException. The test and its expectations remain unchanged.
+
+The emitter now resolves the handle through resolve_oop_handle with the
+native-root load barrier before comparing it with the resolved constant.
+This matches the handle indirection in the current x86/aarch64 implementations.
+The cached constant fast path is retained, and ordinary non-null references
+still preserve identity. No compiler or VM feature was disabled.
+
+Validation: nine extracted-emitter ASan/UBSan cases passed for runtime null,
+cached sentinel and ordinary object references across three relocated sentinel
+addresses. ConstantDynamicNullSmoke passed in all four host Java 17 modes,
+each checking 80000 null/non-null constant pairs, bootstrap-cache reuse and GC.
+run-condy-null-repro.sh compiles with the JDK image and runs interpreter, C1,
+mixed and C2, with a 300-second watchdog per mode and separate result logs.
+Host checks do not validate generated SPARC instructions or establish that
+the entire native TestConstantDynamic test now passes. Native reruns are needed.
+Shell syntax, cumulative patch dry run, ZIP CRC and source SHA-256 checks passed.
+
+priority-1-2-status-v39.csv records all 25 actual native v38 outcomes. All cases
+remain selected in the direct runner with timeout factor 4. The remaining
+unsafe alignment, C2 range-check, compiled reserved-stack, small-stack startup,
+class-space placement, large-page selection, pretouch-accounting and timeout
+failures remain unresolved, along with the intermittent CTW crash.
+
+After installing the archive:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-condy-null-repro.sh
+  bash tests/rerun-priority-1-2.sh
+  latest_results=$(ls -dt "$PWD"/priority-1-2-rerun-*/ | head -1)
+  bash tests/collect-priority-evidence.sh "$latest_results"
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+## Included v38 changes
 
 v38 includes all v37 source changes plus a Forge launcher correction for the
 reported process-reaper StackOverflowError during shutdown. The launcher now

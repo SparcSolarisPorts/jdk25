@@ -367,7 +367,10 @@ void TemplateTable::fast_aldc(LdcType type) {
     // but it's harmless to retry.
     Label notNull;
     __ set(ExternalAddress((address)Universe::the_null_sentinel_addr()), G3_scratch);
+    // Universe stores an OopHandle, not an oop. Load its storage slot and
+    // resolve that slot with the native-root barrier before comparing.
     __ ld_ptr(G3_scratch, 0, G3_scratch);
+    __ resolve_oop_handle(G3_scratch, Lscratch);
     __ cmp(G3_scratch, Otos_i);
     __ br(Assembler::notEqual, true, Assembler::pt, notNull);
     __ delayed()->nop();
