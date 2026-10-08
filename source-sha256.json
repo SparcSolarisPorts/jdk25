@@ -40,7 +40,7 @@
   "src/hotspot/cpu/sparc/vtableStubs_sparc.cpp": "c9efbb642dd2413c5c31e4bbfcaaaf567d787511c4e30de2d7b44fd0fe89c222",
   "src/hotspot/os/posix/os_posix.cpp": "863490e20fcb6626c9c8b21c991f00000770bb856a67d44c7510484e0d46da31",
   "src/hotspot/os/solaris/dtrace/jhelper.d": "94c6d5b66ea64f38e3cdc0a8b4ec743cf9317c2c75bb6eae66ff842f5f3feaca",
-  "src/hotspot/os/solaris/os_solaris.cpp": "15c20219f9185047d6c596fea7d8299fb037ac2408e8e55cef173d30db611e85",
+  "src/hotspot/os/solaris/os_solaris.cpp": "481c2a8f713943c7d16f850826f1986dc979371f610b36ec5996751d3de45cb2",
   "src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.cpp": "0e8c7cae81f0c3e1eb7f1140973869614c9905fcd57583d0280b04774dec25a5",
   "src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.hpp": "b4c7e5d472b70f15803418c106a821c4151d7b5c4dc7f29b4806cb987b2e548a",
   "src/hotspot/os_cpu/solaris_sparc/os_solaris_sparc.cpp": "0dae004bafdc24aa360993cd2b90f21268e17ea0071b904217e056a5c8d6f7dc",

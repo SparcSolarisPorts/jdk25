@@ -1791,7 +1791,7 @@ void os::large_page_init() {
     st.print("Usable page sizes (bytes):");
     for (size_t page = _page_sizes.smallest(); page != 0;
          page = _page_sizes.next_larger(page)) {
-      st.print(" " SIZE_FORMAT, page);
+      st.print(" %zu", page);
     }
     st.cr();
   }

@@ -1,4 +1,21 @@
-# JDK 25 Solaris/SPARC continuation candidate (v43)
+# JDK 25 Solaris/SPARC continuation candidate (v44)
+
+v44 corrects a v43 build error in os_solaris.cpp: the usable-page-size
+logging line used SIZE_FORMAT, which JDK 25 no longer defines. Use %zu
+for its size_t argument, consistent with current HotSpot formatting.
+All v43 functional candidates and regression tests are retained.
+The original native build excerpt omitted the actual error diagnostic;
+this undefined macro is independently confirmed as a compilation error.
+Any additional errors require the error lines from /tmp/jdk25-build.log.
+
+Validation: the exact logging statement compiles with C++17 and strict
+format checks after correction; cumulative patch application, ZIP CRC,
+source hashes and shell syntax are checked. A native Solaris/SPARC build
+and the v43 native regression rerun remain required.
+
+## v43 changes
+
+### v43
 
 The user confirms Gradle works with v42. The latest native 25-case rerun
 has 13 passed, 10 failed, and 2 errors; v43 does not claim those failures
