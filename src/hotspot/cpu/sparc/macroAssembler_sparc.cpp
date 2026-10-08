@@ -307,8 +307,9 @@ void MacroAssembler::post_call_nop() {
 }
 
 void MacroAssembler::safepoint_poll(Label& slow_path, bool a, Register thread_reg, Register temp_reg) {
-  ldx(Address(thread_reg, JavaThread::polling_page_offset()), temp_reg, 0);
-  // Armed page has poll bit set.
+  // Polling pages are page-aligned. The armed bit belongs to the polling
+  // word; testing it in the page address misses native-return safepoints.
+  ldx(Address(thread_reg, JavaThread::polling_word_offset()), temp_reg, 0);
   and3(temp_reg, SafepointMechanism::poll_bit(), temp_reg);
   br_notnull(temp_reg, a, Assembler::pn, slow_path);
 }

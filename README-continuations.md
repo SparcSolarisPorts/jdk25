@@ -1,4 +1,88 @@
-# JDK 25 Solaris/SPARC continuation candidate (v41)
+# JDK 25 Solaris/SPARC continuation candidate (v42)
+
+v42 targets the Gradle 9.2.1 daemon crash in hs_err_pid22207.log from
+Texto pegado(20261008-033802).txt. The failing process is explicitly running
+/usr/jdk/instances/jdk25, version 25.0.5+1. It crashes in native G1 TLAB
+allocation while the VM is at a safepoint, dereferencing a null allocation
+region at address 0x10. This is a JVM failure during Gradle's build, before
+Minecraft server startup; it is separate from the earlier JDK 21 JFR crash.
+
+A concrete bug in MacroAssembler::safepoint_poll affects native-return code:
+it loads JavaThread::polling_page_offset() and tests poll_bit() == 1. In
+JDK 25's protected-page mode both armed and disarmed page addresses are page
+aligned, so their low bit is always zero. Native wrappers can therefore miss
+an active safepoint when returning to Java. The VM may regard a native thread
+as safe for GC while that thread resumes Java allocation. This is consistent
+with the observed G1 allocation crash during a safepoint; native rerunning
+Gradle is still required to establish that the patch resolves this crash.
+
+The helper now reads polling_word_offset(), which contains the armed bit.
+Interpreter polls and interpreted/compiled native returns using this helper
+receive the correction. Protected-page faulting polls in C1/C2 retain their
+page-address loads; those loads serve a different purpose and are unchanged.
+G1 allocation, C1/C2, JNI, instrumentation and continuations remain enabled.
+No null-region guard or recovery workaround is added to G1.
+
+Native v41 confirmation: all four minimum-stack smoke modes and all four
+JFR management smoke modes pass on Solaris. TestStackOverflowDuringInit now
+passes. The selected jtreg results are 12 passed, 11 failed and 2 timeouts.
+TestStackBangMonitorOwned prints TEST PASSED/STATUS:Passed before hanging
+at JVM shutdown. UnexpectedDeoptimizationAllTest still crashes with exit 11.
+The other failures are retained; no unverified pass is recorded.
+
+NativeReturnGcSmoke holds JNI calls in native code briefly while another
+thread repeatedly invokes GC. Workers check returned object identity,
+payloads and 64-bit values, then allocate immediately after native returns.
+The runner compiles its native probe using the tested JDK's JNI headers and
+runs interpreter, C1, mixed and C2 with G1, safepoint/GC logs and a five-minute
+watchdog per mode. Default load is 32 workers, 2000 iterations each; use
+NATIVE_GC_WORKERS and NATIVE_GC_ITERATIONS to adjust it.
+
+Host validation uses Linux x86 Java 17, not SPARC. The probe uses no JNI
+function-table calls, so host compilation uses minimal JNI ABI declarations
+where the host JDK lacks headers. Four host modes check the Java/native
+round trips and GC workload; this does not validate SPARC emitted code.
+Shell syntax, cumulative patch dry run, ZIP CRC and source hashes are checked.
+
+Extract this cumulative ZIP over ~/git/jdk25, then:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-native-return-gc-repro.sh
+  bash tests/rerun-priority-1-2.sh
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+To test the original Gradle workload with the newly built image directly:
+
+```bash
+cd ~/git/jdk25
+bash tests/run-gradle-with-jdk25.sh "$HOME/git/jackrippermc" runServer \
+  > /tmp/jdk25-gradle-runServer.log 2>&1
+```
+
+The launcher selects build/.../images/jdk through JAVA_HOME, PATH and
+org.gradle.java.home. It preserves the project's Gradle wrapper and supplied
+tasks/options. It does not disable the instrumentation agent or change the
+project. JVM selection can also be controlled by a project's Gradle daemon
+criteria file; check the daemon log's javaHome if one exists. Using the build
+image avoids needing to overwrite an installed JDK while daemons are running.
+
+After the jtreg rerun:
+
+```bash
+cd ~/git/jdk25
+latest_results=$(ls -dt "$PWD"/priority-1-2-rerun-*/ | head -1)
+bash tests/collect-priority-evidence.sh "$latest_results"
+```
+
+Upload that ZIP, native-return smoke results and the Gradle log/crash report.
+
+## Included v41 changes
+
 
 Latest native v40 evidence: 11 passed, 12 failed and 2 timeout errors.
 TestConstantDynamic now passes, confirming the cached null-sentinel correction.

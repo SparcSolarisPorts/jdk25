@@ -1983,7 +1983,19 @@
  }
  
  void MacroAssembler::post_call_nop() {
-@@ -332,7 +333,7 @@
+@@ -306,8 +307,9 @@
+ }
+ 
+ void MacroAssembler::safepoint_poll(Label& slow_path, bool a, Register thread_reg, Register temp_reg) {
+-  ldx(Address(thread_reg, JavaThread::polling_page_offset()), temp_reg, 0);
+-  // Armed page has poll bit set.
++  // Polling pages are page-aligned. The armed bit belongs to the polling
++  // word; testing it in the page address misses native-return safepoints.
++  ldx(Address(thread_reg, JavaThread::polling_word_offset()), temp_reg, 0);
+   and3(temp_reg, SafepointMechanism::poll_bit(), temp_reg);
+   br_notnull(temp_reg, a, Assembler::pn, slow_path);
+ }
+@@ -332,7 +334,7 @@
  #endif
  
  #ifdef ASSERT
@@ -1992,7 +2004,7 @@
  #endif
  
  // call this when G2_thread is not known to be valid
-@@ -442,7 +443,7 @@
+@@ -442,7 +444,7 @@
  #endif /* ASSERT */
    //
    // When returning from calling out from Java mode the frame anchor's last_Java_pc
@@ -2001,7 +2013,7 @@
    // native (not VM) that we capture the known pc and don't have to rely on the
    // native call having a standard frame linkage where we can find the pc.
  
-@@ -715,7 +716,7 @@
+@@ -715,7 +717,7 @@
  
  int MacroAssembler::ic_check_size() {
    // lduw|ldx (receiver klass) + ldx (speculated klass) + cmp + trap
@@ -2010,7 +2022,7 @@
  }
  
  int MacroAssembler::ic_check(int end_alignment) {
-@@ -738,7 +739,7 @@
+@@ -738,7 +740,7 @@
    // receiver when UseCompressedClassPointers is on, the full Klass*
    // otherwise (see CompiledICData::initialize).
    if (UseCompressedClassPointers) {
@@ -2019,7 +2031,7 @@
    } else {
      ld_ptr(receiver, oopDesc::klass_offset_in_bytes(), tmp1);
    }
-@@ -838,7 +839,7 @@
+@@ -838,7 +840,7 @@
  }
  
  int MacroAssembler::worst_case_insts_for_set() {
@@ -2028,7 +2040,7 @@
  }
  
  
-@@ -1068,14 +1069,14 @@
+@@ -1068,14 +1070,14 @@
  
  
  AddressLiteral MacroAssembler::allocate_metadata_address(Metadata* obj) {
@@ -2045,7 +2057,7 @@
    int index = oop_recorder()->find_index(obj);
    RelocationHolder rspec = metadata_Relocation::spec(index);
    return AddressLiteral((address)obj, rspec);
-@@ -1095,7 +1096,7 @@
+@@ -1095,7 +1097,7 @@
  }
  
  void  MacroAssembler::set_narrow_oop(jobject obj, Register d) {
@@ -2054,7 +2066,7 @@
    int oop_index = oop_recorder()->find_index(obj);
    RelocationHolder rspec = oop_Relocation::spec(oop_index);
  
-@@ -1110,7 +1111,7 @@
+@@ -1110,7 +1112,7 @@
  }
  
  void  MacroAssembler::set_narrow_klass(Klass* k, Register d) {
@@ -2063,7 +2075,7 @@
    int klass_index = oop_recorder()->find_index(k);
    RelocationHolder rspec = metadata_Relocation::spec(klass_index);
    narrowKlass encoded_k = CompressedKlassPointers::encode(k);
-@@ -1231,7 +1232,7 @@
+@@ -1231,7 +1233,7 @@
    // plausibility check for oops
    if (!VerifyOops) return;
  
@@ -2072,7 +2084,7 @@
  
    BLOCK_COMMENT("verify_oop {");
    char buffer[64];
-@@ -1242,7 +1243,7 @@
+@@ -1242,7 +1244,7 @@
    }
  #endif
  
@@ -2081,7 +2093,7 @@
    {
      ResourceMark rm;
      stringStream ss;
-@@ -1280,7 +1281,7 @@
+@@ -1280,7 +1282,7 @@
    // plausibility check for oops
    if (!VerifyOops) return;
  
@@ -2090,7 +2102,7 @@
    {
      ResourceMark rm;
      stringStream ss;
-@@ -1314,7 +1315,7 @@
+@@ -1314,7 +1316,7 @@
  }
  
  // side-door communication with signalHandler in os_solaris.cpp
@@ -2099,7 +2111,7 @@
  
  // This macro is expanded just once; it creates shared code.  Contract:
  // receives an oop in O0.  Must restore O0 & O7 from TLS.  Must not smash ANY
-@@ -1350,7 +1351,7 @@
+@@ -1350,7 +1352,7 @@
    Register O4_temp = O4;
  
    // mark lower end of faulting range
@@ -2108,7 +2120,7 @@
    _verify_oop_implicit_branch[0] = pc();
  
    // We can't check the mark oop because it could be in the process of
-@@ -1370,7 +1371,7 @@
+@@ -1370,7 +1372,7 @@
    // Check the Klass* of this object for being in the right area of memory.
    // Cannot do the load in the delay above slot in case O0 is null
    load_klass(O0_obj, O0_obj);
@@ -2117,7 +2129,7 @@
    br_null_short(O0_obj, pn, fail);
  
    wrccr( O5_save_flags ); // Restore CCR's
-@@ -2261,13 +2262,13 @@
+@@ -2261,13 +2263,13 @@
    check_klass_subtype_fast_path(sub_klass, super_klass,
                                  temp_reg, temp2_reg,
                                  (did_save ? &L_pop_to_success : &L_success),
@@ -2133,7 +2145,7 @@
  
    // on success:
    bind(L_pop_to_success);
-@@ -2491,6 +2492,105 @@
+@@ -2491,6 +2493,105 @@
  }
  
  
@@ -2239,7 +2251,7 @@
  // compiler_lock_object() and compiler_unlock_object() are direct transliterations
  // of i486.ad fast_lock() and fast_unlock().  See those methods for detailed comments.
  // The code could be tightened up considerably.
-@@ -2515,6 +2615,21 @@
+@@ -2515,6 +2616,21 @@
  
  void MacroAssembler::compiler_lock_object(Register Roop, Register Rmark,
                                            Register Rbox, Register Rscratch) {
@@ -2261,7 +2273,7 @@
     Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
  
     verify_oop(Roop);
-@@ -2577,10 +2692,10 @@
+@@ -2577,10 +2693,10 @@
  
     bind   (IsInflated);
  
@@ -2274,7 +2286,7 @@
     cas_ptr(Rmark, G0, Rscratch);
     andcc(Rscratch, Rscratch, G0);             // set ICCs for done: icc.zf iff success
     // set icc.zf : 1=success 0=failure
-@@ -2595,6 +2710,21 @@
+@@ -2595,6 +2711,21 @@
  
  void MacroAssembler::compiler_unlock_object(Register Roop, Register Rmark,
                                              Register Rbox, Register Rscratch) {
@@ -2296,7 +2308,7 @@
     Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
  
     Label done ;
-@@ -2643,7 +2773,7 @@
+@@ -2643,7 +2774,7 @@
     brx(Assembler::notZero, false, Assembler::pt, done);
     delayed()->andcc(G0, G0, G0);
     add(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner), Rmark);
@@ -2305,7 +2317,7 @@
     cas_ptr(Rmark, G0, Rscratch);
     cmp(Rscratch, G0);
     // invert icc.zf and goto done
-@@ -2926,7 +3056,9 @@
+@@ -2926,7 +3057,9 @@
    Label no_reserved_zone_enabling;
  
    ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G4_scratch);
@@ -2316,7 +2328,7 @@
  
    call_VM_leaf(L0, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
  
-@@ -2958,14 +3090,25 @@
+@@ -2958,14 +3091,25 @@
    // MachCallDynamicJavaNode::ret_addr_offset()
    // if this changes, change that.
    if (UseCompressedClassPointers) {
@@ -2343,7 +2355,7 @@
    if (UseCompressedClassPointers) {
      assert(dst_oop != klass, "not enough registers");
      encode_klass_not_null(klass);
-@@ -2976,7 +3119,7 @@
+@@ -2976,7 +3120,7 @@
  }
  
  void MacroAssembler::store_klass_gap(Register s, Register d) {
@@ -2352,7 +2364,7 @@
      assert(s != d, "not enough registers");
      st(s, d, oopDesc::klass_gap_offset_in_bytes());
    }
-@@ -3045,13 +3188,16 @@
+@@ -3045,13 +3189,16 @@
  }
  
  
@@ -2373,7 +2385,7 @@
      return;
    }
    Label done;
-@@ -3060,14 +3206,14 @@
+@@ -3060,14 +3207,14 @@
      bpr(rc_nz, true, Assembler::pt, src, done);
      delayed() -> sub(src, G6_heapbase, dst); // annulled if not taken
      bind(done);
@@ -2390,7 +2402,7 @@
      bind(done);
    }
  }
-@@ -3075,33 +3221,36 @@
+@@ -3075,33 +3222,36 @@
  
  void MacroAssembler::encode_heap_oop_not_null(Register r) {
    assert (UseCompressedOops, "must be compressed");
@@ -2439,7 +2451,7 @@
    if (CompressedOops::base() != nullptr) {
      Label done;
      bpr(rc_nz, true, Assembler::pt, dst, done);
-@@ -3116,10 +3265,11 @@
+@@ -3116,10 +3266,11 @@
    // pd_code_size_limit.
    // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
@@ -2455,7 +2467,7 @@
      add(r, G6_heapbase, r);
  }
  
-@@ -3128,15 +3278,16 @@
+@@ -3128,15 +3279,16 @@
    // pd_code_size_limit.
    // Also do not verify_oop as this is called by verify_oop.
    assert (UseCompressedOops, "must be compressed");
@@ -2476,7 +2488,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      sub(r, G6_heapbase, r);
-@@ -3154,7 +3305,7 @@
+@@ -3154,7 +3306,7 @@
      encode_klass_not_null(src);
    } else {
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2485,7 +2497,7 @@
        set((intptr_t)CompressedKlassPointers::base(), dst);
        sub(src, dst, dst);
        if (CompressedKlassPointers::shift() != 0) {
-@@ -3173,7 +3324,7 @@
+@@ -3173,7 +3325,7 @@
  int MacroAssembler::instr_size_for_decode_klass_not_null() {
    assert (UseCompressedClassPointers, "only for compressed klass ptrs");
    int num_instrs = 1;  // shift src,dst or add
@@ -2494,7 +2506,7 @@
      // set + add + set
      num_instrs += insts_for_internal_set((intptr_t)CompressedKlassPointers::base()) +
                    insts_for_internal_set((intptr_t)CompressedOops::base());
-@@ -3190,7 +3341,7 @@
+@@ -3190,7 +3342,7 @@
    // Do not add assert code to this unless you change vtableStubs_sparc.cpp
    // pd_code_size_limit.
    assert (UseCompressedClassPointers, "must be compressed");
@@ -2503,7 +2515,7 @@
      assert(r != G6_heapbase, "bad register choice");
      set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
      if (CompressedKlassPointers::shift() != 0)
-@@ -3209,7 +3360,7 @@
+@@ -3209,7 +3361,7 @@
      // Do not add assert code to this unless you change vtableStubs_sparc.cpp
      // pd_code_size_limit.
      assert (UseCompressedClassPointers, "must be compressed");
@@ -2512,7 +2524,7 @@
        if (CompressedKlassPointers::shift() != 0) {
          assert((src != G6_heapbase) && (dst != G6_heapbase), "bad register choice");
          set((intptr_t)CompressedKlassPointers::base(), G6_heapbase);
-@@ -3253,7 +3404,7 @@
+@@ -3253,7 +3405,7 @@
  
  void MacroAssembler::reinit_heapbase() {
    if (UseCompressedOops || UseCompressedClassPointers) {
