@@ -1,8 +1,56 @@
-# JDK 25 Solaris/SPARC continuation candidate (v33)
+# JDK 25 Solaris/SPARC continuation candidate (v34)
 
 This is an experimental source candidate for the attached JDK 25 tree. It
 re-enables VMContinuations and implements missing entry/yield native wrappers.
 It is not yet a runtime-validated SPARC continuation port.
+
+v34 responds to jdk25-priority-1-2-evidence.zip. The native v33 run has
+41 passes, 23 failures, two timeouts reported as errors and seven tests not
+meeting platform requirements. All continuation smoke modes and the native
+arraycopy/header smoke matrix passed before this run.
+
+Two concrete source corrections:
+* C2 legacy locking: inflated-monitor enter and unlock's owner-reacquisition
+  CAS now load JavaThread::monitor_owner_id, matching JDK25 ObjectMonitor's
+  int64 owner representation. The old code installed the JavaThread pointer,
+  which the shared notify/ownership checks reject. Four C2 recursive-locking
+  cases failed with IllegalMonitorStateException in LockingMode=1; the mode=0
+  action passed. Stack-lock CAS and lightweight-lock fast paths are retained.
+* Solaris native frame reporting: os::current_frame now returns frame() when
+  its first C frame is unwalkable, rather than calling the SP-dereferencing
+  window constructor with nullptr. Both CTW compiler-thread crash reports
+  show frame::frame +4 reading address 0x70. TestNativeStack reports the same
+  failure while printing a JNI warning on a native attached thread. This
+  fixes the diagnostic crash; underlying CTW compilation issues may remain.
+
+Validation: 18 cases using extracted owner-CAS emitter code passed an ASan /
+UBSan host model with empty, same-owner and other-owner monitors, including
+64-bit IDs. The extracted current_frame path returns an initialized empty
+frame for an unwalkable native stack and follows its sender when walkable.
+The direct rerunner's mock harness preserves #id arguments and propagates
+jtreg failure exit status. Native Solaris/SPARC validation is still required.
+
+The archive includes priority-1-2-status-v34.csv with all 25 unsuccessful cases
+and their observed causes, plus jdk25-priority-1-2-remaining.txt and a direct
+rerunner. It reads JT_HOME/JTREG_JDK from spec.gmk and passes test names as an
+argument array, preserving #id selections. It does not depend on the inactive
+make test wrapper. It keeps concurrency 16 (JDK25_TEST_JOBS can override),
+timeout factor 4, and retained failure/error output, without streaming the log.
+
+```sh
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/rerun-priority-1-2.sh
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+v34 does not claim all 25 cases are fixed. The other failures include unsafe
+memory access faults, G1/oop corruption, virtual-thread deoptimization,
+reserved-stack handling, constant-dynamic behavior, compression/page-size
+expectations and compilation deadlines. The two errors are actual timeouts,
+not missing native libraries. Further native evidence is needed after the
+confirmed source corrections; no tests are removed from the rerun list.
 
 v33 responds to the native output from 20261007-232916 and the full
 continuation-test-results-20261007-231504 archive. All nine string-equality

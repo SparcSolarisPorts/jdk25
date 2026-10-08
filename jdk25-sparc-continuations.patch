@@ -2068,6 +2068,19 @@
     Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
  
     verify_oop(Roop);
+@@ -2577,10 +2692,10 @@
+ 
+    bind   (IsInflated);
+ 
+-   // Try to CAS m->owner from null to Self
++   // Inflated monitor ownership uses the thread/virtual-thread owner ID.
+    // Invariant: if we acquire the lock then _recursions should be 0.
+    add(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner), Rmark);
+-   mov(G2_thread, Rscratch);
++   ld_ptr(G2_thread, in_bytes(JavaThread::monitor_owner_id_offset()), Rscratch);
+    cas_ptr(Rmark, G0, Rscratch);
+    andcc(Rscratch, Rscratch, G0);             // set ICCs for done: icc.zf iff success
+    // set icc.zf : 1=success 0=failure
 @@ -2595,6 +2710,21 @@
  
  void MacroAssembler::compiler_unlock_object(Register Roop, Register Rmark,
@@ -2090,6 +2103,15 @@
     Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
  
     Label done ;
+@@ -2643,7 +2773,7 @@
+    brx(Assembler::notZero, false, Assembler::pt, done);
+    delayed()->andcc(G0, G0, G0);
+    add(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner), Rmark);
+-   mov(G2_thread, Rscratch);
++   ld_ptr(G2_thread, in_bytes(JavaThread::monitor_owner_id_offset()), Rscratch);
+    cas_ptr(Rmark, G0, Rscratch);
+    cmp(Rscratch, G0);
+    // invert icc.zf and goto done
 @@ -2958,14 +3088,25 @@
    // MachCallDynamicJavaNode::ret_addr_offset()
    // if this changes, change that.
@@ -4004,7 +4026,7 @@
    if (os::is_first_C_frame(&myframe)) {
      // stack is not walkable
 -    return frame(NULL, NULL, false);
-+    return frame(nullptr, nullptr, false);
++    return frame(); // Empty frame; the window constructor dereferences its SP.
    } else {
      return os::get_sender_for_C_frame(&myframe);
    }

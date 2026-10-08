@@ -2692,10 +2692,10 @@ void MacroAssembler::compiler_lock_object(Register Roop, Register Rmark,
 
    bind   (IsInflated);
 
-   // Try to CAS m->owner from null to Self
+   // Inflated monitor ownership uses the thread/virtual-thread owner ID.
    // Invariant: if we acquire the lock then _recursions should be 0.
    add(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner), Rmark);
-   mov(G2_thread, Rscratch);
+   ld_ptr(G2_thread, in_bytes(JavaThread::monitor_owner_id_offset()), Rscratch);
    cas_ptr(Rmark, G0, Rscratch);
    andcc(Rscratch, Rscratch, G0);             // set ICCs for done: icc.zf iff success
    // set icc.zf : 1=success 0=failure
@@ -2773,7 +2773,7 @@ void MacroAssembler::compiler_unlock_object(Register Roop, Register Rmark,
    brx(Assembler::notZero, false, Assembler::pt, done);
    delayed()->andcc(G0, G0, G0);
    add(Rmark, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner), Rmark);
-   mov(G2_thread, Rscratch);
+   ld_ptr(G2_thread, in_bytes(JavaThread::monitor_owner_id_offset()), Rscratch);
    cas_ptr(Rmark, G0, Rscratch);
    cmp(Rscratch, G0);
    // invert icc.zf and goto done
