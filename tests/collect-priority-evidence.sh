@@ -27,7 +27,7 @@ while IFS= read -r test; do
     cp "$file" "$stage/source/$(dirname "$test")/"
   done
 done < "$root/jdk25-priority-1-2-remaining.txt"
-for rel in src/hotspot/cpu/sparc/frame_sparc.cpp src/hotspot/cpu/sparc/frame_sparc.hpp src/hotspot/cpu/sparc/frame_sparc.inline.hpp src/hotspot/share/runtime/continuation.cpp src/hotspot/cpu/sparc/macroAssembler_sparc.cpp src/hotspot/cpu/sparc/interp_masm_sparc.cpp; do
+for rel in src/hotspot/cpu/sparc/frame_sparc.cpp src/hotspot/cpu/sparc/frame_sparc.hpp src/hotspot/cpu/sparc/frame_sparc.inline.hpp src/hotspot/share/runtime/continuation.cpp src/hotspot/cpu/sparc/macroAssembler_sparc.cpp src/hotspot/cpu/sparc/interp_masm_sparc.cpp src/hotspot/os/solaris/os_solaris.cpp src/hotspot/share/jfr/jni/jfrJavaSupport.cpp src/hotspot/share/jfr/dcmd/jfrDcmds.cpp; do
   [[ -f "$root/$rel" ]] || continue
   mkdir -p "$stage/source/$(dirname "$rel")"
   cp "$root/$rel" "$stage/source/$rel"

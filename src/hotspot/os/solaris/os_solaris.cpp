@@ -2412,6 +2412,13 @@ jint os::init_2(void) {
   Solaris::synchronization_init();
   DEBUG_ONLY(os::set_mutex_init_done();)
 
+  // Include guard/shadow space in the platform minima and validate -Xss,
+  // as on the other POSIX ports. Also publish the configured Java stack
+  // size before calculating the native-thread limit below.
+  if (set_minimum_stack_sizes() == JNI_ERR) {
+    return JNI_ERR;
+  }
+
   if (MaxFDLimit) {
     // set the number of file descriptors to max. print out error
     // if getrlimit/setrlimit fails but continue regardless.

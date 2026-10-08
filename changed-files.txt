@@ -38,11 +38,14 @@ src/hotspot/cpu/sparc/templateTable_sparc.cpp
 src/hotspot/cpu/sparc/vm_version_sparc.cpp
 src/hotspot/cpu/sparc/vtableStubs_sparc.cpp
 src/hotspot/os/solaris/dtrace/jhelper.d
+src/hotspot/os/solaris/os_solaris.cpp
 src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.cpp
 src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.hpp
 src/hotspot/os_cpu/solaris_sparc/os_solaris_sparc.cpp
 src/hotspot/os_cpu/solaris_sparc/vm_version_solaris_sparc.cpp
 src/hotspot/share/c1/c1_Runtime1.cpp
+src/hotspot/share/jfr/dcmd/jfrDcmds.cpp
+src/hotspot/share/jfr/jni/jfrJavaSupport.cpp
 src/hotspot/share/opto/library_call.cpp
 src/hotspot/share/runtime/arguments.cpp
 src/hotspot/share/runtime/continuation.cpp

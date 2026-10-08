@@ -1,4 +1,82 @@
-# JDK 25 Solaris/SPARC continuation candidate (v40)
+# JDK 25 Solaris/SPARC continuation candidate (v41)
+
+Latest native v40 evidence: 11 passed, 12 failed and 2 timeout errors.
+TestConstantDynamic now passes, confirming the cached null-sentinel correction.
+CTW java_base_2 passes this run; UnexpectedDeoptimizationAllTest crashes in
+C2 VirtualThread.parkNanos, so intermittent compiler/continuation failures
+remain unresolved. All 25 selected cases remain in the rerun list.
+
+v41 initializes Solaris's shared minimum-stack policy by calling
+os::set_minimum_stack_sizes() from os::init_2(), before thread-limit calculation.
+The old Solaris path reported only the 86 KB usable-stack minimum and omitted
+guard/shadow space. The failing ClassInitErrors test consequently launched with
+-Xss88064 and overflowed during String class initialization before its test body.
+The shared initialization includes guards/shadow space, rounds to OS pages,
+validates Java/compiler/VM stack sizes and publishes the configured Java stack
+size. It also makes configured -Xss effective for new Java threads. The normal
+Java thread default remains 1 MB; an attached primordial Java thread now uses
+the configured size instead of the old independent 2 MB fallback. No stack
+guards, compilers, continuations or header features are disabled.
+
+The additional Gradle attachment reports a JDK 21 crash in JFR read_field while
+ManagementFactory creates its platform MBean server. It is truncated before
+registers, fault address and instructions, so this crash is not diagnosed fully.
+v41 includes a JFR rooting candidate: receiver handles span class initialization
+in field reads/writes, and JFR command metadata holds its argument array and
+argument objects in handles rather than raw oops across field-access calls.
+This corrects object lifetime across possible safepoints, but native validation
+is needed to establish whether it resolves that SIGBUS. A separate
+jdk21-jfr-rooting.patch contains only the corresponding JDK 21 changes; do not
+copy JDK 25 source replacements into JDK 21. These changes preserve JFR.
+
+Validation: the extracted shared stack policy passed 18 ASan/UBSan cases for
+4 KB, 8 KB and 64 KB pages, invalid stack sizes and configured-size publication.
+SmallStackStartupSmoke passed at the host VM's reported minimum in interpreter,
+C1, mixed and C2 modes. JfrManagementSmoke exercises platform MBean startup,
+JFR command descriptors, recording start/stop and concurrent GC in four modes.
+These are Linux x86 host checks; a native Solaris build and rerun remain required.
+Shell syntax, cumulative patch dry run, ZIP CRC and source SHA-256 are checked.
+
+Extract the ZIP over your JDK 25 checkout, then build quietly and run:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-small-stack-repro.sh
+  bash tests/run-jfr-management-repro.sh
+  bash tests/rerun-priority-1-2.sh
+  latest_results=$(ls -dt "$PWD"/priority-1-2-rerun-*/ | head -1)
+  bash tests/collect-priority-evidence.sh "$latest_results"
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+Both new smoke runners have a five-minute watchdog per mode. The jtreg runner
+retains its existing timeouts and logs. Upload the newly collected evidence.
+For the Gradle crash, also provide the complete original hs_err_pid14860.log
+(or the complete new crash log), not a truncated Markdown rendering.
+
+For JDK 21, copy just jdk21-jfr-rooting.patch and the JfrManagementSmoke.java /
+run-jfr-management-repro.sh test pair from this ZIP to ~/git/jdk21, then:
+
+```bash
+cd ~/git/jdk21
+patch --dry-run -p1 < jdk21-jfr-rooting.patch
+patch -p1 < jdk21-jfr-rooting.patch
+if gmake images JOBS=8 > /tmp/jdk21-build.log 2>&1; then
+  JDK25_IMAGE="$PWD/build/solaris-sparcv9-server-release/images/jdk" \
+    bash tests/run-jfr-management-repro.sh
+else
+  tail -80 /tmp/jdk21-build.log
+fi
+```
+
+The runner's JDK25_IMAGE variable is a path override and works with JDK 21.
+Select the rebuilt Java executable in Gradle before checking daemon startup.
+
+## Included v40 changes
+
 
 v40 corrects the v39 smoke-test compilation failure. The test previously
 imported jdk.internal.org.objectweb.asm, which is unavailable in the user's

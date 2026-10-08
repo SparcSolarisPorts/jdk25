@@ -4187,6 +4187,22 @@
 -}
 +  0;
 +}
+--- a/src/hotspot/os/solaris/os_solaris.cpp
++++ b/src/hotspot/os/solaris/os_solaris.cpp
+@@ -2411,6 +2411,13 @@
+   // initialize synchronization primitives
+   Solaris::synchronization_init();
+   DEBUG_ONLY(os::set_mutex_init_done();)
++
++  // Include guard/shadow space in the platform minima and validate -Xss,
++  // as on the other POSIX ports. Also publish the configured Java stack
++  // size before calculating the native-thread limit below.
++  if (set_minimum_stack_sizes() == JNI_ERR) {
++    return JNI_ERR;
++  }
+ 
+   if (MaxFDLimit) {
+     // set the number of file descriptors to max. print out error
 --- a/src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.cpp
 +++ b/src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.cpp
 @@ -29,7 +29,7 @@
@@ -4462,6 +4478,92 @@
            RelocIterator mds(nm, copy_buff, copy_buff + 1);
            bool found = false;
            while (mds.next() && !found) {
+--- a/src/hotspot/share/jfr/dcmd/jfrDcmds.cpp
++++ b/src/hotspot/share/jfr/dcmd/jfrDcmds.cpp
+@@ -299,7 +299,7 @@
+   return str;
+ }
+ 
+-static const char* read_string_field(oop argument, const char* field_name, TRAPS) {
++static const char* read_string_field(Handle argument, const char* field_name, TRAPS) {
+   JavaValue result(T_OBJECT);
+   JfrJavaArguments args(&result);
+   args.set_klass(argument->klass());
+@@ -311,7 +311,7 @@
+   return string_oop != nullptr ? get_as_dcmd_arena_string(string_oop) : nullptr;
+ }
+ 
+-static bool read_boolean_field(oop argument, const char* field_name, TRAPS) {
++static bool read_boolean_field(Handle argument, const char* field_name, TRAPS) {
+   JavaValue result(T_BOOLEAN);
+   JfrJavaArguments args(&result);
+   args.set_klass(argument->klass());
+@@ -322,7 +322,7 @@
+   return (result.get_jint() & 1) == 1;
+ }
+ 
+-static DCmdArgumentInfo* create_info(oop argument, TRAPS) {
++static DCmdArgumentInfo* create_info(Handle argument, TRAPS) {
+   return new DCmdArgumentInfo(
+     read_string_field(argument, "name", THREAD),
+     read_string_field(argument, "description", THREAD),
+@@ -352,14 +352,14 @@
+     assert(array->length() == _num_arguments, "invariant");
+     return array;
+   }
+-  objArrayOop arguments = objArrayOop(result.get_oop());
+-  assert(arguments != nullptr, "invariant");
++  objArrayHandle arguments(thread, objArrayOop(result.get_oop()));
++  assert(arguments.not_null(), "invariant");
+   assert(arguments->is_array(), "must be array");
+   const int num_arguments = arguments->length();
+   assert(num_arguments == _num_arguments, "invariant");
+   prepare_dcmd_string_arena(thread);
+   for (int i = 0; i < num_arguments; ++i) {
+-    DCmdArgumentInfo* const dai = create_info(arguments->obj_at(i), thread);
++    DCmdArgumentInfo* const dai = create_info(Handle(thread, arguments->obj_at(i)), thread);
+     assert(dai != nullptr, "invariant");
+     array->append(dai);
+   }
+--- a/src/hotspot/share/jfr/jni/jfrJavaSupport.cpp
++++ b/src/hotspot/share/jfr/jni/jfrJavaSupport.cpp
+@@ -437,8 +437,13 @@
+   assert(result != nullptr, "invariant");
+   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(THREAD));
+   result->set_oop(nullptr); // Initialize result in case klass initialize throws.
++  HandleMark hm(THREAD);
++  Handle receiver(THREAD, args->has_receiver() ? args->receiver() : nullptr);
+   InstanceKlass* const klass = static_cast<InstanceKlass*>(args->klass());
+   klass->initialize(CHECK);
++  if (receiver.not_null()) {
++    args->set_receiver(receiver);
++  }
+   read_field(args, result, static_cast<Thread*>(THREAD));
+ }
+ 
+@@ -446,16 +451,20 @@
+   assert(args != nullptr, "invariant");
+   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(THREAD));
+ 
++  HandleMark hm(THREAD);
++  Handle receiver(THREAD, args->has_receiver() ? args->receiver() : nullptr);
+   InstanceKlass* const klass = static_cast<InstanceKlass*>(args->klass());
+   klass->initialize(CHECK);
++  if (receiver.not_null()) {
++    args->set_receiver(receiver);
++  }
+ 
+   const bool static_field = !args->has_receiver();
+   fieldDescriptor fd;
+   lookup_field(args, klass, &fd, static_field);
+   assert(fd.offset() > 0, "invariant");
+ 
+-  HandleMark hm(THREAD);
+-  Handle h_oop(static_field ? Handle(THREAD, klass->java_mirror()) : Handle(THREAD, args->receiver()));
++  Handle h_oop(static_field ? Handle(THREAD, klass->java_mirror()) : receiver);
+   write_specialized_field(args, h_oop, &fd, static_field);
+ }
+ 
 --- a/src/hotspot/share/opto/library_call.cpp
 +++ b/src/hotspot/share/opto/library_call.cpp
 @@ -7124,7 +7124,7 @@

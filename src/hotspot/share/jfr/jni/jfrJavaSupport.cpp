@@ -437,8 +437,13 @@ static void read_field(JfrJavaArguments* args, JavaValue* result, TRAPS) {
   assert(result != nullptr, "invariant");
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(THREAD));
   result->set_oop(nullptr); // Initialize result in case klass initialize throws.
+  HandleMark hm(THREAD);
+  Handle receiver(THREAD, args->has_receiver() ? args->receiver() : nullptr);
   InstanceKlass* const klass = static_cast<InstanceKlass*>(args->klass());
   klass->initialize(CHECK);
+  if (receiver.not_null()) {
+    args->set_receiver(receiver);
+  }
   read_field(args, result, static_cast<Thread*>(THREAD));
 }
 
@@ -446,16 +451,20 @@ static void write_field(JfrJavaArguments* args, TRAPS) {
   assert(args != nullptr, "invariant");
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(THREAD));
 
+  HandleMark hm(THREAD);
+  Handle receiver(THREAD, args->has_receiver() ? args->receiver() : nullptr);
   InstanceKlass* const klass = static_cast<InstanceKlass*>(args->klass());
   klass->initialize(CHECK);
+  if (receiver.not_null()) {
+    args->set_receiver(receiver);
+  }
 
   const bool static_field = !args->has_receiver();
   fieldDescriptor fd;
   lookup_field(args, klass, &fd, static_field);
   assert(fd.offset() > 0, "invariant");
 
-  HandleMark hm(THREAD);
-  Handle h_oop(static_field ? Handle(THREAD, klass->java_mirror()) : Handle(THREAD, args->receiver()));
+  Handle h_oop(static_field ? Handle(THREAD, klass->java_mirror()) : receiver);
   write_specialized_field(args, h_oop, &fd, static_field);
 }
 

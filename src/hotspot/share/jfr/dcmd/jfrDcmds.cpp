@@ -299,7 +299,7 @@ static const char* get_as_dcmd_arena_string(oop string) {
   return str;
 }
 
-static const char* read_string_field(oop argument, const char* field_name, TRAPS) {
+static const char* read_string_field(Handle argument, const char* field_name, TRAPS) {
   JavaValue result(T_OBJECT);
   JfrJavaArguments args(&result);
   args.set_klass(argument->klass());
@@ -311,7 +311,7 @@ static const char* read_string_field(oop argument, const char* field_name, TRAPS
   return string_oop != nullptr ? get_as_dcmd_arena_string(string_oop) : nullptr;
 }
 
-static bool read_boolean_field(oop argument, const char* field_name, TRAPS) {
+static bool read_boolean_field(Handle argument, const char* field_name, TRAPS) {
   JavaValue result(T_BOOLEAN);
   JfrJavaArguments args(&result);
   args.set_klass(argument->klass());
@@ -322,7 +322,7 @@ static bool read_boolean_field(oop argument, const char* field_name, TRAPS) {
   return (result.get_jint() & 1) == 1;
 }
 
-static DCmdArgumentInfo* create_info(oop argument, TRAPS) {
+static DCmdArgumentInfo* create_info(Handle argument, TRAPS) {
   return new DCmdArgumentInfo(
     read_string_field(argument, "name", THREAD),
     read_string_field(argument, "description", THREAD),
@@ -352,14 +352,14 @@ GrowableArray<DCmdArgumentInfo*>* JfrDCmd::argument_info_array() const {
     assert(array->length() == _num_arguments, "invariant");
     return array;
   }
-  objArrayOop arguments = objArrayOop(result.get_oop());
-  assert(arguments != nullptr, "invariant");
+  objArrayHandle arguments(thread, objArrayOop(result.get_oop()));
+  assert(arguments.not_null(), "invariant");
   assert(arguments->is_array(), "must be array");
   const int num_arguments = arguments->length();
   assert(num_arguments == _num_arguments, "invariant");
   prepare_dcmd_string_arena(thread);
   for (int i = 0; i < num_arguments; ++i) {
-    DCmdArgumentInfo* const dai = create_info(arguments->obj_at(i), thread);
+    DCmdArgumentInfo* const dai = create_info(Handle(thread, arguments->obj_at(i)), thread);
     assert(dai != nullptr, "invariant");
     array->append(dai);
   }
