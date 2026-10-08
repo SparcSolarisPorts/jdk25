@@ -1,4 +1,105 @@
-# JDK 25 Solaris/SPARC continuation candidate (v36)
+# JDK 25 Solaris/SPARC continuation candidate (v38)
+
+v38 includes all v37 source changes plus a Forge launcher correction for the
+reported process-reaper StackOverflowError during shutdown. The launcher now
+exports -Djdk.lang.processReaperUseDefaultStackSize=true through JDK_JAVA_OPTIONS,
+so the Java process launched by Forge's run.sh uses the normal VM thread stack
+rather than the reaper's small dedicated stack. Existing JDK_JAVA_OPTIONS,
+user_jvm_args.txt, Forge argument files and server arguments are preserved.
+The process reaper continues running; C1, C2, continuations and compact object
+headers retain their existing configuration. The launcher continues to check
+compact-header support before invoking Forge.
+
+This is a supported process-reaper stack configuration, targeted at the
+observed small-stack failure. The native trace has no full Java stack, so
+confirmation on Solaris is required before calling the Forge shutdown fixed.
+The Java property is documented in OpenJDK's ProcessHandleImpl implementation:
+https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/lang/ProcessHandleImpl.java
+
+New ProcessReaperSmoke.java starts 100 bounded subprocesses per mode and checks
+waitFor, ProcessHandle.onExit, nonzero exit status, captured output and uncaught
+thread exceptions. run-process-reaper-repro.sh runs interpreter, C1, mixed and
+C2 with compact headers, records OS thread-stack diagnostics, and has both
+Java completion deadlines and a 300-second whole-process watchdog per mode.
+The main test passed 400 subprocess completions across the four host Java 17
+modes. Host execution does not validate SPARC frames or JDK 25 compact headers.
+Launcher checks passed with existing Java options, server/JDK paths containing
+spaces, forwarded server arguments and FORGE_TRACE=1. Shell syntax checks,
+cumulative patch dry run, ZIP CRC and source SHA-256 checks passed.
+
+After installing the archive, run:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-process-reaper-repro.sh &&
+  bash tests/run-forge-with-jdk25.sh \
+    "$HOME/Downloads/forge26.3servertest/forge26.3servertest"
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+The launcher change itself works with the existing JDK image; rebuilding
+applies the cumulative HotSpot changes, including v37's C1 displacement fixes.
+Forge's EULA check is independent: review and accept eula.txt yourself if you
+agree. This archive leaves the server's EULA file untouched.
+
+## Included v37 changes and native results
+
+v37 responds to priority-1-2-rerun-20261008-013011-evidence.zip, including
+its actual jtreg Java sources. Native v36 results: 9 passes, 14 failures and
+2 timeout errors. ReservedStackTest now passes. CTW java_base_2 passes in
+this run; it has varied between runs, so remains a regression selection.
+The separate compiled reserved-stack test still fails.
+
+v37 fixes two C1 displacement bugs in c1_LIRAssembler_sparc.cpp:
+* OSR monitor copying now materializes the monitor address when either word
+  lies outside the signed 13-bit immediate range. It preserves I0, which
+  subsequent local-variable copying needs. The uploaded TestLargeMonitorOffset
+  declares 1000 long locals, placing its monitor around 16 KB into the OSR
+  buffer. Previously release builds could encode a truncated displacement,
+  copying unrelated data into the compiled monitor's oop slot. Its observed
+  G1 oop-copy crash is consistent with that defect, but a native rerun must
+  establish whether this is its complete cause.
+* Both C1 immediate load/store range checks now parenthesize the conditional
+  addend. The previous expression tested 0 or wordSize regardless of the
+  actual displacement and could incorrectly choose an immediate instruction
+  for an out-of-range address.
+
+The extracted OSR emitter passed 42 host ASan/UBSan checks covering both
+monitor words, multiple monitors, immediate-range boundaries, 1000-long-local
+geometry, maximum local counts and preservation of the OSR buffer pointer.
+These checks simulate address emission; they do not execute SPARC instructions.
+No HotSpot SPARC build or native jtreg run is available here. The cumulative
+patch dry run, ZIP CRC and source SHA-256 checks passed.
+
+priority-1-2-status-v37.csv records all 25 native v36 outcomes. All selections
+remain in the runner. No test expectations or VM features were disabled.
+The other 13 failures and 2 errors remain unresolved: unsafe access alignment,
+constant-dynamic C1 results, C2 long range checks, compiled reserved-stack
+handling, small-stack initialization, virtual-thread/deoptimization stress,
+class-space placement, large-page selection, stack-pretouch accounting and
+JNI/stack-bang timeouts. These require separate fixes and native validation.
+
+Rebuild and rerun:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-continuation-repro.sh
+  bash tests/rerun-priority-1-2.sh
+  latest_results=$(ls -dt "$PWD"/priority-1-2-rerun-*/ | head -1)
+  bash tests/collect-priority-evidence.sh "$latest_results"
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+The direct runner retains timeout factor 4, logs output to its results folder,
+and preserves failing/error artifacts. It returns jtreg's exit code.
+
+## Earlier v36 changes
 
 v36 responds to jdk25-priority-v35-evidence.zip. Native v35 confirms both
 new fixes: TestAllocateHeapAtMultiple and TestNativeStack pass, and all six

@@ -20,7 +20,42 @@
  #ifdef ASSERT
 --- a/src/hotspot/cpu/sparc/c1_LIRAssembler_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/c1_LIRAssembler_sparc.cpp
-@@ -294,7 +294,7 @@
+@@ -217,20 +217,31 @@
+     // the oop.
+     for (int i = 0; i < number_of_locks; i++) {
+       int slot_offset = monitor_offset - ((i * 2) * BytesPerWord);
++      Register monitor_base = OSR_buf;
++      // Both words must fit the signed 13-bit displacement. Large local
++      // arrays place the monitor beyond that range; materialize its address
++      // without clobbering I0 (the locals still use the OSR buffer).
++      if (!Assembler::is_simm13(slot_offset) ||
++          !Assembler::is_simm13(slot_offset + BytesPerWord)) {
++        __ set(slot_offset, G3_scratch);
++        __ add(OSR_buf, G3_scratch, G3_scratch);
++        monitor_base = G3_scratch;
++        slot_offset = 0;
++      }
+ #ifdef ASSERT
+       // verify the interpreter's monitor has a non-null object
+       {
+         Label L;
+-        __ ld_ptr(OSR_buf, slot_offset + 1*BytesPerWord, O7);
++        __ ld_ptr(monitor_base, slot_offset + 1*BytesPerWord, O7);
+         __ cmp_and_br_short(O7, G0, Assembler::notEqual, Assembler::pt, L);
+         __ stop("locked object is null");
+         __ bind(L);
+       }
+ #endif // ASSERT
+       // Copy the lock field into the compiled activation.
+-      __ ld_ptr(OSR_buf, slot_offset + 0, O7);
++      __ ld_ptr(monitor_base, slot_offset + 0, O7);
+       __ st_ptr(O7, frame_map()->address_for_monitor_lock(i));
+-      __ ld_ptr(OSR_buf, slot_offset + 1*BytesPerWord, O7);
++      __ ld_ptr(monitor_base, slot_offset + 1*BytesPerWord, O7);
+       __ st_ptr(O7, frame_map()->address_for_monitor_object(i));
+     }
+   }
+@@ -294,7 +305,7 @@
  
    address handler_base = __ start_a_stub(exception_handler_size());
  
@@ -29,7 +64,7 @@
      // not enough space left for the handler
      bailout("exception handler overflow");
      return -1;
-@@ -381,7 +381,7 @@
+@@ -381,7 +392,7 @@
    // generate code for deopt handler
    ciMethod* method = compilation()->method();
    address handler_base = __ start_a_stub(deopt_handler_size());
@@ -38,7 +73,7 @@
      // not enough space left for the handler
      bailout("deopt handler overflow");
      return -1;
-@@ -420,10 +420,10 @@
+@@ -420,10 +431,10 @@
    int oop_index = __ oop_recorder()->allocate_oop_index(nullptr);
    PatchingStub* patch = new PatchingStub(_masm, patching_id(info), oop_index);
  
@@ -52,7 +87,7 @@
    // therefore generate the sethi/add as a placeholders
    __ patchable_set(addrlit, reg);
  
-@@ -439,10 +439,10 @@
+@@ -439,10 +450,10 @@
    // Allocate a new index in table to hold the klass once it's been patched
    int index = __ oop_recorder()->allocate_metadata_index(nullptr);
    PatchingStub* patch = new PatchingStub(_masm, PatchingStub::load_klass_id, index);
@@ -66,7 +101,7 @@
    // therefore generate the sethi/add as a placeholders
    __ patchable_set(addrlit, reg);
  
-@@ -552,7 +552,7 @@
+@@ -552,7 +563,7 @@
    if (op->block() != nullptr)  _branch_target_blocks.append(op->block());
    if (op->ublock() != nullptr) _branch_target_blocks.append(op->ublock());
  #endif
@@ -75,7 +110,25 @@
  
    if (op->cond() == lir_cond_always) {
      __ br(Assembler::always, false, Assembler::pt, *(op->label()));
-@@ -1018,7 +1018,7 @@
+@@ -701,7 +712,7 @@
+ 
+ int LIR_Assembler::store(LIR_Opr from_reg, Register base, int offset, BasicType type, bool wide, bool unaligned) {
+   int store_offset;
+-  if (!Assembler::is_simm13(offset + (type == T_LONG) ? wordSize : 0)) {
++  if (!Assembler::is_simm13(offset + ((type == T_LONG) ? wordSize : 0))) {
+     assert(base != O7, "destroying register");
+     assert(!unaligned, "can't handle this");
+     // for offsets larger than a simm13 we setup the offset in O7
+@@ -807,7 +818,7 @@
+ 
+ int LIR_Assembler::load(Register base, int offset, LIR_Opr to_reg, BasicType type, bool wide, bool unaligned) {
+   int load_offset;
+-  if (!Assembler::is_simm13(offset + (type == T_LONG) ? wordSize : 0)) {
++  if (!Assembler::is_simm13(offset + ((type == T_LONG) ? wordSize : 0))) {
+     assert(base != O7, "destroying register");
+     assert(!unaligned, "can't handle this");
+     // for offsets larger than a simm13 we setup the offset in O7
+@@ -1018,7 +1029,7 @@
      case T_OBJECT: {
        jobject obj = c->as_jobject();
        LIR_Opr tmp;
@@ -84,7 +137,7 @@
          tmp = FrameMap::G0_opr;
        } else {
          tmp = FrameMap::O7_opr;
-@@ -1038,7 +1038,7 @@
+@@ -1038,7 +1049,7 @@
      default:
        Unimplemented();
    }
@@ -93,7 +146,7 @@
      assert(offset != -1, "offset should've been set");
      add_debug_info_for_null_check(offset, info);
    }
-@@ -1114,7 +1114,7 @@
+@@ -1114,7 +1125,7 @@
      case T_FLOAT:
        {
          address const_addr = __ float_constant(c->as_jfloat());
@@ -102,7 +155,7 @@
            bailout("const section overflow");
            break;
          }
-@@ -1137,7 +1137,7 @@
+@@ -1137,7 +1148,7 @@
      case T_DOUBLE:
        {
          address const_addr = __ double_constant(c->as_jdouble());
@@ -111,7 +164,7 @@
            bailout("const section overflow");
            break;
          }
-@@ -1239,7 +1239,7 @@
+@@ -1239,7 +1250,7 @@
      __ verify_oop(src);
    }
  
@@ -120,7 +173,7 @@
    if (needs_patching) {
      patch = new PatchingStub(_masm, PatchingStub::access_field_id);
      assert(!to_reg->is_double_cpu() ||
-@@ -1276,10 +1276,10 @@
+@@ -1276,10 +1287,10 @@
      offset = load(src, disp_reg, to_reg, type, wide);
    }
  
@@ -133,7 +186,7 @@
  }
  
  
-@@ -1352,7 +1352,7 @@
+@@ -1352,7 +1363,7 @@
      __ verify_oop(src);
    }
  
@@ -142,7 +195,7 @@
    if (needs_patching) {
      patch = new PatchingStub(_masm, PatchingStub::access_field_id);
      assert(!from_reg->is_double_cpu() ||
-@@ -1389,11 +1389,11 @@
+@@ -1389,11 +1400,11 @@
      offset = store(from_reg, src, disp_reg, type, wide);
    }
  
@@ -156,7 +209,7 @@
  }
  
  
-@@ -1411,7 +1411,7 @@
+@@ -1411,7 +1422,7 @@
  
  int LIR_Assembler::safepoint_poll(LIR_Opr tmp, CodeEmitInfo* info) {
    __ ld_ptr(Address(G2_thread, JavaThread::polling_page_offset()), tmp->as_register());
@@ -165,7 +218,7 @@
      add_debug_info_for_branch(info);
    }
    int offset = __ offset();
-@@ -1433,7 +1433,7 @@
+@@ -1433,7 +1444,7 @@
    int start = __ offset();
    __ relocate(static_stub_Relocation::spec(call_pc));
  
@@ -174,7 +227,7 @@
    // must be set to -1 at code generation time
    AddressLiteral addrlit(-1);
    __ jump_to(addrlit, G3);
-@@ -1947,8 +1947,8 @@
+@@ -1947,8 +1958,8 @@
        // Simple test for basic type arrays
        if (UseCompressedClassPointers) {
          // We don't need decode because we just need to compare
@@ -185,7 +238,7 @@
          __ cmp(tmp, tmp2);
          __ br(Assembler::notEqual, false, Assembler::pt, *stub->entry());
        } else {
-@@ -1969,7 +1969,7 @@
+@@ -1969,7 +1980,7 @@
        __ load_klass(src, G3);
        __ load_klass(dst, G1);
  
@@ -194,7 +247,7 @@
  
        __ call(Runtime1::entry_for(C1StubId::slow_subtype_check_id), relocInfo::runtime_call_type);
        __ delayed()->nop();
-@@ -2085,12 +2085,13 @@
+@@ -2085,12 +2096,13 @@
        __ encode_klass_not_null(tmp);
        // load the raw value of the dst klass, since we will be comparing
        // uncompressed values directly.
@@ -210,7 +263,7 @@
          __ cmp_and_br_short(tmp, tmp2, Assembler::equal, Assembler::pn, known_ok);
        } else {
          __ cmp(tmp, tmp2);
-@@ -2148,7 +2149,8 @@
+@@ -2148,7 +2160,8 @@
    }
  
    bool disjoint = (flags & LIR_OpArrayCopy::overlapping) == 0;
@@ -220,7 +273,7 @@
    const char *name;
    address entry = StubRoutines::select_arraycopy_function(basic_type, aligned, disjoint, name, false);
  
-@@ -2270,7 +2272,7 @@
+@@ -2270,7 +2283,7 @@
                        op->tmp1()->as_register(),
                        op->tmp2()->as_register(),
                        op->tmp3()->as_register(),
@@ -229,7 +282,7 @@
                        type2aelembytes(op->type()),
                        op->klass()->as_register(),
                        *op->stub()->entry());
-@@ -2322,7 +2324,7 @@
+@@ -2322,7 +2335,7 @@
  void LIR_Assembler::setup_md_access(ciMethod* method, int bci,
                                      ciMethodData*& md, ciProfileData*& data, int& mdo_offset_bias) {
    md = method->method_data_or_null();
@@ -238,7 +291,7 @@
    data = md->bci_to_data(bci);
    assert(data != nullptr,       "need data for checkcast");
    assert(data->is_ReceiverTypeData(), "need ReceiverTypeData for type check");
-@@ -2412,7 +2414,7 @@
+@@ -2412,7 +2425,7 @@
      } else {
        // perform the fast part of the checking logic
        __ check_klass_subtype_fast_path(klass_RInfo, k_RInfo, Rtmp1, O7, success_target,
@@ -247,7 +300,7 @@
      }
      if (need_slow_path) {
        // call out-of-line instance of __ check_klass_subtype_slow_path(...):
-@@ -2508,7 +2510,7 @@
+@@ -2508,7 +2521,7 @@
      // get instance klass
      __ ld_ptr(Address(k_RInfo, ObjArrayKlass::element_klass_offset()), k_RInfo);
      // perform the fast part of the checking logic
@@ -256,7 +309,7 @@
  
      // call out-of-line instance of __ check_klass_subtype_slow_path(...):
      assert(klass_RInfo == G3 && k_RInfo == G1, "incorrect call setup");
-@@ -2694,16 +2696,11 @@
+@@ -2694,16 +2707,11 @@
    Register result = op->result_opr()->as_pointer_register();
  
    CodeEmitInfo* info = op->info();
@@ -275,7 +328,7 @@
  }
  
  void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
-@@ -2713,7 +2710,7 @@
+@@ -2713,7 +2721,7 @@
  
    // Update counter for all call types
    ciMethodData* md = method->method_data_or_null();
@@ -284,7 +337,7 @@
    ciProfileData* data = md->bci_to_data(bci);
    assert(data != nullptr && data->is_CounterData(), "need CounterData for calls");
    assert(op->mdo()->is_single_cpu(),  "mdo must be allocated");
-@@ -2889,7 +2886,7 @@
+@@ -2889,7 +2897,7 @@
            __ delayed()->nop();
          }
        } else {
@@ -293,7 +346,7 @@
                 ciTypeEntries::valid_ciklass(current_klass) != exact_klass, "conflict only");
  
          __ btst(TypeEntries::type_unknown, tmp2);
-@@ -2927,7 +2924,7 @@
+@@ -2927,7 +2935,7 @@
  #endif
  
        } else {
@@ -302,7 +355,7 @@
                 ciTypeEntries::valid_ciklass(current_klass) != exact_klass, "inconsistent");
  
          // already unknown. Nothing to do anymore.
-@@ -3010,7 +3007,7 @@
+@@ -3010,7 +3018,7 @@
    }
    __ call(dest, relocInfo::runtime_call_type);
    __ delayed()->nop();
@@ -311,7 +364,7 @@
      add_call_info_here(info);
    }
    if (tmp->is_valid()) {
-@@ -3072,7 +3069,7 @@
+@@ -3072,7 +3080,7 @@
      } else {
        Unimplemented();
      }
@@ -320,7 +373,7 @@
        add_debug_info_for_null_check(null_check_offset, info);
      }
  
-@@ -3214,14 +3211,14 @@
+@@ -3214,14 +3222,14 @@
        case lir_cond_float_branch:
        case lir_branch: {
          LIR_OpBranch* branch = op->as_OpBranch();
@@ -338,7 +391,7 @@
              // swap previous instruction into delay slot
              inst->at_put(i - 1, op);
              inst->at_put(i, new LIR_OpDelay(prev, op->info()));
-@@ -3230,7 +3227,7 @@
+@@ -3230,7 +3238,7 @@
          }
  
          if (!delay_op) {
@@ -347,7 +400,7 @@
          }
          inst->insert_before(i + 1, delay_op);
          break;
-@@ -3240,7 +3237,7 @@
+@@ -3240,7 +3248,7 @@
        case lir_optvirtual_call:
        case lir_dynamic_call: {
          LIR_Op* prev = inst->at(i - 1);

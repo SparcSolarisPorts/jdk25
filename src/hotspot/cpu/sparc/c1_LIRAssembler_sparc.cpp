@@ -217,20 +217,31 @@ void LIR_Assembler::osr_entry() {
     // the oop.
     for (int i = 0; i < number_of_locks; i++) {
       int slot_offset = monitor_offset - ((i * 2) * BytesPerWord);
+      Register monitor_base = OSR_buf;
+      // Both words must fit the signed 13-bit displacement. Large local
+      // arrays place the monitor beyond that range; materialize its address
+      // without clobbering I0 (the locals still use the OSR buffer).
+      if (!Assembler::is_simm13(slot_offset) ||
+          !Assembler::is_simm13(slot_offset + BytesPerWord)) {
+        __ set(slot_offset, G3_scratch);
+        __ add(OSR_buf, G3_scratch, G3_scratch);
+        monitor_base = G3_scratch;
+        slot_offset = 0;
+      }
 #ifdef ASSERT
       // verify the interpreter's monitor has a non-null object
       {
         Label L;
-        __ ld_ptr(OSR_buf, slot_offset + 1*BytesPerWord, O7);
+        __ ld_ptr(monitor_base, slot_offset + 1*BytesPerWord, O7);
         __ cmp_and_br_short(O7, G0, Assembler::notEqual, Assembler::pt, L);
         __ stop("locked object is null");
         __ bind(L);
       }
 #endif // ASSERT
       // Copy the lock field into the compiled activation.
-      __ ld_ptr(OSR_buf, slot_offset + 0, O7);
+      __ ld_ptr(monitor_base, slot_offset + 0, O7);
       __ st_ptr(O7, frame_map()->address_for_monitor_lock(i));
-      __ ld_ptr(OSR_buf, slot_offset + 1*BytesPerWord, O7);
+      __ ld_ptr(monitor_base, slot_offset + 1*BytesPerWord, O7);
       __ st_ptr(O7, frame_map()->address_for_monitor_object(i));
     }
   }
@@ -701,7 +712,7 @@ void LIR_Assembler::ic_call(LIR_OpJavaCall* op) {
 
 int LIR_Assembler::store(LIR_Opr from_reg, Register base, int offset, BasicType type, bool wide, bool unaligned) {
   int store_offset;
-  if (!Assembler::is_simm13(offset + (type == T_LONG) ? wordSize : 0)) {
+  if (!Assembler::is_simm13(offset + ((type == T_LONG) ? wordSize : 0))) {
     assert(base != O7, "destroying register");
     assert(!unaligned, "can't handle this");
     // for offsets larger than a simm13 we setup the offset in O7
@@ -807,7 +818,7 @@ int LIR_Assembler::store(LIR_Opr from_reg, Register base, Register disp, BasicTy
 
 int LIR_Assembler::load(Register base, int offset, LIR_Opr to_reg, BasicType type, bool wide, bool unaligned) {
   int load_offset;
-  if (!Assembler::is_simm13(offset + (type == T_LONG) ? wordSize : 0)) {
+  if (!Assembler::is_simm13(offset + ((type == T_LONG) ? wordSize : 0))) {
     assert(base != O7, "destroying register");
     assert(!unaligned, "can't handle this");
     // for offsets larger than a simm13 we setup the offset in O7
