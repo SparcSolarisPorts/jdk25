@@ -1339,6 +1339,18 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 
   copy_to_chunk(stack_frame_top, heap_frame_top, fsize);
 #ifdef SPARC
+  // A c2i adapter lowers the compiled caller's physical SP without rotating
+  // its window. FLUSHW spills live L/I registers at that physical SP, while
+  // frame_top() starts at the original unextended SP. The payload copy can
+  // therefore contain stale window slots. Copy the live architectural window
+  // separately to the physical SP used by register maps and thaw rebuilding.
+  if (f.sp() != f.unextended_sp()) {
+    Copy::conjoint_words((HeapWord*)f.sp(), (HeapWord*)hf.sp(),
+                        frame::register_save_words);
+  }
+#endif
+
+#ifdef SPARC
   if (preserve_caller_window) {
     Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 16);
   }
@@ -2768,6 +2780,16 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   assert(!is_bottom_frame || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
 
   copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
+#ifdef SPARC
+  // The canonical compiled payload starts at unextended_sp(), but a mixed
+  // c2i frame keeps its live saved window at the lower physical SP. Restore
+  // that window independently; the canonical slots may have been reused.
+  if (hf.sp() != hf.unextended_sp()) {
+    Copy::conjoint_words((HeapWord*)hf.sp(), (HeapWord*)f.sp(),
+                        frame::register_save_words);
+  }
+#endif
+
 
   patch(f, caller, is_bottom_frame);
 

@@ -24,12 +24,15 @@
 #include "oops/compressedKlass.hpp"
 #include "utilities/globalDefinitions.hpp"
 
-// Prefer a zero-based encoding above the brk heap. Do not probe below 4G:
-// reserving class space there can obstruct later Solaris malloc growth.
+// Try unscaled encoding below 4G first. The previous native-heap obstruction
+// was at 0x10c000000, above 4G, not in this range. A reservation wholly below
+// 4G does not occupy that Solaris LP64 brk growth area.
 char* CompressedKlassPointers::reserve_address_space_for_compressed_classes(size_t size, bool aslr, bool optimize_for_zero_base) {
   if (optimize_for_zero_base) {
-    // This helper probes [4G, 32G), preserving native-heap headroom while
-    // allowing zero-based klass decoding independently of compressed oops.
+    char* result = reserve_address_space_for_unscaled_encoding(size, aslr);
+    if (result != nullptr) {
+      return result;
+    }
     return reserve_address_space_for_zerobased_encoding(size, aslr);
   }
   return nullptr;

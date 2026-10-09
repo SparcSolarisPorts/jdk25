@@ -1,4 +1,68 @@
-# JDK 25 Solaris/SPARC continuation candidate (v45)
+# JDK 25 Solaris/SPARC continuation candidate (v46)
+
+
+
+## v46: mixed compiled-window and unscaled klass placement candidates
+
+The native v45 build completed after the class-list generation retry. All four
+continuation smoke modes passed. The full 25-case rerun now reports 21 passed,
+2 failed and 2 errors, with no platform-requirement skips. Both unchanged
+reserved-stack tests passed. See priority-1-2-status-v46.csv for the actual
+native results. The class-list failure's cause remains unestablished; this
+successful retry is not evidence that it was fixed by a source change.
+
+The two source changes in v46 are candidates requiring native validation:
+
+* Mixed continuation windows: compiled frame payload copies begin at the
+  unextended SP. A c2i adapter lowers physical SP without rotating the caller's
+  window, so its live L/I save area can lie outside that payload copy. Freeze
+  now copies the physical 16-word window independently, and slow thaw restores
+  it independently, before the normal frame patching. Ordinary frames and
+  continuation fast paths retain their current paths. The repeated native
+  crash resumes C2 VirtualThread.parkNanos after interpreted yield0 with L2=0x24;
+  this copy gap is a candidate explanation, not a proved native fix.
+* Klass reservation: with CDS off and ordinary class headers, try the existing
+  unscaled reservation helper below 4G before the shifted zero-based helper.
+  The earlier native malloc obstruction was at 0x10c000000 (above 4G), so the
+  previous comment treating below-4G placement as the offending range was
+  incorrect. This restores an attempt at base=0, shift=0 when available.
+  Compact headers use their existing reduced encoding range; unsuccessful
+  preferred reservations still fall back. The test assertions are unchanged.
+
+Host validation: 561 geometry cases cover independent physical/canonical SPs,
+all 16 live window words, and compiled payload preservation. This model does
+not execute SPARC or validate GC maps. Cumulative patch dry-run, ZIP CRC,
+source hashes and shell syntax are checked. VirtualThreadMixedYieldSmoke
+requires the new Solaris image; it forces yield0 to remain interpreted and
+records compilation output while running mixed, C1 and C2 modes.
+
+Build and validate:
+
+```bash
+cd ~/git/jdk25
+if gmake images test-image > /tmp/jdk25-build.log 2>&1; then
+  bash tests/run-continuation-repro.sh
+  bash tests/run-mixed-yield-repro.sh
+  bash tests/rerun-priority-1-2.sh
+else
+  tail -80 /tmp/jdk25-build.log
+fi
+```
+
+The JNI startup race and StackBangMonitorOwned shutdown timeout remain
+unresolved. The latter prints TEST PASSED and STATUS:Passed before process
+completion hangs. Existing evidence has Java agent stacks but lacks the native
+child stacks needed to locate the block. Run the separate diagnostic helper:
+
+```bash
+bash tests/capture-native-timeouts.sh
+```
+
+It runs those two unchanged tests with concurrency 2 and timeout factor 4,
+then captures Solaris pstack output from their process tree before jtreg kills
+them. GNU timeout bounds each diagnostic attachment. Send the printed
+native-timeout-results directory together with the corresponding jtreg results;
+no core files or compilation XML are needed. No timeout failure is relabeled.
 
 
 ## v45: reserved-stack return boundary candidate

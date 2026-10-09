@@ -16,7 +16,7 @@ tests=()
 while IFS= read -r test; do
   test=${test%$'\r'}
   [[ -n "$test" ]] && tests+=("${test#jtreg:}")
-done < "$root/jdk25-priority-1-2-remaining.txt"
+done < "${JDK25_TEST_LIST:-$root/jdk25-priority-1-2-remaining.txt}"
 ((${#tests[@]} > 0)) || { echo "Empty test selection" >&2; exit 1; }
 out="$root/priority-1-2-rerun-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$out"
