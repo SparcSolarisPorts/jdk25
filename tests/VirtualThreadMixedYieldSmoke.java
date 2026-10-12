@@ -5,6 +5,11 @@ import java.util.concurrent.locks.LockSupport;
 
 public class VirtualThreadMixedYieldSmoke {
     public static void main(String[] args) throws Exception {
+        String pidFile = System.getProperty("mixedYield.pidFile");
+        if (pidFile != null) {
+            java.nio.file.Files.writeString(java.nio.file.Path.of(pidFile),
+                    Long.toString(ProcessHandle.current().pid()));
+        }
         AtomicReference<Throwable> failure = new AtomicReference<>();
         Thread[] threads = new Thread[8];
         AtomicIntegerArray progress = new AtomicIntegerArray(threads.length);

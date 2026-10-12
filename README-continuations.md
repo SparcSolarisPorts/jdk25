@@ -1,6 +1,37 @@
-# JDK 25 Solaris/SPARC continuation candidate (v46)
+# JDK 25 Solaris/SPARC continuation candidate (v47)
 
 
+
+## v47: unmounted virtual-thread stack dump crash
+
+Native v46b evidence reports C1 PASS; mixed and C2 finish all 20,000
+iterations but leave some or all virtual threads alive. Excluding
+VirtualThread.runContinuation does not fix completion. The termination
+hang remains unresolved and is not marked passed.
+
+The diagnostic crash at PID 10241 is a separate, identified defect:
+Thread.dump_to_file invokes RegisterMap(oop, UpdateMap::include), which
+intentionally sets _thread to nullptr. SPARC pd_clear dereferenced it in
+has_last_Java_frame, causing SIGSEGV at address 0x420 on the Attach Listener.
+The v47 source change checks _thread before reading the carrier frame anchor.
+An unmounted map starts with both window pointers null; stack-chunk walking
+establishes them. Ordinary carrier maps keep their previous initialization.
+
+Host validation compiled and executed the actual edited pd_clear body with
+mock carrier/frame types: null carrier, carrier with anchor and carrier without
+anchor all passed. This is not a native SPARC JVM test. Shell syntax and ZIP
+checks passed; native validation is still required.
+
+The bounded mixed-yield runner now captures scheduler state, a JSON thread
+dump and Solaris pstack at 15 seconds, with separate time limits on diagnostic
+commands. Test joins, iteration checks, compiler modes and VM fast paths stay
+enabled. No compile exclusions have been added beyond the existing interpreted
+yield0 repro setting. The dump may expose a further stack-walking defect; an
+attach crash is not a test pass.
+
+Apply this cumulative ZIP over the repository, rebuild images and test-image,
+and run tests/run-mixed-yield-repro.sh. Send the output logs, threads JSON,
+results.txt and any hs_err reports, excluding cores.
 
 ## v46: mixed compiled-window and unscaled klass placement candidates
 

@@ -47,7 +47,9 @@
 #endif
 
 void RegisterMap::pd_clear() {
-  if (_thread->has_last_Java_frame()) {
+  // An unmounted continuation has no carrier JavaThread. Its window is
+  // established by the stack-chunk walk rather than a Java frame anchor.
+  if (_thread != nullptr && _thread->has_last_Java_frame()) {
     frame fr = _thread->last_frame();
     _window = fr.sp();
   } else {

@@ -22,8 +22,32 @@ for mode in mixed c1 c2; do
     "$jdk/bin/java" -Xmx256m "${flags[@]}" \
     '-XX:CompileCommand=exclude,jdk.internal.vm.Continuation::yield0' \
     -XX:+PrintCompilation "-XX:ErrorFile=$out/hs_err_${mode}_pid%p.log" \
-    -cp "$out/classes" VirtualThreadMixedYieldSmoke > "$out/$mode.log" 2>&1
+    "-DmixedYield.pidFile=$out/$mode.pid" \
+    -cp "$out/classes" VirtualThreadMixedYieldSmoke > "$out/$mode.log" 2>&1 &
+  run_pid=$!
+  # Capture unmounted virtual-thread stacks while the Java watchdog is alive.
+  # Each attach command is bounded independently of the target JVM.
+  (
+    sleep 15
+    [[ -s "$out/$mode.pid" ]] || exit 0
+    vm_pid=$(cat "$out/$mode.pid")
+    [[ "$vm_pid" =~ ^[0-9]+$ ]] || exit 0
+    kill -0 "$vm_pid" 2>/dev/null || exit 0
+    "$timeout_cmd" --kill-after=5s 15s "$jdk/bin/jcmd" "$vm_pid" \
+      Thread.vthread_scheduler > "$out/$mode.scheduler.log" 2>&1
+    "$timeout_cmd" --kill-after=5s 15s "$jdk/bin/jcmd" "$vm_pid" \
+      Thread.dump_to_file -overwrite -format=json "$out/$mode.threads.json" \
+      > "$out/$mode.dump.log" 2>&1
+    if command -v pstack >/dev/null 2>&1; then
+      "$timeout_cmd" --kill-after=5s 15s pstack "$vm_pid" \
+        > "$out/$mode.pstack.log" 2>&1
+    fi
+  ) &
+  capture_pid=$!
+  wait "$run_pid"
   result=$?
+  kill "$capture_pid" 2>/dev/null || true
+  wait "$capture_pid" 2>/dev/null || true
   printf '%s exit=%s\n' "$mode" "$result" >> "$out/results.txt"
   if ((result == 124 || result == 137)); then
     echo "$mode TIMEOUT: JVM failed to exit; this is not a PASS"
