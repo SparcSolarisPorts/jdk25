@@ -2762,7 +2762,13 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   // yet laid out in the stack, and so the original_pc is not stored in it.
   // As a result, f.is_deoptimized_frame() is always false and we must test hf to know if the frame is deoptimized.
   frame f = new_stack_frame<ContinuationHelper::CompiledFrame>(hf, caller, is_bottom_frame);
+#ifdef SPARC
+  // A c2i adapter can move the physical window below the compiled payload.
+  // Match the canonical source address; restore the physical window separately.
+  intptr_t* const stack_frame_top = f.unextended_sp();
+#else
   intptr_t* const stack_frame_top = f.sp();
+#endif
   intptr_t* const heap_frame_top = hf.unextended_sp();
 
   const int added_argsize = (is_bottom_frame || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;

@@ -1,6 +1,39 @@
-# JDK 25 Solaris/SPARC continuation candidate (v47)
+# JDK 25 Solaris/SPARC continuation candidate (v48)
 
 
+
+## v48: restore mixed compiled payload at its canonical SP
+
+The native v47 rerun still reports mixed exit=2, C1 exit=0, C2 exit=2.
+Both Thread.dump_to_file commands now successfully create JSON dumps, so the
+previous null-carrier RegisterMap crash is no longer observed in these runs.
+The scheduler reports no queued/submitted/delayed work and zero active workers.
+All eight C2 virtual threads show a single visible VirtualThread.run:460 frame;
+three mixed-mode virtual threads remain alive after finishing the task loop.
+These observations locate the failure near completion but do not prove its
+source. Compiler modes and iteration/termination checks are unchanged.
+
+Source inspection found a concrete mismatch in recurse_thaw_compiled_frame:
+heap_frame_top uses hf.unextended_sp(), but stack_frame_top used f.sp(). On
+SPARC a c2i adapter can lower physical SP without relocating the canonical
+compiled payload. This copied the payload to the wrong address and left the
+upper canonical spill slots unrestored. v48 uses f.unextended_sp() for the
+compiled payload destination on SPARC. The separately copied physical L/I
+window from v46 is retained. Other architectures retain f.sp(); frames without
+an adapter extension retain the same source/destination addresses. Continuation
+fast paths and C1/C2 remain enabled.
+
+The v46 host model already used the canonical destination; it did not check
+that the implementation selected that address. The v48 regression geometry
+model checks both destinations: all 561 corrected layouts pass; the old
+physical destination fails all 528 extended layouts. The 33 nonextended
+layouts pass with either destination. These are host memory-layout checks,
+not native register-window, oop-map, GC or deoptimization validation.
+
+Native validation is required to determine whether this resolves the observed
+completion hang. Apply this cumulative ZIP, build images and test-image, then
+run tests/run-continuation-repro.sh and tests/run-mixed-yield-repro.sh. The
+mixed runner remains bounded and captures JSON stacks and scheduler state.
 
 ## v47: unmounted virtual-thread stack dump crash
 

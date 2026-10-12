@@ -5421,7 +5421,21 @@
  
    // Make sure the relativized locals is already set.
    assert(f.interpreter_frame_local_at(0) == stack_frame_bottom - 1, "invalid frame bottom");
-@@ -2620,6 +2780,16 @@
+@@ -2602,7 +2762,13 @@
+   // yet laid out in the stack, and so the original_pc is not stored in it.
+   // As a result, f.is_deoptimized_frame() is always false and we must test hf to know if the frame is deoptimized.
+   frame f = new_stack_frame<ContinuationHelper::CompiledFrame>(hf, caller, is_bottom_frame);
++#ifdef SPARC
++  // A c2i adapter can move the physical window below the compiled payload.
++  // Match the canonical source address; restore the physical window separately.
++  intptr_t* const stack_frame_top = f.unextended_sp();
++#else
+   intptr_t* const stack_frame_top = f.sp();
++#endif
+   intptr_t* const heap_frame_top = hf.unextended_sp();
+ 
+   const int added_argsize = (is_bottom_frame || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
+@@ -2620,6 +2786,16 @@
    assert(!is_bottom_frame || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
  
    copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
@@ -5438,7 +5452,7 @@
  
    patch(f, caller, is_bottom_frame);
  
-@@ -2638,7 +2808,7 @@
+@@ -2638,7 +2814,7 @@
  
      f.deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
      assert(f.is_deoptimized_frame(), "");
@@ -5447,7 +5461,7 @@
      maybe_set_fastpath(f.sp());
    }
  
-@@ -2774,6 +2944,7 @@
+@@ -2774,6 +2950,7 @@
      assert(f.is_interpreted_frame(), "");
      f.set_sp(align_down(f.sp(), frame::frame_alignment));
    }
@@ -5455,7 +5469,7 @@
    push_return_frame(f);
    chunk->fix_thawed_frame(f, SmallRegisterMap::instance()); // can only fix caller after push_return_frame (due to callee saved regs)
  
-@@ -2790,8 +2961,8 @@
+@@ -2790,8 +2967,8 @@
  }
  
  void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
@@ -5466,7 +5480,7 @@
  
    LogTarget(Trace, continuations) lt;
    if (lt.develop_is_enabled()) {
-@@ -2802,7 +2973,7 @@
+@@ -2802,7 +2979,7 @@
  
    assert(f.sp() - frame::metadata_words_at_bottom >= _top_stack_address, "overwrote past thawing space"
      " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(f.sp() - frame::metadata_words), p2i(_top_stack_address));
@@ -5475,7 +5489,7 @@
    ContinuationHelper::push_pd(f);
  
    assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
-@@ -2985,7 +3156,8 @@
+@@ -2985,7 +3162,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;
