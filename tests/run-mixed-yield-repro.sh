@@ -20,6 +20,9 @@ for mode in mixed c1 c2; do
   echo "Running $mode with interpreted yield0; log: $out/$mode.log"
   "$timeout_cmd" --signal=QUIT --kill-after=30s 180s \
     "$jdk/bin/java" -Xmx256m "${flags[@]}" \
+    --add-opens=java.base/java.lang=ALL-UNNAMED \
+    --add-opens=java.base/jdk.internal.vm=ALL-UNNAMED \
+    -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames \
     '-XX:CompileCommand=exclude,jdk.internal.vm.Continuation::yield0' \
     -XX:+PrintCompilation "-XX:ErrorFile=$out/hs_err_${mode}_pid%p.log" \
     "-DmixedYield.pidFile=$out/$mode.pid" \
