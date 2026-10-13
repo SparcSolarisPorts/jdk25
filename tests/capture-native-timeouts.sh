@@ -14,6 +14,9 @@ cat > "$out/tests.txt" <<'TESTS'
 jtreg:test/hotspot/jtreg/runtime/jni/getCreatedJavaVMs/TestGetCreatedJavaVMs.java
 jtreg:test/hotspot/jtreg/compiler/uncommontrap/TestStackBangMonitorOwned.java
 TESTS
+# These product options warn about a stuck safepoint without aborting the VM.
+# JAVA_TOOL_OPTIONS also reaches JNI-created VMs in native child executables.
+JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-XX:+SafepointTimeout -XX:SafepointTimeoutDelay=2000" \
 JDK25_TEST_LIST="$out/tests.txt" JDK25_TEST_JOBS=2 \
   bash "$root/tests/rerun-priority-1-2.sh" > "$out/runner.log" 2>&1 &
 runner_pid=$!
@@ -35,11 +38,12 @@ for delay in 60 120 120; do
         }
         if (!changed) break
       }
-      for (i=1;i<=NR;i++) if (child[pid[i]] &&
-        command[pid[i]] ~ /(java|exeGetCreatedJavaVMs)/) print pid[i]
+      # Include every descendant: native test executable names need not
+      # contain "java" or the legacy "exeGetCreatedJavaVMs" prefix.
+      for (i=1;i<=NR;i++) if (child[pid[i]]) print pid[i]
     }' "$out/processes-$tag.txt" > "$out/pids-$tag.txt"
   while IFS= read -r pid; do
-    "$timeout_cmd" 20 /usr/bin/pstack "$pid" > "$out/pstack-$tag-$pid.txt" 2>&1
+    "$timeout_cmd" --kill-after=5s 20s /usr/bin/pstack "$pid" > "$out/pstack-$tag-$pid.txt" 2>&1
   done < "$out/pids-$tag.txt"
 done
 wait "$runner_pid"
