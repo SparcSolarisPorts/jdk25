@@ -1575,3 +1575,14 @@ remain unverified. Lightweight locking is implemented in v14; explicit legacy
 mode still pins synchronized sections. Asynchronous preemption is not implemented.
 It also does not address the separate source-21/--enable-preview build error in
 the JDK build makefiles, which were not included in the attached source archives.
+
+## v50: bound Solaris pthread TLS restoration
+
+The 20261013-011007 capture includes the previously missed native JNI child.
+Its creator worker is repeatedly in Solaris TSD destructor cleanup while
+main waits in `pthread_join`. v50 bounds HotSpot TLS restoration to four
+passes on Solaris; explicit attach/detach resets the counter. See
+`README-native-timeouts-v50.txt` for evidence, host validation, and rerun
+commands. Native Solaris validation remains required. The separate stack-bang
+VM shutdown safepoint timeout is still under investigation. The prior native
+result remains 23 passed and two errors; it is not replaced by host checks.

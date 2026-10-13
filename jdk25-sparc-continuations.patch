@@ -4341,6 +4341,58 @@
              return true; // just continue
            }
          }
+--- a/src/hotspot/os/posix/threadLocalStorage_posix.cpp
++++ b/src/hotspot/os/posix/threadLocalStorage_posix.cpp
+@@ -24,10 +24,19 @@
+ 
+ #include "runtime/threadLocalStorage.hpp"
+ #include "utilities/debug.hpp"
++#include "utilities/globalDefinitions.hpp"
+ #include <pthread.h>
+ 
+ static pthread_key_t _thread_key;
+ static bool _initialized = false;
++
++#ifdef SOLARIS
++// Solaris keeps invoking TSD destructors while they repopulate their keys.
++// Permit the POSIX minimum of four destructor passes, then leave this key
++// cleared so an attached native thread can finish pthread_exit().
++static THREAD_LOCAL unsigned int _restore_thread_pointer_count = 0;
++static const unsigned int max_thread_pointer_restores = 4;
++#endif
+ 
+ // Restore the thread pointer if the destructor is called. This is in case
+ // someone from JNI code sets up a destructor with pthread_key_create to run
+@@ -36,7 +45,18 @@
+ // to null and we will not be called again. If detachCurrentThread is never
+ // called we could loop forever depending on the pthread implementation.
+ extern "C" void restore_thread_pointer(void* p) {
++#ifdef SOLARIS
++  if (_restore_thread_pointer_count >= max_thread_pointer_restores) {
++    return;
++  }
++  ++_restore_thread_pointer_count;
++  // Do not reset the pass count through set_thread(). The pthread runtime
++  // cleared this key before calling us; restore it for JNI detach callbacks.
++  int rslt = pthread_setspecific(_thread_key, p);
++  assert_status(rslt == 0, rslt, "pthread_setspecific");
++#else
+   ThreadLocalStorage::set_thread((Thread*) p);
++#endif
+ }
+ 
+ void ThreadLocalStorage::init() {
+@@ -64,6 +84,10 @@
+ 
+ void ThreadLocalStorage::set_thread(Thread* current) {
+   assert(_initialized, "TLS not initialized yet!");
++#ifdef SOLARIS
++  // Explicit attach/detach starts a fresh TLS lifecycle.
++  _restore_thread_pointer_count = 0;
++#endif
+   int rslt = pthread_setspecific(_thread_key, current);
+   assert_status(rslt == 0, rslt, "pthread_setspecific");
+ }
 --- a/src/hotspot/os/solaris/dtrace/jhelper.d
 +++ b/src/hotspot/os/solaris/dtrace/jhelper.d
 @@ -83,12 +83,12 @@

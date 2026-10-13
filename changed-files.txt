@@ -38,6 +38,7 @@ src/hotspot/cpu/sparc/templateTable_sparc.cpp
 src/hotspot/cpu/sparc/vm_version_sparc.cpp
 src/hotspot/cpu/sparc/vtableStubs_sparc.cpp
 src/hotspot/os/posix/os_posix.cpp
+src/hotspot/os/posix/threadLocalStorage_posix.cpp
 src/hotspot/os/solaris/dtrace/jhelper.d
 src/hotspot/os/solaris/os_solaris.cpp
 src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.cpp
