@@ -1,6 +1,43 @@
-# JDK 25 Solaris/SPARC continuation candidate (v48)
+# JDK 25 Solaris/SPARC continuation candidate (v49)
 
 
+
+## v49: SPARC entry return bridge for pending parent chunks
+
+Native v48d state output confirms the stalled virtual threads have no carrier,
+state=2 (RUNNING), Continuation.done=false, mounted=false and preempted=false.
+The newest chunk is empty (sp==bottom), while its parent retains frames
+(sp=441, bottom=818 in the observed parent). The scheduler has no queued work.
+This is pending continuation execution, not just a missing join notification.
+
+v49 adds a pending-return check on the normal enterSpecial cleanup path. If the
+continuation is unfinished, not preempted and has a nonempty chunk anywhere in
+its chain, control goes to the continuation return-barrier stub to restore
+pending callers before exiting the entry. Empty retained head chunks are not
+mistaken for completion. Integer/oop and floating results are preserved in a
+separate ABI window across the leaf check. The helper performs no allocations
+or safepoint operations. Completed and explicitly preempted continuations use
+the existing cleanup. Successful explicit yield returns directly to the entry
+caller and bypasses this normal-return bridge; the exception path is unchanged.
+
+This is a candidate correction for the observed cross-chunk exit state. It has
+not yet been executed on SPARC and does not establish why the previous compiled
+return reached cleanup instead of its parent-chunk barrier. Native validation
+must check completion, return values, GC, preemption and deoptimization; no
+claim of a fully fixed C2 backend or passed jtreg suite is made.
+
+The extracted pending-return helper was host-tested across seven states:
+nonempty parent behind one/two empty heads, nonempty head, completed,
+preempted, entirely empty and no chunks. Model checks pass. Generated SPARC
+code cannot be executed or compiled as a native VM on this Linux host.
+
+No C1/C2, OSR or continuation fast paths are disabled. The normal-return check
+adds a leaf call at entry completion, not to every successful yield. The bounded
+mixed runner retains state snapshots from v48d and records pending-return bridge
+messages in MODE.continuations.log via debug logging, without per-freeze traces.
+
+Apply the cumulative ZIP, rebuild images and test-image, and run both
+run-continuation-repro.sh and run-mixed-yield-repro.sh with ordinary defaults.
 
 ## v48: restore mixed compiled payload at its canonical SP
 

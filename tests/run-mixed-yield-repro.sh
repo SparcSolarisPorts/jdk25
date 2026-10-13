@@ -25,6 +25,7 @@ for mode in mixed c1 c2; do
     -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames \
     '-XX:CompileCommand=exclude,jdk.internal.vm.Continuation::yield0' \
     -XX:+PrintCompilation "-XX:ErrorFile=$out/hs_err_${mode}_pid%p.log" \
+    "-Xlog:continuations=debug:file=$out/$mode.continuations.log:uptime,tid,tags" \
     "-DmixedYield.pidFile=$out/$mode.pid" \
     -cp "$out/classes" VirtualThreadMixedYieldSmoke > "$out/$mode.log" 2>&1 &
   run_pid=$!

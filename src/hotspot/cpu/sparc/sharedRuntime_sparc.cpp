@@ -37,7 +37,9 @@
 #include "prims/methodHandles.hpp"
 #include "runtime/jniHandles.hpp"
 #include "runtime/continuation.hpp"
-#include "runtime/continuationEntry.hpp"
+#include "runtime/continuationEntry.inline.hpp"
+#include "runtime/continuationJavaClasses.inline.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #if INCLUDE_JFR
 #include "jfr/support/jfrIntrinsics.hpp"
 #endif
@@ -1595,6 +1597,28 @@ static OopMap* sparc_continuation_enter_setup(MacroAssembler* masm) {
   return map;
 }
 
+// A normal return from the mounted portion is not an exit from the whole
+// continuation when older chunks still contain callers. Successful explicit
+// yield unwinds directly to the entry's caller and does not use this check.
+static int sparc_continuation_has_pending_return(JavaThread* thread) {
+  ContinuationEntry* entry = thread->last_continuation();
+  assert(entry != nullptr, "mounted continuation entry required");
+  oop cont = entry->cont_oop(thread);
+  if (jdk_internal_vm_Continuation::done(cont) ||
+      jdk_internal_vm_Continuation::is_preempted(cont)) {
+    return 0;
+  }
+  for (stackChunkOop chunk = jdk_internal_vm_Continuation::tail(cont);
+       chunk != nullptr; chunk = chunk->parent()) {
+    if (!chunk->is_empty()) {
+      log_debug(continuations)("SPARC normal return resumes pending chunk: " INTPTR_FORMAT,
+                               p2i(chunk));
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static void sparc_continuation_enter(MacroAssembler* masm,
                                     OopMapSet* maps,
                                     int& interp_entry, int& verified_entry,
@@ -1647,6 +1671,24 @@ static void sparc_continuation_enter(MacroAssembler* masm,
 
   __ bind(cleanup);
   ContinuationEntry::_cleanup_offset = __ pc() - start;
+  // Cross-chunk normal return must finish pending callers before unmounting.
+  // Use a separate ABI window so the leaf check cannot overwrite entry data;
+  // retain integer/oop and floating results for the resumed caller.
+  __ save_frame(2);
+  __ stf(FloatRegisterImpl::D, F0, SP, STACK_BIAS + 22 * wordSize);
+  __ call_VM_leaf(L7_thread_cache,
+                  CAST_FROM_FN_PTR(address, sparc_continuation_has_pending_return),
+                  G2_thread);
+  __ mov(O0, G3_scratch);
+  __ mov(I0, G5);
+  __ ldf(FloatRegisterImpl::D, SP, STACK_BIAS + 22 * wordSize, F0);
+  __ restore();
+  __ mov(G5, O0);
+  Label completed_or_preempted;
+  __ br_null_short(G3_scratch, Assembler::pt, completed_or_preempted);
+  __ jump_to(AddressLiteral(StubRoutines::cont_returnBarrier()), G1);
+  __ delayed()->nop();
+  __ bind(completed_or_preempted);
   continuation_enter_cleanup(masm);
   __ ret();
   __ delayed()->restore();
