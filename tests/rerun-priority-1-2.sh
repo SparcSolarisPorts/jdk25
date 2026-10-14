@@ -22,11 +22,19 @@ out="$root/priority-1-2-rerun-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$out"
 printf '%s\n' "${tests[@]}" > "$out/tests.txt"
 echo "Running ${#tests[@]} selected cases; log: $out/run.log"
+diagnostic_options=()
+if [[ ${JDK25_SAFEPOINT_DIAGNOSTICS:-0} == 1 ]]; then
+  # jtreg filters the environment of /othervm children. Pass these through
+  # its VM option interface so the tested JVM actually receives them.
+  diagnostic_options+=( -vmoption:-XX:+SafepointTimeout
+    -vmoption:-XX:SafepointTimeoutDelay=2000 )
+fi
 "$runner" -Xmx512m -jar "$jtreg_home/lib/jtreg.jar" \
   -jdk:"$jdk" -agentvm -conc:"${JDK25_TEST_JOBS:-16}" \
   -timeoutFactor:4 -retain:fail,error -verbose:summary \
   -nativepath:"$build/images/test/hotspot/jtreg/native" \
   -w:"$out/work" -r:"$out/report" \
+  "${diagnostic_options[@]}" \
   "${tests[@]}" > "$out/run.log" 2>&1
 rc=$?
 tail -60 "$out/run.log"

@@ -11,16 +11,16 @@ timeout_cmd=$(command -v gtimeout || command -v timeout || true)
 out="$root/native-timeout-results-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$out"
 cat > "$out/tests.txt" <<'TESTS'
-jtreg:test/hotspot/jtreg/runtime/jni/getCreatedJavaVMs/TestGetCreatedJavaVMs.java
 jtreg:test/hotspot/jtreg/compiler/uncommontrap/TestStackBangMonitorOwned.java
 TESTS
 # These product options warn about a stuck safepoint without aborting the VM.
-# JAVA_TOOL_OPTIONS also reaches JNI-created VMs in native child executables.
+# JAVA_TOOL_OPTIONS alone does not reach jtreg's filtered /othervm children.
+# Pass the flags explicitly through jtreg as well.
 JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-XX:+SafepointTimeout -XX:SafepointTimeoutDelay=2000" \
-JDK25_TEST_LIST="$out/tests.txt" JDK25_TEST_JOBS=2 \
+JDK25_SAFEPOINT_DIAGNOSTICS=1 JDK25_TEST_LIST="$out/tests.txt" JDK25_TEST_JOBS=1 \
   bash "$root/tests/rerun-priority-1-2.sh" > "$out/runner.log" 2>&1 &
 runner_pid=$!
-echo "Running two timeout cases; native captures: $out"
+echo "Running the remaining shutdown timeout case; native captures: $out"
 # Fresh process-tree snapshots avoid guessing the native child PID.
 for delay in 60 120 120; do
   sleep "$delay"
