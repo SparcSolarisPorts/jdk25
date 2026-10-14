@@ -1608,3 +1608,12 @@ eight-byte vector load/store rules with aligned fast paths. See
 `README-priority-crashes-v52.txt` for evidence, validation limits and the
 26-case focused rerun. Native confirmation remains required, particularly
 for the suspend/monitor timeouts and intermittent deoptimization crash.
+
+## v53: fix the v52 anchor regression without writing live locals
+
+Native v52 vector smokes passed, but interpreted/mixed continuation GC crashed.
+The entry-slot restoration could overwrite live bottom-frame locals before
+freeze copied them. v53 removes those writes and restores the v51 entry layout.
+It anchors at the actual live entry window and uses FP minus entry size to
+recover canonical metadata for oop maps. Vector and deferred-deopt-PC fixes
+remain. See `README-anchor-regression-v53.txt`. Native confirmation is pending.

@@ -1,3 +1,7 @@
+HISTORICAL v52 NOTE: its entry-slot restoration caused a native GC regression.
+That anchor/layout change is superseded by v53; see README-anchor-regression-v53.txt.
+The vector/deoptimization changes remain.
+
 v52: fixes targeting the four highest-priority groups from the 233-case rerun
 
 Native evidence was read from priority-1-2-rerun-20261014-012127.zip.

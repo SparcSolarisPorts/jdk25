@@ -94,7 +94,19 @@ inline void ContinuationHelper::push_pd(const frame& f) {
 
 inline void ContinuationHelper::set_anchor_to_entry_pd(
     JavaFrameAnchor* anchor, ContinuationEntry* entry) {
-  entry->restore_register_window();
+  // An interpreted callee may extend/relocate the entry's physical window.
+  // Find that live window from the existing flushed anchor, without writing
+  // the canonical save area: it can overlap live interpreter locals.
+  intptr_t* cursor = anchor->last_Java_sp();
+  intptr_t* entry_fp = entry->entry_fp();
+  guarantee(cursor != nullptr && cursor < entry_fp, "entry anchor requires a live window");
+  for (;;) {
+    intptr_t* next = (intptr_t*)(cursor[sparc_fp_slot] + STACK_BIAS);
+    guarantee(next > cursor && next <= entry_fp, "invalid entry window chain");
+    if (next == entry_fp) break;
+    cursor = next;
+  }
+  anchor->set_last_Java_sp(cursor);
   anchor->set_flags(JavaFrameAnchor::flushed);
 }
 

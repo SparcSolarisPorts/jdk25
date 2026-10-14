@@ -32,6 +32,7 @@
 #include "oops/oop.inline.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaCalls.hpp"
 #include "runtime/monitorChunk.hpp"
@@ -353,6 +354,13 @@ void frame::init(intptr_t* sp, address pc, CodeBlob* cb) {
   if (_cb == nullptr && _pc != nullptr ) {
     _cb = CodeCache::find_blob(_pc);
   }
+  if (_cb != nullptr && _cb->is_nmethod() &&
+      _cb->as_nmethod()->method()->is_continuation_enter_intrinsic()) {
+    // Entry oop-map slots address canonical metadata, even if the live
+    // register window was relocated for an interpreted callee's locals.
+    _unextended_sp = _fp - ContinuationEntry::size() / wordSize;
+    _sp_adjustment_by_callee = pointer_delta_as_int(_unextended_sp, _sp);
+  }
   _deopt_state = unknown;
 }
 
@@ -406,6 +414,11 @@ frame::frame(intptr_t* sp, intptr_t* younger_sp, bool younger_frame_is_interpret
   }
 
   _unextended_sp = sp + _sp_adjustment_by_callee;
+  if (_cb != nullptr && _cb->is_nmethod() &&
+      _cb->as_nmethod()->method()->is_continuation_enter_intrinsic()) {
+    _unextended_sp = _fp - ContinuationEntry::size() / wordSize;
+    _sp_adjustment_by_callee = pointer_delta_as_int(_unextended_sp, _sp);
+  }
 
   // It is important that the frame is fully constructed when we do
   // this lookup as get_deopt_original_pc() needs a correct value for

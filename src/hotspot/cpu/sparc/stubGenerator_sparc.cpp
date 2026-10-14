@@ -5943,11 +5943,6 @@ class StubGenerator: public StubCodeGenerator {
 // On Java entry the arguments are caller %o0/%o1/%o2.  After the wrapper's
 // save_frame they are visible as %i0/%i1/%i2.
 void fill_continuation_entry(MacroAssembler* masm) {
-  // Interpreter locals can relocate the live entry window and overwrite
-  // its canonical spill area. Retain its native caller link and return PC
-  // outside that area for the post-freeze anchor/JVMTI walk.
-  __ st_ptr(I6, SP, STACK_BIAS + in_bytes(ContinuationEntry::saved_i6_offset()));
-  __ st_ptr(I7, SP, STACK_BIAS + in_bytes(ContinuationEntry::saved_i7_offset()));
 #ifdef ASSERT
   __ set(ContinuationEntry::cookie_value(), G1);
   __ st(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::cookie_offset()));

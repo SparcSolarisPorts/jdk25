@@ -334,9 +334,15 @@ static void set_anchor(JavaThread* thread, intptr_t* sp) {
 
 static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry) {
   JavaFrameAnchor* anchor = thread->frame_anchor();
-  ContinuationHelper::set_anchor_to_entry_pd(anchor, entry);
   anchor->set_last_Java_pc(entry->entry_pc());
+#ifdef SPARC
+  // The CPU helper selects the live register window from the old anchor.
+  // Its physical SP may differ from the canonical metadata address.
+  ContinuationHelper::set_anchor_to_entry_pd(anchor, entry);
+#else
   anchor->set_last_Java_sp(entry->entry_sp());
+  ContinuationHelper::set_anchor_to_entry_pd(anchor, entry);
+#endif
 
   assert(thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != nullptr, "");
