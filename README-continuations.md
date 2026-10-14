@@ -1597,3 +1597,14 @@ polls remain intact. See `README-interpreter-safepoints-v51.txt` for source
 evidence, host checks, a bounded GC/spin reproduction, and native rerun steps.
 Native v51 validation is pending; 24 of the selected 25 cases have passed
 across the prior native runs.
+
+## v52: JVMTI frame anchors, thaw deoptimization and vector memory alignment
+
+The broader 233-case rerun recorded 124 passes, 93 failures, 14 errors and
+two unfinished cases. v52 preserves continuation-entry caller links outside
+the relocated window, defers slow-thaw return-PC patching until a younger
+window exists, corrects deopt-state recognition, and adds alignment-safe
+eight-byte vector load/store rules with aligned fast paths. See
+`README-priority-crashes-v52.txt` for evidence, validation limits and the
+26-case focused rerun. Native confirmation remains required, particularly
+for the suspend/monitor timeouts and intermittent deoptimization crash.

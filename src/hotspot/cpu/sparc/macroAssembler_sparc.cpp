@@ -3938,3 +3938,63 @@ void MacroAssembler::kernel_crc32c(Register crc, Register buf, Register len, Reg
   bind(L_crc32c_return);
   nop();
 }
+
+// C2 vector loads/stores can target arbitrary byte offsets in a MemorySegment.
+// Retain the aligned LDDF/STDF fast path and assemble unaligned values in bytes.
+void MacroAssembler::load_vector8(const Address& src, FloatRegister dst,
+                                  Register addr, Register bits, Register byte_tmp) {
+  assert_different_registers(addr, bits, byte_tmp);
+  Label aligned, done;
+  add(src, addr);
+  andcc(addr, 7, G0);
+  br(Assembler::zero, false, Assembler::pt, aligned);
+  delayed()->nop();
+  clr(bits);
+  for (int i = 0; i < 8; ++i) {
+    ldub(addr, i, byte_tmp);
+    sllx(bits, 8, bits);
+    or3(bits, byte_tmp, bits);
+  }
+  assert(UseVIS >= 3, "unaligned vector bit transfer requires VIS3");
+  movxtod(bits, dst);
+  ba(done);
+  delayed()->nop();
+  bind(aligned);
+  ldf(FloatRegisterImpl::D, Address(addr, 0), dst);
+  bind(done);
+}
+
+void MacroAssembler::store_vector8(FloatRegister src, const Address& dst,
+                                   Register addr, Register bits) {
+  assert_different_registers(addr, bits);
+  Label aligned, done;
+  add(dst, addr);
+  andcc(addr, 7, G0);
+  br(Assembler::zero, false, Assembler::pt, aligned);
+  delayed()->nop();
+  assert(UseVIS >= 3, "unaligned vector bit transfer requires VIS3");
+  movdtox(src, bits);
+  for (int i = 7; i >= 0; --i) {
+    stb(bits, addr, i);
+    if (i != 0) srlx(bits, 8, bits);
+  }
+  ba(done);
+  delayed()->nop();
+  bind(aligned);
+  stf(FloatRegisterImpl::D, src, Address(addr, 0));
+  bind(done);
+}
+
+void MacroAssembler::store_vector8_zero(const Address& dst, Register addr) {
+  Label aligned, done;
+  add(dst, addr);
+  andcc(addr, 7, G0);
+  br(Assembler::zero, false, Assembler::pt, aligned);
+  delayed()->nop();
+  for (int i = 0; i < 8; ++i) stb(G0, addr, i);
+  ba(done);
+  delayed()->nop();
+  bind(aligned);
+  stx(G0, addr, 0);
+  bind(done);
+}

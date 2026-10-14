@@ -1347,6 +1347,12 @@ public:
   void fold_8bit_crc32(Register crc, Register table, Register tmp);
   // CRC32C code for java.util.zip.CRC32C::updateBytes/updateDirectByteBuffer intrinsic.
   void kernel_crc32c(Register crc, Register buf, Register len, Register table);
+  // Vector API memory segments allow byte-aligned eight-byte vectors.
+  void load_vector8(const Address& src, FloatRegister dst, Register addr,
+                    Register bits, Register byte_tmp);
+  void store_vector8(FloatRegister src, const Address& dst, Register addr,
+                     Register bits);
+  void store_vector8_zero(const Address& dst, Register addr);
 
 };
 

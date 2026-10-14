@@ -1,0 +1,158 @@
+gtest/ObjArrayTests.java#no-coops-with-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/CompressedKlassGtest.java#use-zero-based-encoding
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/CompressedKlassGtest.java#ccp_off
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/MetaspaceGtests.java#no-ccs
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ObjArrayTests.java#no-coops-with-ccp-large-align
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ObjArrayTests.java#no-coops-no-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/NativeHeapTrimmerGtest.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/CompressedKlassGtest.java#use-zero-based-encoding-coh-large-class-space
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ObjArrayTests.java#no-coops-no-ccp-large-align
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ObjArrayTests.java#with-coops-with-ccp-large-align
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ObjArrayTests.java#with-coops-no-ccp-large-align
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/AsyncLogGtest.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ObjArrayTests.java#with-coops-with-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/NMTGtests.java#nmt-detail
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ArrayTests.java#with-coops-no-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ArrayTests.java#no-coops-with-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ArrayTests.java#with-coops-with-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ArrayTests.java#no-coops-no-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/NMTGtests.java#nmt-summary
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/GTestWrapper.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/CompressedKlassGtest.java#use-zero-based-encoding-coh
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/ObjArrayTests.java#with-coops-no-ccp
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/LockStackGtests.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+gtest/NMTGtests.java#nmt-off
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: the library has not been found in /export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/test/hotspot/jtreg/native. Did you forget to use --with-gtest to configure?
+
+applications/jcstress/varhandles.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/initClass.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/memeffects.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/atomics.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/defaultValues.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/coherence.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/locks.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/accessAtomic.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/mxbeans.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/future.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/executors.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/init.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/copy.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/tearing.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/collections.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/volatiles.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/threadlocal.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/seqcst.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/singletons.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/atomicity.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/unsafe.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/countdownlatch.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/initLen.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/interrupt.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/acqrel.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/strings.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/causality.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/oota.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner
+
+applications/jcstress/fences.java
+Failed. Execution failed: `main' threw exception: java.lang.Error: TESTBUG: Can not resolve artifacts for applications.jcstress.JcstressRunner

@@ -1584,6 +1584,12 @@ bool Matcher::match_rule_supported(int opcode) {
 }
 
 bool Matcher::match_rule_supported_vector(int opcode, int vlen, BasicType bt) {
+  // Vector API memory operations permit byte alignment. Without VIS3 raw
+  // FP/integer transfers, retain the Java fallback for these operations.
+  if (UseVIS < 3 && (opcode == Op_LoadVector || opcode == Op_StoreVector)) {
+    return false;
+  }
+
 
   // TODO
   // identify extra cases that we might want to provide match rules for
@@ -10397,80 +10403,82 @@ instruct storeS_reversed(indIndexMemory dst, iRegI src) %{
 // ====================VECTOR INSTRUCTIONS=====================================
 
 // Load Aligned Packed values into a Double Register
-instruct loadV8(regD dst, memory mem) %{
+instruct loadV8(regD dst, memory mem, iRegP addr, iRegL bits, iRegL byte_tmp, flagsReg ccr) %{
   predicate(n->as_LoadVector()->memory_size() == 8);
   match(Set dst (LoadVector mem));
+  effect(TEMP addr, TEMP bits, TEMP byte_tmp, KILL ccr);
   ins_cost(MEMORY_REF_COST);
-  size(4);
   format %{ "LDDF   $mem,$dst\t! load vector (8 bytes)" %}
   ins_encode %{
-    __ ldf(FloatRegisterImpl::D, $mem$$Address, as_DoubleFloatRegister($dst$$reg));
+    __ load_vector8($mem$$Address, as_DoubleFloatRegister($dst$$reg),
+                     $addr$$Register, $bits$$Register, $byte_tmp$$Register);
   %}
   ins_pipe(floadD_mem);
 %}
 
 // Store Vector in Double register to memory
-instruct storeV8(memory mem, regD src) %{
+instruct storeV8(memory mem, regD src, iRegP addr, iRegL bits, flagsReg ccr) %{
   predicate(n->as_StoreVector()->memory_size() == 8);
   match(Set mem (StoreVector mem src));
+  effect(TEMP addr, TEMP bits, KILL ccr);
   ins_cost(MEMORY_REF_COST);
-  size(4);
   format %{ "STDF   $src,$mem\t! store vector (8 bytes)" %}
   ins_encode %{
-    __ stf(FloatRegisterImpl::D, as_DoubleFloatRegister($src$$reg), $mem$$Address);
+    __ store_vector8(as_DoubleFloatRegister($src$$reg), $mem$$Address,
+                      $addr$$Register, $bits$$Register);
   %}
   ins_pipe(fstoreD_mem_reg);
 %}
 
 // Store Zero into vector in memory
-instruct storeV8B_zero(memory mem, immI0 zero) %{
+instruct storeV8B_zero(memory mem, immI0 zero, iRegP addr, flagsReg ccr) %{
   predicate(n->as_StoreVector()->memory_size() == 8 &&
             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_BYTE);
   match(Set mem (StoreVector mem (Replicate zero)));
+  effect(TEMP addr, KILL ccr);
   ins_cost(MEMORY_REF_COST);
-  size(4);
   format %{ "STX    $zero,$mem\t! store zero vector (8 bytes)" %}
   ins_encode %{
-    __ stx(G0, $mem$$Address);
+    __ store_vector8_zero($mem$$Address, $addr$$Register);
   %}
   ins_pipe(fstoreD_mem_zero);
 %}
 
-instruct storeV4S_zero(memory mem, immI0 zero) %{
+instruct storeV4S_zero(memory mem, immI0 zero, iRegP addr, flagsReg ccr) %{
   predicate(n->as_StoreVector()->memory_size() == 8 &&
             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_SHORT);
   match(Set mem (StoreVector mem (Replicate zero)));
+  effect(TEMP addr, KILL ccr);
   ins_cost(MEMORY_REF_COST);
-  size(4);
   format %{ "STX    $zero,$mem\t! store zero vector (4 shorts)" %}
   ins_encode %{
-    __ stx(G0, $mem$$Address);
+    __ store_vector8_zero($mem$$Address, $addr$$Register);
   %}
   ins_pipe(fstoreD_mem_zero);
 %}
 
-instruct storeV2I_zero(memory mem, immI0 zero) %{
+instruct storeV2I_zero(memory mem, immI0 zero, iRegP addr, flagsReg ccr) %{
   predicate(n->as_StoreVector()->memory_size() == 8 &&
             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_INT);
   match(Set mem (StoreVector mem (Replicate zero)));
+  effect(TEMP addr, KILL ccr);
   ins_cost(MEMORY_REF_COST);
-  size(4);
   format %{ "STX    $zero,$mem\t! store zero vector (2 ints)" %}
   ins_encode %{
-    __ stx(G0, $mem$$Address);
+    __ store_vector8_zero($mem$$Address, $addr$$Register);
   %}
   ins_pipe(fstoreD_mem_zero);
 %}
 
-instruct storeV2F_zero(memory mem, immF0 zero) %{
+instruct storeV2F_zero(memory mem, immF0 zero, iRegP addr, flagsReg ccr) %{
   predicate(n->as_StoreVector()->memory_size() == 8 &&
             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_FLOAT);
   match(Set mem (StoreVector mem (Replicate zero)));
+  effect(TEMP addr, KILL ccr);
   ins_cost(MEMORY_REF_COST);
-  size(4);
   format %{ "STX    $zero,$mem\t! store zero vector (2 floats)" %}
   ins_encode %{
-    __ stx(G0, $mem$$Address);
+    __ store_vector8_zero($mem$$Address, $addr$$Register);
   %}
   ins_pipe(fstoreD_mem_zero);
 %}

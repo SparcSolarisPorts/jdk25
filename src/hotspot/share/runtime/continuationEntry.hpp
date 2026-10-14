@@ -94,6 +94,9 @@ class ContinuationEntry {
   void set_resume_pc(address pc) { _pd.set_resume_pc(pc); }
   static ByteSize thaw_bottom_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::thaw_bottom_offset(); }
   void set_thaw_bottom(intptr_t* sp) { _pd.set_thaw_bottom(sp); }
+  static ByteSize saved_i6_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::saved_i6_offset(); }
+  static ByteSize saved_i7_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::saved_i7_offset(); }
+  void restore_register_window() const { _pd.restore_register_window(entry_sp()); }
 #endif
   static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
   static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }

@@ -94,7 +94,7 @@ inline void ContinuationHelper::push_pd(const frame& f) {
 
 inline void ContinuationHelper::set_anchor_to_entry_pd(
     JavaFrameAnchor* anchor, ContinuationEntry* entry) {
-  (void)entry;
+  entry->restore_register_window();
   anchor->set_flags(JavaFrameAnchor::flushed);
 }
 

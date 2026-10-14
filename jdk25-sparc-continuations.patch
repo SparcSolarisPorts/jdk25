@@ -849,7 +849,7 @@
  }
 --- a/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 +++ b/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
-@@ -25,8 +25,19 @@
+@@ -25,8 +25,27 @@
  #ifndef CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
  #define CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
  
@@ -861,12 +861,20 @@
 +  intptr_t _abi_save_area[22];
 +  address _resume_pc;
 +  intptr_t* _thaw_bottom;
++  intptr_t _saved_i6;
++  intptr_t _saved_i7;
 + public:
 +  static ByteSize resume_pc_offset() { return byte_offset_of(ContinuationEntryPD, _resume_pc); }
 +  static ByteSize thaw_bottom_offset() { return byte_offset_of(ContinuationEntryPD, _thaw_bottom); }
 +  address resume_pc() const { return _resume_pc; }
 +  void set_resume_pc(address pc) { _resume_pc = pc; }
 +  void set_thaw_bottom(intptr_t* sp) { _thaw_bottom = sp; }
++  static ByteSize saved_i6_offset() { return byte_offset_of(ContinuationEntryPD, _saved_i6); }
++  static ByteSize saved_i7_offset() { return byte_offset_of(ContinuationEntryPD, _saved_i7); }
++  void restore_register_window(intptr_t* sp) const {
++    sp[14] = _saved_i6;
++    sp[15] = _saved_i7;
++  }
  };
  
  #endif // CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
@@ -1164,6 +1172,15 @@
  template<typename FKind>
  static inline intptr_t** link_address(const frame& f) {
    assert(FKind::is_instance(f), "wrong frame kind");
+@@ -102,7 +94,7 @@
+ 
+ inline void ContinuationHelper::set_anchor_to_entry_pd(
+     JavaFrameAnchor* anchor, ContinuationEntry* entry) {
+-  (void)entry;
++  entry->restore_register_window();
+   anchor->set_flags(JavaFrameAnchor::flushed);
+ }
+ 
 @@ -129,12 +121,17 @@
  
  inline address* ContinuationHelper::InterpretedFrame::return_pc_address(
@@ -1468,7 +1485,36 @@
    return frame(last_Java_sp, frame::unpatchable, jfa->last_Java_pc());
  }
  
-@@ -555,11 +570,11 @@
+@@ -528,15 +543,25 @@
+   if (thread == Thread::current()) {
+     StubRoutines::Sparc::flush_callers_register_windows_func()();
+   }
+-  if (TracePcPatching) {
++  const bool deferred_thaw_patch = thread == nullptr && younger_sp_or_null() == nullptr;
++  if (TracePcPatching && !deferred_thaw_patch) {
+     // QQQ this assert is invalid (or too strong anyway) sice _pc could
+     // be original pc and frame could have the deopt pc.
+     // assert(_pc == *O7_addr() + pc_return_offset, "frame has wrong pc");
+     tty->print_cr("patch_pc at address " INTPTR_FORMAT " [" INTPTR_FORMAT " -> " INTPTR_FORMAT "]",
+                   p2i(O7_addr()), p2i(_pc), p2i(pc));
+   }
+-  *O7_addr() = pc - pc_return_offset;
+-  address original_pc = get_deopt_original_pc();
++  // A frame reconstructed during slow thaw has no younger save window yet.
++  // Thaw patches the caller's I7 once that younger window has been copied,
++  // and publishes the top frame's raw PC through ContinuationEntry.
++  if (!deferred_thaw_patch) {
++    *O7_addr() = pc - pc_return_offset;
++  }
++  nmethod* nm = _cb == nullptr ? nullptr : _cb->as_nmethod_or_null();
++  // _pc is the logical original PC. Test the newly requested hardware PC
++  // for deoptimization rather than testing that unchanged logical PC.
++  address original_pc = nm != nullptr && nm->is_deopt_pc(pc)
++      ? nm->get_original_pc(this) : nullptr;
+   if (original_pc != nullptr) {
+     assert(original_pc == _pc, "expected original to be stored before patching");
+     _deopt_state = is_deoptimized;
+@@ -555,11 +580,11 @@
  
  /*
    Find the (biased) sp that is just younger than old_sp starting at sp.
@@ -1482,7 +1528,7 @@
    intptr_t* orig_sp = sp;
  
    int max_frames = (old_sp - sp) / 16; // Minimum frame size is 16
-@@ -573,7 +588,7 @@
+@@ -573,7 +598,7 @@
      sp = (intptr_t*)((intptr_t)sp + STACK_BIAS);
    }
  
@@ -1491,7 +1537,7 @@
  }
  
  /*
-@@ -583,7 +598,7 @@
+@@ -583,7 +608,7 @@
    thread stack in question are flushed.
  */
  bool frame::is_valid_stack_pointer(intptr_t* valid_sp, intptr_t* sp) {
@@ -1500,7 +1546,7 @@
  }
  
  bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
-@@ -648,12 +663,31 @@
+@@ -648,12 +673,31 @@
  // in the bad old _post_Java_state days.
  //
  void JavaFrameAnchor::capture_last_Java_pc(intptr_t* sp) {
@@ -1534,7 +1580,7 @@
      _last_Java_pc = (address) _post_Java_sp[ I7->sp_offset_in_saved_window()] + frame::pc_return_offset;
  
    }
-@@ -668,7 +702,7 @@
+@@ -668,7 +712,7 @@
    // We always flush in case the profiler wants it but we won't mark
    // the windows as flushed unless we have a last_Java_frame
    intptr_t* sp = StubRoutines::Sparc::flush_callers_register_windows_func()();
@@ -2559,6 +2605,70 @@
        set((intptr_t)CompressedOops::base(), G6_heapbase);
      } else {
        AddressLiteral base(CompressedOops::base_addr());
+@@ -3785,3 +3938,63 @@
+   bind(L_crc32c_return);
+   nop();
+ }
++
++// C2 vector loads/stores can target arbitrary byte offsets in a MemorySegment.
++// Retain the aligned LDDF/STDF fast path and assemble unaligned values in bytes.
++void MacroAssembler::load_vector8(const Address& src, FloatRegister dst,
++                                  Register addr, Register bits, Register byte_tmp) {
++  assert_different_registers(addr, bits, byte_tmp);
++  Label aligned, done;
++  add(src, addr);
++  andcc(addr, 7, G0);
++  br(Assembler::zero, false, Assembler::pt, aligned);
++  delayed()->nop();
++  clr(bits);
++  for (int i = 0; i < 8; ++i) {
++    ldub(addr, i, byte_tmp);
++    sllx(bits, 8, bits);
++    or3(bits, byte_tmp, bits);
++  }
++  assert(UseVIS >= 3, "unaligned vector bit transfer requires VIS3");
++  movxtod(bits, dst);
++  ba(done);
++  delayed()->nop();
++  bind(aligned);
++  ldf(FloatRegisterImpl::D, Address(addr, 0), dst);
++  bind(done);
++}
++
++void MacroAssembler::store_vector8(FloatRegister src, const Address& dst,
++                                   Register addr, Register bits) {
++  assert_different_registers(addr, bits);
++  Label aligned, done;
++  add(dst, addr);
++  andcc(addr, 7, G0);
++  br(Assembler::zero, false, Assembler::pt, aligned);
++  delayed()->nop();
++  assert(UseVIS >= 3, "unaligned vector bit transfer requires VIS3");
++  movdtox(src, bits);
++  for (int i = 7; i >= 0; --i) {
++    stb(bits, addr, i);
++    if (i != 0) srlx(bits, 8, bits);
++  }
++  ba(done);
++  delayed()->nop();
++  bind(aligned);
++  stf(FloatRegisterImpl::D, src, Address(addr, 0));
++  bind(done);
++}
++
++void MacroAssembler::store_vector8_zero(const Address& dst, Register addr) {
++  Label aligned, done;
++  add(dst, addr);
++  andcc(addr, 7, G0);
++  br(Assembler::zero, false, Assembler::pt, aligned);
++  delayed()->nop();
++  for (int i = 0; i < 8; ++i) stb(G0, addr, i);
++  ba(done);
++  delayed()->nop();
++  bind(aligned);
++  stx(G0, addr, 0);
++  bind(done);
++}
 --- a/src/hotspot/cpu/sparc/macroAssembler_sparc.hpp
 +++ b/src/hotspot/cpu/sparc/macroAssembler_sparc.hpp
 @@ -309,7 +309,7 @@
@@ -2590,6 +2700,19 @@
    void compiler_lock_object(Register Roop, Register Rmark, Register Rbox,
                              Register Rscratch);
    void compiler_unlock_object(Register Roop, Register Rmark, Register Rbox,
+@@ -1341,6 +1347,12 @@
+   void fold_8bit_crc32(Register crc, Register table, Register tmp);
+   // CRC32C code for java.util.zip.CRC32C::updateBytes/updateDirectByteBuffer intrinsic.
+   void kernel_crc32c(Register crc, Register buf, Register len, Register table);
++  // Vector API memory segments allow byte-aligned eight-byte vectors.
++  void load_vector8(const Address& src, FloatRegister dst, Register addr,
++                    Register bits, Register byte_tmp);
++  void store_vector8(FloatRegister src, const Address& dst, Register addr,
++                     Register bits);
++  void store_vector8_zero(const Address& dst, Register addr);
+ 
+ };
+ 
 --- a/src/hotspot/cpu/sparc/macroAssembler_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/macroAssembler_sparc.inline.hpp
 @@ -246,10 +246,10 @@
@@ -3183,7 +3306,20 @@
      ciEnv::current()->record_failure("CodeCache is full");
      return 0;  // CodeBuffer::expand failed
    }
-@@ -1607,7 +1611,7 @@
+@@ -1580,6 +1584,12 @@
+ }
+ 
+ bool Matcher::match_rule_supported_vector(int opcode, int vlen, BasicType bt) {
++  // Vector API memory operations permit byte alignment. Without VIS3 raw
++  // FP/integer transfers, retain the Java fallback for these operations.
++  if (UseVIS < 3 && (opcode == Op_LoadVector || opcode == Op_StoreVector)) {
++    return false;
++  }
++
+ 
+   // TODO
+   // identify extra cases that we might want to provide match rules for
+@@ -1607,7 +1617,7 @@
  }
  
  const RegMask* Matcher::predicate_reg_mask(void) {
@@ -3192,7 +3328,7 @@
  }
  
  
-@@ -1622,7 +1626,7 @@
+@@ -1622,7 +1632,7 @@
  }
  
  #ifdef ASSERT
@@ -3201,7 +3337,7 @@
  #endif
  
  // Vector width in bytes
-@@ -1668,7 +1672,7 @@
+@@ -1668,7 +1678,7 @@
  
  MachOper* Matcher::pd_specialize_generic_vector_operand(MachOper* original_opnd, uint ideal_reg, bool is_temp) {
    ShouldNotReachHere(); // generic vector operands not supported
@@ -3210,7 +3346,7 @@
  }
  
  bool Matcher::is_reg2reg_move(MachNode* m) {
-@@ -2263,7 +2267,7 @@
+@@ -2263,7 +2273,7 @@
  
        // Emit stub for static call.
        address stub = CompiledDirectCall::emit_to_interp_stub(masm);
@@ -3219,7 +3355,7 @@
          ciEnv::current()->record_failure("CodeCache is full");
          return;
        }
-@@ -2290,8 +2294,9 @@
+@@ -2290,8 +2300,9 @@
        __ load_klass(O0, G3_scratch);
        int klass_load_size;
        if (UseCompressedClassPointers) {
@@ -3231,7 +3367,7 @@
        } else {
          klass_load_size = 1*BytesPerInstWord;
        }
-@@ -3137,7 +3142,7 @@
+@@ -3137,7 +3148,7 @@
    interface(CONST_INTER);
  %}
  
@@ -3240,7 +3376,7 @@
  operand immN0()
  %{
    predicate(n->get_narrowcon() == 0);
-@@ -5496,6 +5501,7 @@
+@@ -5496,6 +5507,7 @@
  
  // Load narrow Klass Pointer
  instruct loadNKlass(iRegN dst, memory mem) %{
@@ -3248,7 +3384,7 @@
    match(Set dst (LoadNKlass mem));
    ins_cost(MEMORY_REF_COST);
    size(4);
-@@ -5503,6 +5509,22 @@
+@@ -5503,6 +5515,22 @@
    format %{ "LDUW   $mem,$dst\t! compressed klass ptr" %}
    ins_encode %{
      __ lduw($mem$$Address, $dst$$Register);
@@ -3271,7 +3407,7 @@
    %}
    ins_pipe(iload_mem);
  %}
-@@ -5632,7 +5654,7 @@
+@@ -5632,7 +5660,7 @@
    match(Set dst src);
  
    size(4);
@@ -3280,7 +3416,7 @@
    ins_encode %{
      __ clr($dst$$Register);
    %}
-@@ -6000,7 +6022,7 @@
+@@ -6000,7 +6028,7 @@
    ins_encode %{
      __ encode_heap_oop($src$$Register, $dst$$Register);
    %}
@@ -3289,7 +3425,7 @@
    ins_pipe(ialu_reg);
  %}
  
-@@ -6502,6 +6524,86 @@
+@@ -6502,6 +6530,86 @@
    ins_pipe(ialu_reg);
  %}
  
@@ -3376,7 +3512,7 @@
  
  //----------OS and Locking Instructions----------------------------------------
  
-@@ -9551,6 +9653,19 @@
+@@ -9551,6 +9659,19 @@
    // The hack duplicates the exception oop into G3, so that CreateEx can use it there.
    // ins_encode( form3_rs1_simm13_rd( jump_target, 0x00, R_G0 ), move_return_pc_to_o1() );
    ins_avoid_back_to_back(AVOID_BEFORE);
@@ -3396,6 +3532,107 @@
    ins_pipe(tail_call);
  %}
  
+@@ -10282,80 +10403,82 @@
+ // ====================VECTOR INSTRUCTIONS=====================================
+ 
+ // Load Aligned Packed values into a Double Register
+-instruct loadV8(regD dst, memory mem) %{
++instruct loadV8(regD dst, memory mem, iRegP addr, iRegL bits, iRegL byte_tmp, flagsReg ccr) %{
+   predicate(n->as_LoadVector()->memory_size() == 8);
+   match(Set dst (LoadVector mem));
++  effect(TEMP addr, TEMP bits, TEMP byte_tmp, KILL ccr);
+   ins_cost(MEMORY_REF_COST);
+-  size(4);
+   format %{ "LDDF   $mem,$dst\t! load vector (8 bytes)" %}
+   ins_encode %{
+-    __ ldf(FloatRegisterImpl::D, $mem$$Address, as_DoubleFloatRegister($dst$$reg));
++    __ load_vector8($mem$$Address, as_DoubleFloatRegister($dst$$reg),
++                     $addr$$Register, $bits$$Register, $byte_tmp$$Register);
+   %}
+   ins_pipe(floadD_mem);
+ %}
+ 
+ // Store Vector in Double register to memory
+-instruct storeV8(memory mem, regD src) %{
++instruct storeV8(memory mem, regD src, iRegP addr, iRegL bits, flagsReg ccr) %{
+   predicate(n->as_StoreVector()->memory_size() == 8);
+   match(Set mem (StoreVector mem src));
++  effect(TEMP addr, TEMP bits, KILL ccr);
+   ins_cost(MEMORY_REF_COST);
+-  size(4);
+   format %{ "STDF   $src,$mem\t! store vector (8 bytes)" %}
+   ins_encode %{
+-    __ stf(FloatRegisterImpl::D, as_DoubleFloatRegister($src$$reg), $mem$$Address);
++    __ store_vector8(as_DoubleFloatRegister($src$$reg), $mem$$Address,
++                      $addr$$Register, $bits$$Register);
+   %}
+   ins_pipe(fstoreD_mem_reg);
+ %}
+ 
+ // Store Zero into vector in memory
+-instruct storeV8B_zero(memory mem, immI0 zero) %{
++instruct storeV8B_zero(memory mem, immI0 zero, iRegP addr, flagsReg ccr) %{
+   predicate(n->as_StoreVector()->memory_size() == 8 &&
+             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_BYTE);
+   match(Set mem (StoreVector mem (Replicate zero)));
++  effect(TEMP addr, KILL ccr);
+   ins_cost(MEMORY_REF_COST);
+-  size(4);
+   format %{ "STX    $zero,$mem\t! store zero vector (8 bytes)" %}
+   ins_encode %{
+-    __ stx(G0, $mem$$Address);
++    __ store_vector8_zero($mem$$Address, $addr$$Register);
+   %}
+   ins_pipe(fstoreD_mem_zero);
+ %}
+ 
+-instruct storeV4S_zero(memory mem, immI0 zero) %{
++instruct storeV4S_zero(memory mem, immI0 zero, iRegP addr, flagsReg ccr) %{
+   predicate(n->as_StoreVector()->memory_size() == 8 &&
+             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_SHORT);
+   match(Set mem (StoreVector mem (Replicate zero)));
++  effect(TEMP addr, KILL ccr);
+   ins_cost(MEMORY_REF_COST);
+-  size(4);
+   format %{ "STX    $zero,$mem\t! store zero vector (4 shorts)" %}
+   ins_encode %{
+-    __ stx(G0, $mem$$Address);
++    __ store_vector8_zero($mem$$Address, $addr$$Register);
+   %}
+   ins_pipe(fstoreD_mem_zero);
+ %}
+ 
+-instruct storeV2I_zero(memory mem, immI0 zero) %{
++instruct storeV2I_zero(memory mem, immI0 zero, iRegP addr, flagsReg ccr) %{
+   predicate(n->as_StoreVector()->memory_size() == 8 &&
+             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_INT);
+   match(Set mem (StoreVector mem (Replicate zero)));
++  effect(TEMP addr, KILL ccr);
+   ins_cost(MEMORY_REF_COST);
+-  size(4);
+   format %{ "STX    $zero,$mem\t! store zero vector (2 ints)" %}
+   ins_encode %{
+-    __ stx(G0, $mem$$Address);
++    __ store_vector8_zero($mem$$Address, $addr$$Register);
+   %}
+   ins_pipe(fstoreD_mem_zero);
+ %}
+ 
+-instruct storeV2F_zero(memory mem, immF0 zero) %{
++instruct storeV2F_zero(memory mem, immF0 zero, iRegP addr, flagsReg ccr) %{
+   predicate(n->as_StoreVector()->memory_size() == 8 &&
+             Matcher::vector_element_basic_type(n->in(MemNode::ValueIn)) == T_FLOAT);
+   match(Set mem (StoreVector mem (Replicate zero)));
++  effect(TEMP addr, KILL ccr);
+   ins_cost(MEMORY_REF_COST);
+-  size(4);
+   format %{ "STX    $zero,$mem\t! store zero vector (2 floats)" %}
+   ins_encode %{
+-    __ stx(G0, $mem$$Address);
++    __ store_vector8_zero($mem$$Address, $addr$$Register);
+   %}
+   ins_pipe(fstoreD_mem_zero);
+ %}
 --- a/src/hotspot/cpu/sparc/stackChunkFrameStream_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/stackChunkFrameStream_sparc.inline.hpp
 @@ -27,7 +27,6 @@
@@ -3892,7 +4129,19 @@
  
      return start;
    }
-@@ -5875,14 +5955,19 @@
+@@ -5863,6 +5943,11 @@
+ // On Java entry the arguments are caller %o0/%o1/%o2.  After the wrapper's
+ // save_frame they are visible as %i0/%i1/%i2.
+ void fill_continuation_entry(MacroAssembler* masm) {
++  // Interpreter locals can relocate the live entry window and overwrite
++  // its canonical spill area. Retain its native caller link and return PC
++  // outside that area for the post-freeze anchor/JVMTI walk.
++  __ st_ptr(I6, SP, STACK_BIAS + in_bytes(ContinuationEntry::saved_i6_offset()));
++  __ st_ptr(I7, SP, STACK_BIAS + in_bytes(ContinuationEntry::saved_i7_offset()));
+ #ifdef ASSERT
+   __ set(ContinuationEntry::cookie_value(), G1);
+   __ st(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::cookie_offset()));
+@@ -5875,14 +5960,19 @@
  
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_fastpath_offset()), G1);
    __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()));
@@ -3914,7 +4163,7 @@
  #ifndef PRODUCT
    Label ok;
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
-@@ -5894,11 +5979,11 @@
+@@ -5894,11 +5984,11 @@
  
    __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()), G1);
    __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));
@@ -5116,7 +5365,7 @@
    Unimplemented();
 --- a/src/hotspot/share/runtime/continuationEntry.hpp
 +++ b/src/hotspot/share/runtime/continuationEntry.hpp
-@@ -88,6 +88,13 @@
+@@ -88,6 +88,16 @@
    uint32_t _pin_count;
  
   public:
@@ -5126,13 +5375,16 @@
 +  void set_resume_pc(address pc) { _pd.set_resume_pc(pc); }
 +  static ByteSize thaw_bottom_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::thaw_bottom_offset(); }
 +  void set_thaw_bottom(intptr_t* sp) { _pd.set_thaw_bottom(sp); }
++  static ByteSize saved_i6_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::saved_i6_offset(); }
++  static ByteSize saved_i7_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::saved_i7_offset(); }
++  void restore_register_window() const { _pd.restore_register_window(entry_sp()); }
 +#endif
    static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
    static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
    static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
 --- a/src/hotspot/share/runtime/continuationFreezeThaw.cpp
 +++ b/src/hotspot/share/runtime/continuationFreezeThaw.cpp
-@@ -326,8 +326,9 @@
+@@ -326,16 +326,17 @@
  }
  
  static void set_anchor(JavaThread* thread, intptr_t* sp) {
@@ -5144,6 +5396,16 @@
    set_anchor(thread, sp, pc);
  }
  
+ static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry) {
+   JavaFrameAnchor* anchor = thread->frame_anchor();
++  ContinuationHelper::set_anchor_to_entry_pd(anchor, entry);
++  anchor->set_last_Java_pc(entry->entry_pc());
+   anchor->set_last_Java_sp(entry->entry_sp());
+-  anchor->set_last_Java_pc(entry->entry_pc());
+-  ContinuationHelper::set_anchor_to_entry_pd(anchor, entry);
+ 
+   assert(thread->has_last_Java_frame(), "");
+   assert(thread->last_frame().cb() != nullptr, "");
 @@ -414,7 +415,7 @@
  
    inline frame& last_frame() { return _last_frame; }

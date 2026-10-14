@@ -543,15 +543,25 @@ void frame::patch_pc(Thread* thread, address pc) {
   if (thread == Thread::current()) {
     StubRoutines::Sparc::flush_callers_register_windows_func()();
   }
-  if (TracePcPatching) {
+  const bool deferred_thaw_patch = thread == nullptr && younger_sp_or_null() == nullptr;
+  if (TracePcPatching && !deferred_thaw_patch) {
     // QQQ this assert is invalid (or too strong anyway) sice _pc could
     // be original pc and frame could have the deopt pc.
     // assert(_pc == *O7_addr() + pc_return_offset, "frame has wrong pc");
     tty->print_cr("patch_pc at address " INTPTR_FORMAT " [" INTPTR_FORMAT " -> " INTPTR_FORMAT "]",
                   p2i(O7_addr()), p2i(_pc), p2i(pc));
   }
-  *O7_addr() = pc - pc_return_offset;
-  address original_pc = get_deopt_original_pc();
+  // A frame reconstructed during slow thaw has no younger save window yet.
+  // Thaw patches the caller's I7 once that younger window has been copied,
+  // and publishes the top frame's raw PC through ContinuationEntry.
+  if (!deferred_thaw_patch) {
+    *O7_addr() = pc - pc_return_offset;
+  }
+  nmethod* nm = _cb == nullptr ? nullptr : _cb->as_nmethod_or_null();
+  // _pc is the logical original PC. Test the newly requested hardware PC
+  // for deoptimization rather than testing that unchanged logical PC.
+  address original_pc = nm != nullptr && nm->is_deopt_pc(pc)
+      ? nm->get_original_pc(this) : nullptr;
   if (original_pc != nullptr) {
     assert(original_pc == _pc, "expected original to be stored before patching");
     _deopt_state = is_deoptimized;

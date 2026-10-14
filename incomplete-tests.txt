@@ -1,0 +1,2 @@
+jtreg:test/hotspot/jtreg/serviceability/jvmti/GetOwnedMonitorInfo/GetOwnedMonitorInfoTest.java
+jtreg:test/hotspot/jtreg/serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java#default

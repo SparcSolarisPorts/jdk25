@@ -1,0 +1,161 @@
+runtime/ErrorHandling/TestAbortVmOnException.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'fatal error: Saw MyAbortException, aborting' missing from stdout/stderr
+
+runtime/NMT/MallocSiteTypeChange.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: '(malloc=2KB type=Internal +2KB \#1 +1)' missing from stdout/stderr
+
+runtime/NMT/VirtualAllocCommitMerge.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: '\\[0x[0]*ffffffff60800000 - 0x[0]*ffffffff60860000\\] committed 384KB from.*' missing from stdout/stderr
+
+compiler/whitebox/ForceNMethodSweepTest.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: sweep after deoptimization should decrease usage: expected that 581120 < 581120
+
+compiler/cpuflags/TestAESIntrinsicsOnUnsupportedConfig.java
+Failed. Execution failed: `main' threw exception: java.lang.AssertionError: Expected message not found: 'warning: AES instructions are not available on this CPU'. Case testUseAES failed
+
+compiler/codecache/CheckSegmentedCodeCache.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'Invalid code heap sizes' missing from stdout/stderr
+
+compiler/vectorapi/VectorFPtoIntCastTest.java
+Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.
+
+compiler/vectorapi/VectorMaskCompareNotTest.java
+Failed. Execution failed: `main' threw exception: java.lang.ExceptionInInitializerError
+
+compiler/vectorapi/TestVectorRotateScalarCount.java
+Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.
+
+compiler/vectorapi/VectorRearrangeTest.java
+Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.
+
+compiler/vectorapi/TestBiMorphicMismatchedMemSegment.java
+Failed. Unexpected exit from test [exit code: 6]
+
+compiler/vectorapi/VectorCastShape128Test.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480408 ms)
+
+compiler/vectorapi/TestVectorAddMulReduction.java
+Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.
+
+serviceability/HeapDump/UnmountedVThreadNativeMethodAtTop.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480321 ms)
+
+runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id4
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 1 tests failed\! (Error processing option LargePageSizeInBytes with valid value '-server -XX:+UseG1GC -XX:LargePageSizeInBytes=1'\! JVM exited with unexpected error code = 8 [0x8]) expected: 1 but was: 0
+
+runtime/vthread/JNIMonitor/JNIMonitor.java#missingUnlock
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'VirtualThread \\(tid:.*exiting with Objects still locked by JNI MonitorEnter' missing from stdout
+
+runtime/vthread/JNIMonitor/JNIMonitor.java#multiMissingUnlockWithThrow
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Checking for pattern "VirtualThread \\(tid:.*exiting with Objects still locked by JNI MonitorEnter": expected 5 but found 0
+
+runtime/vthread/JNIMonitor/JNIMonitor.java#missingUnlockWithThrow
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'VirtualThread \\(tid:.*exiting with Objects still locked by JNI MonitorEnter' missing from stdout
+
+runtime/vthread/JNIMonitor/JNIMonitor.java#multiMissingUnlock
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Checking for pattern "VirtualThread \\(tid:.*exiting with Objects still locked by JNI MonitorEnter": expected 5 but found 0
+
+compiler/loopopts/superword/TestAlignVectorFuzzer.java#CompileOnly
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480659 ms)
+
+compiler/vectorization/runner/ArrayUnsafeOpTest.java
+Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.
+
+compiler/c2/aarch64/TestIntrinsicsRegStress.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Failed with -Infinity
+
+compiler/codecache/stress/UnexpectedDeoptimizationAllTest.java
+Failed. Unexpected exit from test [exit code: 11]
+
+compiler/vectorapi/reshape/TestVectorReinterpret.java
+Failed. Execution failed: `main' threw exception: compiler.lib.ir_framework.driver.TestVMException: There were one or multiple errors. Please check stderr for more information.
+
+serviceability/jvmti/DynamicCodeGenerated/DynamicCodeGeneratedTest.java
+Failed. Unexpected exit from test [exit code: 6]
+
+serviceability/jvmti/ObjectMonitorUsage/ObjectMonitorUsage.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480317 ms)
+
+serviceability/attach/AttachAPIv2/StreamingOutputTest.java
+Failed. Execution failed: `main' threw exception: java.lang.Exception: VM did not logged expected 'executing command setflag, streaming output: 1'
+
+compiler/intrinsics/sha/cli/TestUseSHA1IntrinsicsOptionOnUnsupportedCPU.java
+Failed. Execution failed: `main' threw exception: java.lang.AssertionError: Option 'UseSHA1Intrinsics' is expected to have 'false' value, but is 'UseSHA1Intrinsics = t'. Option 'UseSHA1Intrinsics' should be disabled by default
+
+compiler/intrinsics/sha/cli/TestUseSHA256IntrinsicsOptionOnUnsupportedCPU.java
+Failed. Execution failed: `main' threw exception: java.lang.AssertionError: Option 'UseSHA256Intrinsics' is expected to have 'false' value, but is 'UseSHA256Intrinsics = t'. Option 'UseSHA256Intrinsics' should be disabled by default
+
+compiler/intrinsics/sha/cli/TestUseMD5IntrinsicsOptionOnUnsupportedCPU.java
+Failed. Execution failed: `main' threw exception: java.lang.AssertionError: Option 'UseMD5Intrinsics' is expected to have 'false' value, but is 'UseMD5Intrinsics = t'. Option 'UseMD5Intrinsics' should be off on unsupported CPU even if set to true directly
+
+compiler/intrinsics/sha/cli/TestUseSHAOptionOnUnsupportedCPU.java
+Failed. Execution failed: `main' threw exception: java.lang.AssertionError: Option 'UseSHA' is expected to have 'false' value, but is 'UseSHA = t'. Option 'UseSHA' should be disabled by default
+
+compiler/intrinsics/sha/sanity/TestMD5MultiBlockIntrinsics.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected count of intrinsic _digestBase_implCompressMB is expected:true, matched: 0, suspected: 164
+
+compiler/intrinsics/sha/sanity/TestMD5Intrinsics.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected count of intrinsic _md5_implCompress is expected:true, matched: 0, suspected: 164
+
+compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java
+Failed. Execution failed: `main' threw exception: java.lang.AssertionError: JVM should start with option 'ReservedCodeCacheSize' without errors.
+
+compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java
+Failed. Execution failed: `main' threw exception: java.lang.AssertionError: JVM process should have exit value '0', but has '1'. JVM startup failure is not expected, since all options have allowed values
+
+serviceability/jvmti/vthread/GetThreadState/GetThreadStateTest.java#default
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480321 ms)
+
+serviceability/jvmti/vthread/GetThreadState/GetThreadStateTest.java#no-vmcontinuations
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480322 ms)
+
+serviceability/jvmti/vthread/RedefineClasses/RedefineRunningMethods.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 720000 ms (elapsed time including timeout handling 730731 ms)
+
+serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
+Failed. Unexpected exit from test [exit code: 6]
+
+serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480317 ms)
+
+serviceability/jvmti/vthread/ToggleNotifyJvmtiTest/ToggleNotifyJvmtiTest.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 490732 ms)
+
+serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java#default
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480314 ms)
+
+serviceability/jvmti/vthread/ThreadListStackTracesTest/ThreadListStackTracesTest.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480313 ms)
+
+serviceability/jvmti/vthread/InterruptThreadTest/InterruptThreadTest.java#default
+Failed. Unexpected exit from test [exit code: 6]
+
+serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
+Failed. Unexpected exit from test [exit code: 6]
+
+serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
+Failed. Unexpected exit from test [exit code: 6]
+
+serviceability/jvmti/vthread/PopFrameTest/PopFrameTest.java#default
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480318 ms)
+
+serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java#default
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: VThreadNotifyFramePopTest failed\!
+
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480319 ms)
+
+serviceability/jvmti/events/MonitorWaited/monitorwaited01/monitorwaited01.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected status: 2
+
+serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java
+Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Failed
+
+serviceability/jvmti/thread/GetCurrentContendedMonitor/contmon01/contmon01.java
+Failed. Unexpected exit from test [exit code: 6]
+
+serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
+Failed. Unexpected exit from test [exit code: 6]
+
+serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
+Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480365 ms)

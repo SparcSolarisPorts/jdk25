@@ -334,9 +334,9 @@ static void set_anchor(JavaThread* thread, intptr_t* sp) {
 
 static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry) {
   JavaFrameAnchor* anchor = thread->frame_anchor();
-  anchor->set_last_Java_sp(entry->entry_sp());
-  anchor->set_last_Java_pc(entry->entry_pc());
   ContinuationHelper::set_anchor_to_entry_pd(anchor, entry);
+  anchor->set_last_Java_pc(entry->entry_pc());
+  anchor->set_last_Java_sp(entry->entry_sp());
 
   assert(thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != nullptr, "");
