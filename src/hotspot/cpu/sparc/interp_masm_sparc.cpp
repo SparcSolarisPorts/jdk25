@@ -277,8 +277,9 @@ void InterpreterMacroAssembler::dispatch_Lbyte_code(TosState state, address* tab
     Label no_safepoint;
 
     if (tbl.value() != sfpt_tbl.value()) {
-      ldx(Address(G2_thread, JavaThread::polling_page_offset()), G3_scratch, 0);
-      // Armed page has poll_bit set, if poll bit is cleared just continue.
+      // The armed bit is in the polling word, not the page-aligned address.
+      ldx(Address(G2_thread, JavaThread::polling_word_offset()), G3_scratch, 0);
+      // If the poll bit is cleared, continue with the normal dispatch table.
       and3(G3_scratch, SafepointMechanism::poll_bit(), G3_scratch);
 
       br_null_short(G3_scratch, Assembler::pt, no_safepoint);

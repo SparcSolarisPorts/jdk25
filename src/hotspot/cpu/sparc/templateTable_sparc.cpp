@@ -2024,7 +2024,8 @@ void TemplateTable::_return(TosState state) {
 
   if (_desc->bytecode() != Bytecodes::_return_register_finalizer) {
     Label no_safepoint;
-    __ ldx(Address(G2_thread, JavaThread::polling_page_offset()), G3_scratch, 0);
+    // Bit testing uses the polling word; the polling page is an aligned address.
+    __ ldx(Address(G2_thread, JavaThread::polling_word_offset()), G3_scratch, 0);
     __ btst(SafepointMechanism::poll_bit(), G3_scratch);
     __ br(Assembler::zero, false, Assembler::pt, no_safepoint);
     __ delayed()->nop();

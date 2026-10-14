@@ -1840,7 +1840,19 @@
  
      // Initiate earlyret handling only if it is not already being processed.
      // If the flag has the earlyret_processing bit set, it means that this code
-@@ -483,7 +483,7 @@
+@@ -277,8 +277,9 @@
+     Label no_safepoint;
+ 
+     if (tbl.value() != sfpt_tbl.value()) {
+-      ldx(Address(G2_thread, JavaThread::polling_page_offset()), G3_scratch, 0);
+-      // Armed page has poll_bit set, if poll bit is cleared just continue.
++      // The armed bit is in the polling word, not the page-aligned address.
++      ldx(Address(G2_thread, JavaThread::polling_word_offset()), G3_scratch, 0);
++      // If the poll bit is cleared, continue with the normal dispatch table.
+       and3(G3_scratch, SafepointMechanism::poll_bit(), G3_scratch);
+ 
+       br_null_short(G3_scratch, Assembler::pt, no_safepoint);
+@@ -483,7 +484,7 @@
    assert(G4_scratch != Gframe_size, "Only you can prevent register aliasing!");
  
    // A native does not need to do this, since its callee does not change SP.
@@ -1849,7 +1861,7 @@
    btst(JVM_ACC_NATIVE, Gframe_size);
    br(Assembler::notZero, false, Assembler::pt, done);
    delayed()->nop();
-@@ -742,7 +742,7 @@
+@@ -742,7 +743,7 @@
    add(result, index, result);
    load_heap_oop(result, arrayOopDesc::base_offset_in_bytes(T_OBJECT), result, tmp);
    // The resulting oop is null if the reference is not yet resolved.
@@ -1858,7 +1870,7 @@
  }
  
  
-@@ -779,11 +779,11 @@
+@@ -779,11 +780,11 @@
  
    check_klass_subtype_fast_path(Rsub_klass, Rsuper_klass,
                                  Rtmp1, Rtmp2,
@@ -1872,7 +1884,7 @@
  
    bind(not_subtype);
    profile_typecheck_failed(Rtmp1);
-@@ -821,7 +821,7 @@
+@@ -821,7 +822,7 @@
  void InterpreterMacroAssembler::throw_if_not_2( address  throw_entry_point,
                                                  Register Rscratch,
                                                  Label&   ok ) {
@@ -1881,7 +1893,7 @@
    AddressLiteral dest(throw_entry_point);
    jump_to(dest, Rscratch);
    delayed()->nop();
-@@ -959,7 +959,7 @@
+@@ -959,7 +960,7 @@
    const Address access_flags(Lmethod, Method::access_flags_offset());
    interp_verify_oop(Otos_i, state, __FILE__, __LINE__);
    push(state); // save tos
@@ -1890,7 +1902,7 @@
    btst(JVM_ACC_SYNCHRONIZED, G3_scratch);
    br(zero, false, pt, unlocked);
    delayed()->nop();
-@@ -1138,7 +1138,10 @@
+@@ -1138,7 +1139,10 @@
      // testing if Stack Reserved Area needs to be re-enabled
      Label no_reserved_zone_enabling;
      ld_ptr(G2_thread, JavaThread::reserved_stack_activation_offset(), G3_scratch);
@@ -1902,7 +1914,7 @@
  
      call_VM_leaf(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), G2_thread);
      call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::throw_delayed_StackOverflowError), G2_thread);
-@@ -1171,6 +1174,16 @@
+@@ -1171,6 +1175,16 @@
  // Argument - lock_reg points to the BasicObjectLock to be used for locking,
  //            it must be initialized with the object to lock
  void InterpreterMacroAssembler::lock_object(Register lock_reg, Register Object) {
@@ -1919,7 +1931,7 @@
    if (LockingMode == LM_MONITOR) {
      call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter), lock_reg);
    }
-@@ -1241,6 +1254,18 @@
+@@ -1241,6 +1255,18 @@
  // Argument - lock_reg points to the BasicObjectLock for lock
  // Throw IllegalMonitorException if object is not locked by current thread
  void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
@@ -4104,7 +4116,17 @@
      __ bind(notNull);
    }
  
-@@ -2305,7 +2309,7 @@
+@@ -2020,7 +2024,8 @@
+ 
+   if (_desc->bytecode() != Bytecodes::_return_register_finalizer) {
+     Label no_safepoint;
+-    __ ldx(Address(G2_thread, JavaThread::polling_page_offset()), G3_scratch, 0);
++    // Bit testing uses the polling word; the polling page is an aligned address.
++    __ ldx(Address(G2_thread, JavaThread::polling_word_offset()), G3_scratch, 0);
+     __ btst(SafepointMechanism::poll_bit(), G3_scratch);
+     __ br(Assembler::zero, false, Assembler::pt, no_safepoint);
+     __ delayed()->nop();
+@@ -2305,7 +2310,7 @@
        }
        __ verify_oop(Otos_i);
      }
@@ -4113,7 +4135,7 @@
      // Rcache: field entry pointer
      __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_access),
                 Otos_i, Rcache);
-@@ -2326,7 +2330,9 @@
+@@ -2326,7 +2331,9 @@
    Register Rclass = Rcache;
    Register Roffset= G4_scratch;
    Register Rflags = G1_scratch;
@@ -4124,7 +4146,7 @@
  
    resolve_cache_and_index_for_field(byte_no, Rcache, index);
    jvmti_post_field_access(Rcache, index, is_static, false);
-@@ -2671,7 +2677,7 @@
+@@ -2671,7 +2678,7 @@
      }
      // setup pointer to jvalue object
      __ mov(Lesp, G1_scratch);  __ inc(G1_scratch, wordSize);
@@ -4133,7 +4155,7 @@
      // G3_scratch: field entry pointer
      // G1_scratch: jvalue object on the stack
      __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::post_field_modification),
-@@ -2694,7 +2700,9 @@
+@@ -2694,7 +2701,9 @@
    Register Rclass = Rcache;
    Register Roffset= G4_scratch;
    Register Rflags = G1_scratch;
@@ -4144,7 +4166,7 @@
  
    resolve_cache_and_index_for_field(byte_no, Rcache, index);
    jvmti_post_field_mod(Rcache, index, is_static);
-@@ -3151,7 +3159,7 @@
+@@ -3151,7 +3160,7 @@
    __ lduh(G4_scratch, in_bytes(ConstMethod::size_of_parameters_offset()), G4_scratch);
    __ load_receiver(G4_scratch, O0);
  
@@ -4153,7 +4175,7 @@
    __ null_check(O0);
  
    __ profile_final_call(O4);
-@@ -3559,9 +3567,9 @@
+@@ -3559,9 +3568,9 @@
    if (UseTLAB) {
      // clear object fields
      __ bind(initialize_object);
@@ -4165,7 +4187,7 @@
  
      // initialize remaining object fields
      if (UseBlockZeroing) {
-@@ -3591,10 +3599,15 @@
+@@ -3591,10 +3600,15 @@
    // Initialize the header: mark, klass
    __ bind(initialize_header);
  
@@ -4185,7 +4207,7 @@
  
    {
      SkipIfEqual skip_if(
-@@ -3645,7 +3658,7 @@
+@@ -3645,7 +3659,7 @@
    Register RobjKlass = O5;
    Register RspecifiedKlass = O4;
  
@@ -4194,7 +4216,7 @@
    __ br_null(Otos_i, false, Assembler::pn, is_null);
    __ delayed()->nop();
  
-@@ -3703,7 +3716,7 @@
+@@ -3703,7 +3717,7 @@
    Register RobjKlass = O5;
    Register RspecifiedKlass = O4;
  
@@ -4203,7 +4225,7 @@
    __ br_null(Otos_i, false, Assembler::pt, is_null);
    __ delayed()->nop();
  
-@@ -3813,7 +3826,7 @@
+@@ -3813,7 +3827,7 @@
  
  
    // initialize entry pointer

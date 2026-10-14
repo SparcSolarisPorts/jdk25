@@ -1586,3 +1586,14 @@ passes on Solaris; explicit attach/detach resets the counter. See
 commands. Native Solaris validation remains required. The separate stack-bang
 VM shutdown safepoint timeout is still under investigation. The prior native
 result remains 23 passed and two errors; it is not replaced by host checks.
+
+## v51: interpreter dispatch and return safepoints
+
+The corrected diagnostic run identifies the stack-bang test's spinning daemon
+as the thread preventing shutdown's safepoint. SPARC interpreter dispatch
+and return checks were masking the poll bit in the page-aligned polling-page
+address. Both now load the separate polling word. C1/C2 page dereference
+polls remain intact. See `README-interpreter-safepoints-v51.txt` for source
+evidence, host checks, a bounded GC/spin reproduction, and native rerun steps.
+Native v51 validation is pending; 24 of the selected 25 cases have passed
+across the prior native runs.
