@@ -1268,7 +1268,12 @@
  inline intptr_t* ContinuationHelper::InterpretedFrame::callers_sp(const frame& f) {
 --- a/src/hotspot/cpu/sparc/frame_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/frame_sparc.cpp
-@@ -32,10 +32,13 @@
+@@ -28,14 +28,17 @@
+ #include "memory/resourceArea.hpp"
+ #include "memory/universe.hpp"
+ #include "oops/markWord.hpp"
+-#include "oops/method.hpp"
++#include "oops/method.inline.hpp"
  #include "oops/oop.inline.hpp"
  #include "prims/methodHandles.hpp"
  #include "runtime/frame.inline.hpp"

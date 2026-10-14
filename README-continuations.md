@@ -1617,3 +1617,10 @@ freeze copied them. v53 removes those writes and restores the v51 entry layout.
 It anchors at the actual live entry window and uses FP minus entry size to
 recover canonical metadata for oop maps. Vector and deferred-deopt-PC fixes
 remain. See `README-anchor-regression-v53.txt`. Native confirmation is pending.
+
+## v54: inline Method header for the v53 frame walk
+
+v53 introduced a call to `Method::is_continuation_enter_intrinsic` without
+including its inline definition. v54 includes `oops/method.inline.hpp` in
+`frame_sparc.cpp`, fixing the reported unresolved symbol. All v53 runtime
+changes remain intact and still need native smoke confirmation.
