@@ -63,6 +63,12 @@ private:
   static const uint8_t FLAG_HAS_LOCKSTACK = 1 << 5; // LockStack was copied into stackChunk
   static const uint8_t FLAG_PREEMPTED = 1 << 6; // Continuation was unmounted from inside VM
 
+#ifdef SPARC
+  // A fresh chunk with compiled bottom arguments includes the ABI window
+  // between the bottom frame boundary and those arguments.
+  static const uint8_t FLAG_SPARC_ARG_WINDOW = 1 << 7;
+#endif
+
   bool try_acquire_relativization();
   void release_relativization();
 
@@ -130,6 +136,11 @@ public:
   inline void set_flag(uint8_t flag, bool value);
   inline bool try_set_flags(uint8_t prev_flags, uint8_t new_flags);
   inline void clear_flags();
+
+#ifdef SPARC
+  inline bool has_sparc_arg_window() const;
+  inline void set_has_sparc_arg_window(bool value);
+#endif
 
   inline bool has_mixed_frames() const;
   inline void set_has_mixed_frames(bool value);

@@ -1114,7 +1114,13 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   assert(!allocated_old_in_freeze_fast || (!UseZGC && !UseG1GC), "Unexpected allocation");
 
   DEBUG_ONLY(bool empty_chunk = true);
-  if (unextended_sp < _freeze_size || chunk->is_gc_mode() || (!allocated_old_in_freeze_fast && chunk->requires_barriers())) {
+  int required_capacity = _freeze_size;
+#ifdef SPARC
+  if (chunk != nullptr && chunk->is_empty() && callee.is_compiled_frame() && argsize > 0) {
+    required_capacity += frame::register_save_words;
+  }
+#endif
+  if (unextended_sp < required_capacity || chunk->is_gc_mode() || (!allocated_old_in_freeze_fast && chunk->requires_barriers())) {
     // ALLOCATE NEW CHUNK
 
     if (lt.develop_is_enabled()) {
@@ -1131,11 +1137,22 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     _freeze_size += overlap; // we're allocating a new chunk, so no overlap
     // overlap = 0;
 
+#ifdef SPARC
+    // No real caller frame exists in a fresh chunk. Reserve its ABI window
+    // so stack arguments at hf.fp()+16 remain inside the chunk object.
+    const int arg_window = callee.is_compiled_frame() && argsize > 0
+        ? frame::register_save_words : 0;
+    chunk = allocate_chunk_slow(_freeze_size + arg_window, argsize_md + arg_window);
+#else
     chunk = allocate_chunk_slow(_freeze_size, argsize_md);
+#endif
     if (chunk == nullptr) {
       return freeze_exception;
     }
 
+#ifdef SPARC
+    chunk->set_has_sparc_arg_window(arg_window != 0);
+#endif
     // Install new chunk
     _cont.set_tail(chunk);
     assert(chunk->is_empty(), "");
@@ -1144,6 +1161,11 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     log_develop_trace(continuations)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
     if (chunk->is_empty()) {
       int sp = chunk->stack_size() - argsize_md;
+#ifdef SPARC
+      const bool arg_window = callee.is_compiled_frame() && argsize > 0;
+      if (arg_window) sp -= frame::register_save_words;
+      chunk->set_has_sparc_arg_window(arg_window);
+#endif
       chunk->set_sp(sp);
       chunk->set_bottom(sp);
       _freeze_size += overlap;
@@ -1392,6 +1414,17 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 #ifdef SPARC
   if (preserve_caller_window) {
     Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(), 16);
+  }
+#endif
+
+#ifdef SPARC
+  const int stack_args = f.compiled_frame_stack_argsize();
+  if (stack_args > 0) {
+    intptr_t* source_args = f.fp() + frame::register_save_words;
+    intptr_t* heap_args = hf.fp() + frame::register_save_words;
+    assert(heap_args >= _cont.tail()->start_address() &&
+           heap_args + stack_args <= _cont.tail()->end_address(), "frozen arguments must fit in chunk");
+    Copy::conjoint_words((HeapWord*)source_args, (HeapWord*)heap_args, stack_args);
   }
 #endif
 

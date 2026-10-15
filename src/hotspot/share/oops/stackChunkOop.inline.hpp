@@ -101,7 +101,14 @@ inline void stackChunkOopDesc::set_cont_access(oop value) { jdk_internal_vm_Stac
 
 inline int stackChunkOopDesc::argsize() const {
   assert(!is_empty(), "should not ask for argsize in empty chunk");
-  return stack_size() - bottom() - frame::metadata_words_at_top;
+  int words = stack_size() - bottom() - frame::metadata_words_at_top;
+#ifdef SPARC
+  if (has_sparc_arg_window()) {
+    assert(words >= frame::register_save_words, "complete bottom argument window");
+    words -= frame::register_save_words;
+  }
+#endif
+  return words;
 }
 
 inline HeapWord* stackChunkOopDesc::start_of_stack() const {
@@ -156,9 +163,14 @@ inline void stackChunkOopDesc::clear_flags() {
   set_flags(0);
 }
 
+#ifdef SPARC
+inline bool stackChunkOopDesc::has_sparc_arg_window() const { return is_flag(FLAG_SPARC_ARG_WINDOW); }
+inline void stackChunkOopDesc::set_has_sparc_arg_window(bool value) { set_flag(FLAG_SPARC_ARG_WINDOW, value); }
+#endif
+
 inline bool stackChunkOopDesc::has_mixed_frames() const { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
 inline void stackChunkOopDesc::set_has_mixed_frames(bool value) {
-  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAG_PREEMPTED)) == 0, "other flags should not be set");
+  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAG_PREEMPTED SPARC_ONLY(| FLAG_SPARC_ARG_WINDOW))) == 0, "other flags should not be set");
   set_flag(FLAG_HAS_INTERPRETED_FRAMES, value);
 }
 

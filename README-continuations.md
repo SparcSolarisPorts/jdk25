@@ -1,3 +1,66 @@
+v66: retain bottom compiled arguments when allocating a fresh chunk
+==================================================================
+The v65 compressed and uncompressed traces establish this sequence:
+1. First thaw reads the expected integer arguments and live references.
+2. With compressed oops, before-decode contains encoded high-half words;
+   after-decode contains valid full object pointers. Decoding works.
+3. freeze-source immediately afterwards still contains all nine values.
+4. The next thaw-source reads nine zeros, including all five integer args.
+The loss therefore occurs when re-freezing into the new chunk, before the
+next copy or decode. It is not limited to compressed references or oop roots.
+
+Root cause:
+- The generic copy reserves/copies frame_size+argsize contiguous words.
+- On SPARC, incoming stack arguments begin at caller SP+16 words, above
+  the L/I register-save window. A fresh chunk containing a compiled bottom
+  frame had no room/copy for that extra window and its actual arguments.
+- A pre-existing caller frame in an older chunk can mask this defect. GC
+  forces a fresh chunk during the subsequent freeze, exposing the zeros.
+
+Changes:
+- Slow freeze allocates 16 additional words when a fresh chunk has compiled
+  bottom arguments. The empty-chunk reuse capacity check and boundary
+  setup include the same extra words.
+- SPARC-only chunk flag bit 7 records this physical trailer. argsize()
+  subtracts the window words, preserving the true Java argument count.
+- The native thaw size remains the logical frame+argument size. The extra
+  heap window does not become Java parameters or inflate that native size.
+- Compiled freeze explicitly copies arguments from f.fp()+16 to hf.fp()+16,
+  after preserving the caller window. The destination is checked against
+  the chunk's actual allocation bounds.
+- The debug frame-range check includes the ABI window before the argument
+  area, matching the locations used by compiled oop maps.
+- Other architectures retain their original chunk layout/count calculation.
+- No fast-path eligibility checks were weakened or added; existing SPARC
+  eligibility already excludes mounted stack-argument extensions.
+
+Validation on the host:
+- Actual allocation expression, argument-count getter, empty reuse block
+  and explicit argument-copy block: 291 fresh-chunk layouts across 0..96
+  argument words and one/two/three Java frames. All values and allocation
+  guards survive, and logical counts remain correct.
+- The model reproduces zero argument data before the new explicit copy.
+- Existing compiled-window, bitmap, entry-boundary and eviction checks pass.
+- Native Solaris/SPARC build and runtime validation remain required.
+
+After extracting, rebuild quietly and run the targeted GC comparison:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-stack-argument-gc-trace.sh
+    else
+      tail -80 /tmp/jdk25-build.log
+    fi
+
+If both variants pass, validate the normal logging-disabled regressions:
+
+    bash tests/run-v59-regressions.sh
+
+Keep evidence.zip if a targeted case fails. It contains only logs/results,
+not core files. Focused jtreg concurrency remains eight by default.
+
+Earlier release notes follow.
+
 v65 diagnostic build: trace the remaining GC stack-argument failure
 =================================================================
 Native v64: 15/16 regression cases pass. Nested mixed-mode boundary now

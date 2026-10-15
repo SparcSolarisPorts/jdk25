@@ -43,7 +43,7 @@ inline bool StackChunkFrameStream<frame_kind>::is_in_frame(void* p0) const {
   intptr_t* low = sp();
   intptr_t* high = is_interpreted()
       ? (to_frame().interpreter_frame_local_at(0) + 1)
-      : unextended_sp() + _cb->frame_size() + stack_argsize();
+      : unextended_sp() + _cb->frame_size() + frame::register_save_words + stack_argsize();
   return p >= low && p < high;
 }
 #endif
