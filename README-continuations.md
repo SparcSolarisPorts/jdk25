@@ -1,3 +1,46 @@
+v63: preserve compiled register windows during mixed slow freeze
+==============================================================
+Native v62 results:
+- Stack-argument interpreter/C1/C2 PASS; mixed and C2-GC still crash.
+- Boundary interpreter/C1/C2 PASS; mixed reports Pinned: NATIVE.
+- Original continuation and mixed-yield groups PASS.
+These are individual run results, not claims of repeated stability.
+
+New fix:
+- NonInterpretedFrame::frame_top(f, callee_argsize, callee_interpreted)
+  previously advanced the copy start by callee_argsize for compiled callees.
+- SPARC starts a compiled frame with its 16-word L/I register-save window.
+  Outgoing stack arguments follow that window. Advancing the start omits
+  live saved registers, including oop-map locations, during slow freeze.
+- SPARC now copies from unextended_sp() without that displacement. The
+  existing separate copy of a physically extended c2i window remains.
+- This matches the mixed-mode dump showing zeroed saved L registers.
+- No compiler, continuation fast path, OSR or test expectation is disabled.
+- The generic branch retains its previous behavior for other architectures.
+
+Validation on the host:
+- Actual copy-start method compiled and exercised with SPARC defined:
+  194 argument/callee cases preserve every saved register.
+- Compiled without SPARC: 194 cases retain the prior generic behavior.
+- Reintroducing the old displacement makes the regression fail.
+- Existing entry-eviction and slow-thaw layout checks PASS.
+- Solaris/SPARC execution remains required. C2-with-GC and mixed native
+  pinning are not marked fixed by this release.
+
+Extract over the checkout, then rebuild quietly and run all four groups:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-v59-regressions.sh
+    else
+      tail -80 /tmp/jdk25-build.log
+    fi
+
+The independent-group runner retains its v59 name. The focused jtreg
+runner still defaults to eight concurrent tests.
+
+Earlier release notes follow.
+
 v62: evict the entry window before C++ thaw copies Java frames
 ============================================================
 Native v61 evidence:

@@ -144,7 +144,16 @@ inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(const frame& f)
 }
 
 inline intptr_t* ContinuationHelper::NonInterpretedFrame::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {
+#ifdef SPARC
+  // Every compiled frame starts with its architectural L/I save area.
+  // Callee stack arguments live ABOVE that window; skipping their count
+  // here discards live caller registers during slow mixed-mode freeze.
+  (void)callee_argsize;
+  (void)callee_interpreted;
+  return f.unextended_sp();
+#else
   return f.unextended_sp() + (callee_interpreted ? 0 : callee_argsize);
+#endif
 }
 
 inline intptr_t* ContinuationHelper::NonInterpretedFrame::frame_top(const frame& f) { // inclusive; this will be copied with the frame

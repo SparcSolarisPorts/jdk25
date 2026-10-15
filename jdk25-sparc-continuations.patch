@@ -6076,6 +6076,23 @@
                             : *return_pc_address(f) + frame::pc_return_offset;
  #else
    return return_address_at((intptr_t *)return_pc_address(f));
+@@ -144,7 +144,16 @@
+ }
+ 
+ inline intptr_t* ContinuationHelper::NonInterpretedFrame::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {
++#ifdef SPARC
++  // Every compiled frame starts with its architectural L/I save area.
++  // Callee stack arguments live ABOVE that window; skipping their count
++  // here discards live caller registers during slow mixed-mode freeze.
++  (void)callee_argsize;
++  (void)callee_interpreted;
++  return f.unextended_sp();
++#else
+   return f.unextended_sp() + (callee_interpreted ? 0 : callee_argsize);
++#endif
+ }
+ 
+ inline intptr_t* ContinuationHelper::NonInterpretedFrame::frame_top(const frame& f) { // inclusive; this will be copied with the frame
 --- a/src/hotspot/share/runtime/stackChunkFrameStream.hpp
 +++ b/src/hotspot/share/runtime/stackChunkFrameStream.hpp
 @@ -52,6 +52,7 @@
