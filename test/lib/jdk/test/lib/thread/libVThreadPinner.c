@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include "jni.h"
 
 #include "export.h"
 
@@ -30,4 +31,21 @@
  */
 EXPORT void call(void *(*f)(void)) {
     (*f)();
+}
+
+/*
+ * Java -> JNI -> Java leaves a native frame below task.run(), pinning the
+ * virtual thread just as the FFM downcall/upcall does. Keep the existing call
+ * symbol for ports using FFM. Let JNI exceptions propagate to runPinned.
+ */
+JNIEXPORT void JNICALL
+Java_jdk_test_lib_thread_VThreadPinner_invokePinned(JNIEnv* env, jclass klass,
+                                                  jobject task) {
+    jclass task_class = (*env)->GetObjectClass(env, task);
+    if (task_class == NULL) return;
+    jmethodID run = (*env)->GetMethodID(env, task_class, "run", "()V");
+    if (run != NULL) {
+        (*env)->CallVoidMethod(env, task, run);
+    }
+    (*env)->DeleteLocalRef(env, task_class);
 }

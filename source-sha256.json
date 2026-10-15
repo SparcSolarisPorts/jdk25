@@ -60,5 +60,7 @@
   "src/hotspot/share/runtime/stackChunkFrameStream.hpp": "d3a919e482cca5e2f5ee78ab26a28c8fc5bf743fe27277e9e5905ae4ccb40911",
   "src/hotspot/share/runtime/stackChunkFrameStream.inline.hpp": "28b287a2b7d96271b1f4c9f6001e7daa8fefe9226cdec7001bbd3e2cf0b4de40",
   "make/modules/jdk.javadoc/Gendata.gmk": "9687ef4d9e75effc98bfc058f23e8c50b8cff00baf7a6fd4ca9f4999cbc7ced8",
-  "test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java": "1453d912d095e7761661157a84a3554c6e8c2a260e0c494e495a384f21733b77"
+  "test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java": "1453d912d095e7761661157a84a3554c6e8c2a260e0c494e495a384f21733b77",
+  "test/lib/jdk/test/lib/thread/VThreadPinner.java": "09f7ee94ed1f824fa2c351601a0d8b7a996907d40f6727caf01020c9c24bc942",
+  "test/lib/jdk/test/lib/thread/libVThreadPinner.c": "f5df0bf8e3dd1f8ca18372902c5ba102577c50ed8719f99b676a2c21ab4b6ce6"
 }

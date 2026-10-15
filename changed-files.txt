@@ -60,3 +60,5 @@ src/hotspot/share/runtime/stackChunkFrameStream.hpp
 src/hotspot/share/runtime/stackChunkFrameStream.inline.hpp
 make/modules/jdk.javadoc/Gendata.gmk
 test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
+test/lib/jdk/test/lib/thread/VThreadPinner.java
+test/lib/jdk/test/lib/thread/libVThreadPinner.c

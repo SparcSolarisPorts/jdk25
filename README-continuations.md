@@ -1,3 +1,75 @@
+v56: native pinning helper on ports without an FFM linker
+=======================================================
+Native v54 GetThreadStateTest#default timed out after its virtual worker
+threw ExceptionInInitializerError in VThreadPinner: Linker.nativeLinker()
+reported that the platform does not support the native linker. The main
+thread kept waiting for the worker to reach the expected monitor state.
+
+Changes:
+- VThreadPinner selects a JNI callback only when Linker.nativeLinker()
+  throws UnsupportedOperationException. Other FFM/library failures still
+  fail initialization. Ports with a linker keep the original FFM path.
+- libVThreadPinner retains its existing FFM export and adds a JNI entry
+  calling Runnable.run(). Java -> JNI -> Java leaves a real native frame
+  on the stack, preserving carrier pinning instead of calling Java directly.
+- The existing TaskRunner still captures and rethrows checked exceptions,
+  runtime exceptions and errors with their original identity.
+- New bounded smoke checks eight virtual workers, the JNI native frame,
+  virtual identity, sleep/resume, carrier identity and checked exceptions.
+- The focused 26-case runner retains the v55 default of eight jobs and
+  its 45-minute wall limit. No test was skipped or weakened.
+
+Scope: this repairs the test helper's dependency on an unavailable FFM
+linker. It does not implement general SPARC FFM downcalls/upcalls, nor
+claim that all GetThreadState or other monitor tests now pass. The
+monitor preemption/ownership and carrier-frame stack-trace failures remain
+unresolved. In particular, the SPARC preemption stub/check paths need
+further work; no speculative runtime change is included in v56.
+
+Validation:
+- C shared library compiled with OpenJDK JNI headers and strict warnings.
+- Real host JVM JNI bridge check passed callback count, exception identity,
+  repeated calls and -Xcheck:jni.
+- Actual helper initialization and checked-exception paths passed a host
+  JDK17 compatibility model substituting only absent FFM APIs and virtual
+  thread detection. This is not native SPARC or Java25 runtime validation.
+- Shell syntax checked; cumulative ZIP CRC/source SHA-256 verified.
+- Solaris Java25 pinning smoke and jtreg rerun are pending.
+
+After extracting into the repository:
+  if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+    bash tests/run-pinning-helper-repro.sh &&
+      JDK25_TEST_JOBS=8 bash tests/rerun-priority-crashes-v52.sh
+  else
+    ggrep -n -B 4 -A 8 'error:' /tmp/jdk25-build.log
+    tail -40 /tmp/jdk25-build.log
+  fi
+
+v55: focused runner concurrency and native v54 results
+====================================================
+The focused 26-case runner now defaults to eight concurrent test jobs.
+JDK25_TEST_JOBS can override this, for example 16. The 45-minute batch
+limit, original test selections/options and jtreg timeout factor 4 remain.
+The runner prints the chosen job count before starting.
+
+Native v54 evidence from 2026-10-14:
+- All continuation, mixed-yield and vector-memory-alignment smoke modes pass.
+- The focused batch reported 6 passes, 3 failures and 6 errors before its
+  wall-clock limit. Eleven selected cases had no final result.
+- TestBiMorphicMismatchedMemSegment, UnexpectedDeoptimizationAllTest,
+  DynamicCodeGeneratedTest, ContinuationTest, ContStackDepthTest and
+  ContYieldBreakPointTest passed.
+- GetThreadStateTest#default times out after VThreadPinner initialization
+  fails because the platform does not support the native linker.
+- GetStackTraceNotSuspendedStressTest aborts on an incorrect virtual-thread
+  stack trace that includes carrier frames below Continuation.enter.
+- Other monitor-state/event failures and timeouts remain unresolved.
+This version changes the runner only; it does not claim to fix these VM
+or native-linker issues. No rebuild is required for the runner change.
+
+Run:
+  JDK25_TEST_JOBS=8 bash tests/rerun-priority-crashes-v52.sh
+
 # JDK 25 Solaris/SPARC continuation candidate (v49)
 
 

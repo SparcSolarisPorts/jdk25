@@ -50,7 +50,12 @@ public class VThreadPinner {
     private static final MethodHandle INVOKER = invoker();
 
     // function pointer to call
-    private static final MemorySegment UPCALL_STUB = upcallStub();
+    private static final MemorySegment UPCALL_STUB = (INVOKER != null) ? upcallStub() : null;
+
+    // A JNI callback keeps a native frame on the stack on ports without an
+    // FFM native linker. It has the same carrier-pinning requirement as the
+    // downcall/upcall path; it must not be replaced with a direct Java call.
+    private static native void invokePinned(Runnable task);
 
     /**
      * Thread local with the task to run.
@@ -102,7 +107,11 @@ public class VThreadPinner {
         var runner = new TaskRunner(task);
         TASK_RUNNER.set(runner);
         try {
-            INVOKER.invoke(UPCALL_STUB);
+            if (INVOKER != null) {
+                INVOKER.invoke(UPCALL_STUB);
+            } else {
+                invokePinned(runner);
+            }
         } catch (Throwable e) {
             throw new RuntimeException(e);
         } finally {
@@ -125,7 +134,15 @@ public class VThreadPinner {
      */
     @SuppressWarnings("restricted")
     private static MethodHandle invoker() {
-        Linker abi = Linker.nativeLinker();
+        Linker abi;
+        try {
+            abi = Linker.nativeLinker();
+        } catch (UnsupportedOperationException e) {
+            // Only an unavailable linker selects JNI. A broken library or
+            // downcall handle on a supported port must still fail the test.
+            System.load(LIB_PATH.toAbsolutePath().toString());
+            return null;
+        }
         try {
             SymbolLookup lib = SymbolLookup.libraryLookup(LIB_PATH, Arena.global());
             MemorySegment symbol = lib.find("call").orElseThrow();
