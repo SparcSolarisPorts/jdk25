@@ -1,3 +1,64 @@
+v57: SPARC virtual-stack boundary and slow-thaw entry metadata
+============================================================
+The native 2026-10-15 00:31 rerun reports 9 passes, 7 failures and 8 timeout
+errors. GetOwnedMonitorInfoTest and SuspendResume1#default have no final
+result in the archive. This is not a clean 26-case pass.
+
+v56 evidence: the pinned GetThreadStateTest subcases now pass and the
+unsupported-native-linker initialization exception is gone. The unpinned
+monitor subcases fail because their workers terminate. The independent
+pinning smoke output was not included in this archive.
+
+Candidate runtime fixes in v57:
+1. SPARC vframe::java_sender and vframeStreamCommon::next now recognize the
+   logical Java Continuation.enter boundary of a virtual-thread scope.
+   Continuation.enter is @DontInline and is the same logical entry method
+   used to delimit chunk walks. This stops the walk before crossing the
+   physical enterSpecial window after thaw. Both individual JVMTI frame
+   walks and streamed Java frame walks use the predicate.
+   The associated continuation is resolved from THIS frame's stack address
+   (or the chunk map), not just from the carrier's innermost continuation.
+   Therefore a nested user continuation does not truncate its outer virtual
+   thread's stack. Ordinary/platform frames retain their existing behavior.
+   This targets the carrier-frame leakage shown by the stack-trace stress
+   and VThreadNotifyFramePopTest logs. It does not establish that all
+   frame-pop timing/deoptimization problems have been fixed.
+2. Slow thaw's new_entry_frame now calls ContinuationEntry::to_frame(). The
+   explicit SPARC frame constructor used previously does not look up a null
+   CodeBlob, so the synthetic entry lacked its enterSpecial nmethod and
+   failed the expected entry-frame predicate. to_frame supplies this metadata
+   while preserving canonical SP/FP/PC and the absent younger window.
+3. continuationEntry_sparc.inline.hpp includes method.inline.hpp explicitly
+   for the inline Method predicate; do not rely on precompiled includes.
+
+Validation:
+- Compiled and ran the actual boundary predicate against a host model of
+  mounted/chunk scopes, inner user continuations, missing entries and
+  ordinary methods. See tests/check-vframe-boundary-host.py.
+- Shell syntax and cumulative ZIP CRC/source SHA-256 checked.
+- Added a bounded native smoke for mounted/spinning and unmounted/parked
+  virtual stacks across nested continuation yield/resume. It also checks a
+  platform thread's generic continuation, so an overly broad boundary fails.
+- The smoke runs interpreter, C1, mixed and C2 modes; C1/C2 use -Xcomp.
+- Full Java25/SPARC compilation and runtime verification remain pending.
+
+Unresolved: unpinned monitor ownership/preemption, monitor-event delivery,
+other JVMTI suspend/resume timeouts and heap-dump virtual-thread discovery.
+No locking mode, continuation fast path, compiler or original jtreg case
+was disabled. The 26-case runner still defaults to eight concurrent jobs
+with a 45-minute batch wall limit and existing per-test timeouts.
+
+After extracting into the repository:
+  if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+    bash tests/run-virtual-stack-boundary-repro.sh &&
+      bash tests/run-continuation-repro.sh &&
+      bash tests/run-mixed-yield-repro.sh &&
+      JDK25_TEST_JOBS=8 bash tests/rerun-priority-crashes-v52.sh
+  else
+    ggrep -n -B 4 -A 8 'error:' /tmp/jdk25-build.log
+    tail -40 /tmp/jdk25-build.log
+  fi
+
 v56: native pinning helper on ports without an FFM linker
 =======================================================
 Native v54 GetThreadStateTest#default timed out after its virtual worker

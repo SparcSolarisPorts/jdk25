@@ -1,0 +1,27 @@
+Native rerun 20261015-003124: 9 passed; 7 failed; 8 errors; 2 unreported.
+Passed	compiler/codecache/stress/UnexpectedDeoptimizationAllTest.java
+Passed	compiler/vectorapi/TestBiMorphicMismatchedMemSegment.java
+Error	serviceability/HeapDump/UnmountedVThreadNativeMethodAtTop.java
+Passed	serviceability/jvmti/DynamicCodeGenerated/DynamicCodeGeneratedTest.java
+UNREPORTED	serviceability/jvmti/GetOwnedMonitorInfo/GetOwnedMonitorInfoTest.java
+Error	serviceability/jvmti/ObjectMonitorUsage/ObjectMonitorUsage.java
+Error	serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1
+FAILED	serviceability/jvmti/events/MonitorWaited/monitorwaited01/monitorwaited01.java
+FAILED	serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
+Error	serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
+FAILED	serviceability/jvmti/thread/GetCurrentContendedMonitor/contmon01/contmon01.java
+FAILED	serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java
+Passed	serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
+Passed	serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
+Passed	serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
+FAILED	serviceability/jvmti/vthread/GetThreadState/GetThreadStateTest.java#default
+Passed	serviceability/jvmti/vthread/GetThreadState/GetThreadStateTest.java#no-vmcontinuations
+FAILED	serviceability/jvmti/vthread/InterruptThreadTest/InterruptThreadTest.java#default
+Passed	serviceability/jvmti/vthread/PopFrameTest/PopFrameTest.java#default
+Passed	serviceability/jvmti/vthread/RedefineClasses/RedefineRunningMethods.java
+UNREPORTED	serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java#default
+Error	serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java#default
+Error	serviceability/jvmti/vthread/ThreadListStackTracesTest/ThreadListStackTracesTest.java
+Error	serviceability/jvmti/vthread/ToggleNotifyJvmtiTest/ToggleNotifyJvmtiTest.java
+Error	serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
+FAILED	serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java#default

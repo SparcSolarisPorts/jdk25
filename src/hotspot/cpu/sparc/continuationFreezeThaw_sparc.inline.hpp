@@ -264,10 +264,9 @@ inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
 //// Thaw slow path
 
 inline frame ThawBase::new_entry_frame() {
-  frame result(_cont.entrySP(), _cont.entrySP(), _cont.entryFP(),
-               _cont.entryPC());
-  result.set_younger_sp(nullptr);
-  return result;
+  // The explicit SPARC frame constructor does not resolve a missing cb.
+  // to_frame() supplies enterSpecial's nmethod as well as its canonical SP.
+  return _cont.entry()->to_frame();
 }
 
 template<typename FKind>

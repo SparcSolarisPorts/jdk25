@@ -34,6 +34,30 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaThread.inline.hpp"
 
+#ifdef SPARC
+#include "oops/method.inline.hpp"
+#include "runtime/continuationEntry.inline.hpp"
+
+// Continuation.enter is the non-inlined Java boundary of a continuation.
+// After partial thaw its sender can cross a relocated SPARC entry window.
+// Stop virtual-thread walks at this logical boundary without first stepping
+// through that physical window. Resolve the scope of THIS frame's entry so
+// an inner, user-created continuation does not truncate the virtual stack.
+inline bool vframe_is_virtual_thread_continuation_entry(const frame& f,
+                                                        const RegisterMap* map,
+                                                        const Method* method) {
+  if (method->intrinsic_id() != vmIntrinsics::_Continuation_enter) return false;
+  oop cont = nullptr;
+  if (map->in_cont()) {
+    cont = map->cont();
+  } else if (map->thread() != nullptr) {
+    ContinuationEntry* entry = Continuation::get_continuation_entry_for_sp(map->thread(), f.sp());
+    if (entry != nullptr) cont = entry->cont_oop(map->thread());
+  }
+  return cont != nullptr && Continuation::continuation_scope(cont) == java_lang_VirtualThread::vthread_scope();
+}
+#endif
+
 inline vframeStreamCommon::vframeStreamCommon(JavaThread* thread,
                                               RegisterMap::UpdateMap update_map,
                                               RegisterMap::ProcessFrames process_frames,
@@ -75,6 +99,12 @@ inline int vframeStreamCommon::decode_offset() const {
 inline bool vframeStreamCommon::is_interpreted_frame() const { return _frame.is_interpreted_frame(); }
 
 inline void vframeStreamCommon::next() {
+#ifdef SPARC
+  if (vframe_is_virtual_thread_continuation_entry(_frame, &_reg_map, method())) {
+    _mode = at_end_mode;
+    return;
+  }
+#endif
   // handle frames with inlining
   if (_mode == compiled_mode    && fill_in_compiled_inlined_sender()) return;
 

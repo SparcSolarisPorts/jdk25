@@ -8,6 +8,7 @@ src/hotspot/cpu/sparc/c1_sparcTrace.hpp
 src/hotspot/cpu/sparc/c2_MacroAssembler_sparc.cpp
 src/hotspot/cpu/sparc/compressedKlass_sparc.cpp
 src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
+src/hotspot/cpu/sparc/continuationEntry_sparc.inline.hpp
 src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
 src/hotspot/cpu/sparc/continuationHelper_sparc.inline.hpp
 src/hotspot/cpu/sparc/frame_sparc.cpp
@@ -58,6 +59,8 @@ src/hotspot/share/runtime/continuationFreezeThaw.cpp
 src/hotspot/share/runtime/continuationHelper.inline.hpp
 src/hotspot/share/runtime/stackChunkFrameStream.hpp
 src/hotspot/share/runtime/stackChunkFrameStream.inline.hpp
+src/hotspot/share/runtime/vframe.cpp
+src/hotspot/share/runtime/vframe.inline.hpp
 make/modules/jdk.javadoc/Gendata.gmk
 test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
 test/lib/jdk/test/lib/thread/VThreadPinner.java

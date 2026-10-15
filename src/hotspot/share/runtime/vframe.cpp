@@ -108,6 +108,13 @@ bool vframe::is_vthread_entry() const {
 }
 
 javaVFrame* vframe::java_sender() const {
+#ifdef SPARC
+  if (is_java_frame() &&
+      vframe_is_virtual_thread_continuation_entry(fr(), register_map(),
+          static_cast<const javaVFrame*>(this)->method())) {
+    return nullptr;
+  }
+#endif
   vframe* f = sender();
   while (f != nullptr) {
     if (f->is_vthread_entry()) break;

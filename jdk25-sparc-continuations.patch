@@ -870,6 +870,16 @@
  };
  
  #endif // CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
+--- a/src/hotspot/cpu/sparc/continuationEntry_sparc.inline.hpp
++++ b/src/hotspot/cpu/sparc/continuationEntry_sparc.inline.hpp
+@@ -29,6 +29,7 @@
+ #include "runtime/continuationEntry.hpp"
+ 
+ #include "code/codeCache.inline.hpp"
++#include "oops/method.inline.hpp"
+ #include "runtime/frame.inline.hpp"
+ #include "runtime/registerMap.hpp"
+ #include "utilities/macros.hpp"
 --- a/src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
 +++ b/src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
 @@ -32,6 +32,7 @@
@@ -1056,7 +1066,7 @@
  }
  
  //// Thaw fast path
-@@ -203,11 +248,16 @@
+@@ -203,21 +248,25 @@
  
  template <typename ConfigT>
  inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
@@ -1078,7 +1088,20 @@
  }
  
  
-@@ -226,7 +276,19 @@
+ //// Thaw slow path
+ 
+ inline frame ThawBase::new_entry_frame() {
+-  frame result(_cont.entrySP(), _cont.entrySP(), _cont.entryFP(),
+-               _cont.entryPC());
+-  result.set_younger_sp(nullptr);
+-  return result;
++  // The explicit SPARC frame constructor does not resolve a missing cb.
++  // to_frame() supplies enterSpecial's nmethod as well as its canonical SP.
++  return _cont.entry()->to_frame();
+ }
+ 
+ template<typename FKind>
+@@ -226,7 +275,19 @@
    assert(FKind::is_instance(hf), "wrong frame kind");
  
    int fsize = FKind::size(hf);
@@ -1099,7 +1122,7 @@
  
    if (!FKind::interpreted &&
        (bottom || caller.is_interpreted_frame())) {
-@@ -236,10 +298,15 @@
+@@ -236,10 +297,15 @@
      frame_sp = align(hf, frame_sp, caller, bottom);
    }
  
@@ -1117,7 +1140,7 @@
    return result;
  }
  
-@@ -257,8 +324,7 @@
+@@ -257,8 +323,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, const frame& caller) {
@@ -1127,7 +1150,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-@@ -296,10 +362,18 @@
+@@ -296,10 +361,18 @@
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llocals_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_lmonitors_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llast_sp_slot, true);
@@ -5987,6 +6010,68 @@
    assert(!is_interpreted() || _unextended_sp == unextended_sp_for_interpreter_frame(), "");
  
    DEBUG_ONLY(_index++;)
+--- a/src/hotspot/share/runtime/vframe.cpp
++++ b/src/hotspot/share/runtime/vframe.cpp
+@@ -108,6 +108,13 @@
+ }
+ 
+ javaVFrame* vframe::java_sender() const {
++#ifdef SPARC
++  if (is_java_frame() &&
++      vframe_is_virtual_thread_continuation_entry(fr(), register_map(),
++          static_cast<const javaVFrame*>(this)->method())) {
++    return nullptr;
++  }
++#endif
+   vframe* f = sender();
+   while (f != nullptr) {
+     if (f->is_vthread_entry()) break;
+--- a/src/hotspot/share/runtime/vframe.inline.hpp
++++ b/src/hotspot/share/runtime/vframe.inline.hpp
+@@ -33,6 +33,30 @@
+ #include "runtime/frame.inline.hpp"
+ #include "runtime/handles.inline.hpp"
+ #include "runtime/javaThread.inline.hpp"
++
++#ifdef SPARC
++#include "oops/method.inline.hpp"
++#include "runtime/continuationEntry.inline.hpp"
++
++// Continuation.enter is the non-inlined Java boundary of a continuation.
++// After partial thaw its sender can cross a relocated SPARC entry window.
++// Stop virtual-thread walks at this logical boundary without first stepping
++// through that physical window. Resolve the scope of THIS frame's entry so
++// an inner, user-created continuation does not truncate the virtual stack.
++inline bool vframe_is_virtual_thread_continuation_entry(const frame& f,
++                                                        const RegisterMap* map,
++                                                        const Method* method) {
++  if (method->intrinsic_id() != vmIntrinsics::_Continuation_enter) return false;
++  oop cont = nullptr;
++  if (map->in_cont()) {
++    cont = map->cont();
++  } else if (map->thread() != nullptr) {
++    ContinuationEntry* entry = Continuation::get_continuation_entry_for_sp(map->thread(), f.sp());
++    if (entry != nullptr) cont = entry->cont_oop(map->thread());
++  }
++  return cont != nullptr && Continuation::continuation_scope(cont) == java_lang_VirtualThread::vthread_scope();
++}
++#endif
+ 
+ inline vframeStreamCommon::vframeStreamCommon(JavaThread* thread,
+                                               RegisterMap::UpdateMap update_map,
+@@ -75,6 +99,12 @@
+ inline bool vframeStreamCommon::is_interpreted_frame() const { return _frame.is_interpreted_frame(); }
+ 
+ inline void vframeStreamCommon::next() {
++#ifdef SPARC
++  if (vframe_is_virtual_thread_continuation_entry(_frame, &_reg_map, method())) {
++    _mode = at_end_mode;
++    return;
++  }
++#endif
+   // handle frames with inlining
+   if (_mode == compiled_mode    && fill_in_compiled_inlined_sender()) return;
+ 
 --- a/make/modules/jdk.javadoc/Gendata.gmk
 +++ b/make/modules/jdk.javadoc/Gendata.gmk
 @@ -47,8 +47,25 @@
