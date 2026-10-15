@@ -206,6 +206,13 @@ static void verify_continuation(oop continuation) { }
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
 template<typename ConfigT, bool preempt> static inline freeze_result freeze_internal(JavaThread* current, intptr_t* const sp);
 
+#ifdef SPARC
+static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
+                                                   intptr_t* caller_sp,
+                                                   intptr_t* heap_caller_sp,
+                                                   int argsize);
+#endif
+
 static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier);
 template<typename ConfigT> static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::thaw_kind kind);
 
@@ -2301,8 +2308,20 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
   ReconstructedStack rs(_cont.entrySP(), thaw_size, argsize);
 
+#ifdef SPARC
+  // Partial thaw may extend the entry below its canonical SP for stack
+  // arguments. Snapshot the live entry window before the bulk copy; it
+  // must also exist at bottom_sp() when RESTORE refills that window.
+  intptr_t entry_window[frame::register_save_words];
+  Copy::conjoint_words((HeapWord*)_cont.entrySP(), (HeapWord*)entry_window,
+                      frame::register_save_words);
+#endif
   // also copy metadata words at frame bottom
   copy_from_chunk(chunk_sp - frame::metadata_words_at_bottom, rs.top(), rs.total_size());
+#ifdef SPARC
+  intptr_t* heap_caller_sp = chunk_sp + thaw_size - argsize;
+  thaw_sparc_restore_caller_window(entry_window, rs.bottom_sp(), heap_caller_sp, argsize);
+#endif
 
   // update the ContinuationEntry
   _cont.set_argsize(argsize);

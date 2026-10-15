@@ -1,3 +1,69 @@
+v58: partial fast-thaw entry window and Java stack arguments
+===========================================================
+Native v57 output from 2026-10-15 01:07:
+- Build passed.
+- VirtualStackBoundarySmoke: interpreter and C1 passed.
+- Mixed failed with Pinned: NATIVE during a nested continuation yield.
+- C2 crashed on RESTORE in the continuation return barrier.
+- The && chain stopped there: continuation/mixed-yield regressions and the
+  26-case jtreg batch were not run by that command.
+
+C2 crash evidence:
+- pc 0xffffffff70c063b4 decodes to RESTORE (81 e8 00 00).
+- Current unbiased SP is 0xffffffff7d98f060; canonical entry SP is
+  0xffffffff7d98f070, so the entry is extended down by two words.
+- I6/FP is 1; the entry's canonical saved I6 remains at 0xffffffff7d98f0e0.
+- Entry argsize is one word; its aligned extension is 16 bytes.
+This matches a missing physical entry window in the fast partial-thaw
+path. That path rebased the Java frame links to the extended entry SP
+without materializing the entry's saved L/I window there.
+
+Candidate fix:
+- Snapshot the canonical entry's 16 saved L/I registers before bulk copy.
+- Restore them at ReconstructedStack::bottom_sp() before rebuilding windows.
+- Copy incoming stack arguments from the frozen caller's Java argument
+  area to the corresponding area of the relocated entry.
+- Java's argument offset is 16 words (SharedRuntime::out_preserve_stack_slots),
+  not the 22-word C ABI offset. The saved I6/I7 and incoming arguments occupy
+  separate regions in the relocated entry.
+- The helper is forward-declared before its template call sites; the CPU
+  inline definition remains in the normal architecture include at file end.
+- No can_thaw_fast eligibility was narrowed. C1/C2 and fast thaw stay enabled.
+- Existing slow thaw is unchanged in v58. Mixed Pinned: NATIVE, general slow
+  stack-argument layouts and monitor preemption remain unresolved.
+
+Validation:
+- Compiled/executed the actual restoration helper against a host layout
+  model for 0..96 argument words, overlap, saved I6/I7, exact argument values
+  and unchanged entry metadata. The one-word argument case reproduces the
+  old shifted-I6 value of 1 before applying the helper.
+- Existing v57 boundary predicate model still passes.
+- Shell syntax, cumulative ZIP CRC and source SHA-256 checked.
+- Added StackArgumentThawSmoke: deep recursion, many long/reference arguments,
+  two yields, live volatile payloads and exact return values; includes a
+  suspended-stack GC variant. Native execution is pending.
+- Both new smoke runners retain hs_err reports inside their result folders.
+- These host models do not establish native SPARC correctness. Rerun the
+  original failing nested-continuation smoke first.
+
+After extracting:
+  if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+    bash tests/run-virtual-stack-boundary-repro.sh
+    bash tests/run-stack-argument-thaw-repro.sh
+    bash tests/run-continuation-repro.sh
+    bash tests/run-mixed-yield-repro.sh
+  else
+    ggrep -n -B 4 -A 8 'error:' /tmp/jdk25-build.log
+    tail -40 /tmp/jdk25-build.log
+  fi
+
+These smoke commands run independently so a mixed-mode failure does not
+prevent collection of the other modes. Review each script's results.txt;
+a later successful command is not proof that earlier scripts passed.
+The focused jtreg runner remains eight concurrent jobs with a 45-minute
+batch limit. Run it after the continuation smokes are clean:
+  JDK25_TEST_JOBS=8 bash tests/rerun-priority-crashes-v52.sh
+
 v57: SPARC virtual-stack boundary and slow-thaw entry metadata
 ============================================================
 The native 2026-10-15 00:31 rerun reports 9 passes, 7 failures and 8 timeout

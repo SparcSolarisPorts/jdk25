@@ -945,7 +945,7 @@
    stack.sp()[slot] = biased ? (intptr_t)stack_value - STACK_BIAS
                              : (intptr_t)stack_value;
  }
-@@ -121,38 +135,71 @@
+@@ -121,38 +135,93 @@
  inline frame FreezeBase::sender(const frame& f) {
    assert(FKind::is_instance(f), "wrong frame kind");
  
@@ -994,6 +994,28 @@
 +  freeze_sparc_patch_link(caller, caller.fp());
 +}
 +
++// A compiled callee's incoming stack arguments are in its caller's ABI
++// argument area, not in the caller's first words (the L/I window save area).
++// Partial fast thaw must materialize that window at the extended entry SP
++// and install the arguments at the Java ABI offset in the relocated entry.
++static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
++                                                   intptr_t* caller_sp,
++                                                   intptr_t* heap_caller_sp,
++                                                   int argsize) {
++  assert(argsize >= 0, "nonnegative stack argument size");
++  Copy::conjoint_words((HeapWord*)saved_window, (HeapWord*)caller_sp,
++                      frame::register_save_words);
++  // Compiled Java calls reserve the 16-word window only. The six C ABI
++  // argument home words are not part of Java's out-preserve area.
++  constexpr int argument_offset = frame::register_save_words;
++  assert(SharedRuntime::out_preserve_stack_slots() ==
++         argument_offset * VMRegImpl::slots_per_word, "Java argument offset");
++  if (argsize > 0) {
++    Copy::conjoint_words((HeapWord*)(heap_caller_sp + argument_offset),
++                        (HeapWord*)(caller_sp + argument_offset), argsize);
++  }
++}
++
  template<typename FKind>
  frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
    assert(FKind::is_instance(f), "wrong frame kind");
@@ -1031,7 +1053,7 @@
    return heap_frame;
  }
  
-@@ -164,11 +211,9 @@
+@@ -164,11 +233,9 @@
  }
  
  inline void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
@@ -1046,7 +1068,7 @@
  }
  
  inline void FreezeBase::relativize_interpreted_frame_metadata(
-@@ -180,7 +225,7 @@
+@@ -180,7 +247,7 @@
    freeze_sparc_relativize_slot(f, hf, freeze_sparc_i5_slot, true);
  
    freeze_sparc_patch_link(hf, hf.fp());
@@ -1055,7 +1077,7 @@
  }
  
  inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
-@@ -189,8 +234,8 @@
+@@ -189,8 +256,8 @@
  }
  
  inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
@@ -1066,7 +1088,7 @@
  }
  
  //// Thaw fast path
-@@ -203,21 +248,25 @@
+@@ -203,21 +270,25 @@
  
  template <typename ConfigT>
  inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
@@ -1101,7 +1123,7 @@
  }
  
  template<typename FKind>
-@@ -226,7 +275,19 @@
+@@ -226,7 +297,19 @@
    assert(FKind::is_instance(hf), "wrong frame kind");
  
    int fsize = FKind::size(hf);
@@ -1122,7 +1144,7 @@
  
    if (!FKind::interpreted &&
        (bottom || caller.is_interpreted_frame())) {
-@@ -236,10 +297,15 @@
+@@ -236,10 +319,15 @@
      frame_sp = align(hf, frame_sp, caller, bottom);
    }
  
@@ -1140,7 +1162,7 @@
    return result;
  }
  
-@@ -257,8 +323,7 @@
+@@ -257,8 +345,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, const frame& caller) {
@@ -1150,7 +1172,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-@@ -296,10 +361,18 @@
+@@ -296,10 +383,18 @@
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llocals_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_lmonitors_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llast_sp_slot, true);
@@ -5423,7 +5445,21 @@
    static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
 --- a/src/hotspot/share/runtime/continuationFreezeThaw.cpp
 +++ b/src/hotspot/share/runtime/continuationFreezeThaw.cpp
-@@ -326,16 +326,23 @@
+@@ -206,6 +206,13 @@
+ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
+ template<typename ConfigT, bool preempt> static inline freeze_result freeze_internal(JavaThread* current, intptr_t* const sp);
+ 
++#ifdef SPARC
++static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
++                                                   intptr_t* caller_sp,
++                                                   intptr_t* heap_caller_sp,
++                                                   int argsize);
++#endif
++
+ static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier);
+ template<typename ConfigT> static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::thaw_kind kind);
+ 
+@@ -326,16 +333,23 @@
  }
  
  static void set_anchor(JavaThread* thread, intptr_t* sp) {
@@ -5450,7 +5486,7 @@
  
    assert(thread->has_last_Java_frame(), "");
    assert(thread->last_frame().cb() != nullptr, "");
-@@ -414,7 +421,7 @@
+@@ -414,7 +428,7 @@
  
    inline frame& last_frame() { return _last_frame; }
  
@@ -5459,7 +5495,7 @@
    bool check_valid_fast_path();
  #endif
  
-@@ -511,7 +518,9 @@
+@@ -511,7 +525,9 @@
  
    assert(_cont.chunk_invariant(), "");
    assert(!Interpreter::contains(_cont.entryPC()), "");
@@ -5470,7 +5506,7 @@
    static const int doYield_stub_frame_size = frame::metadata_words;
  #else
    static const int doYield_stub_frame_size = frame::native_abi_reg_args_size >> LogBytesPerWord;
-@@ -633,7 +642,7 @@
+@@ -633,7 +649,7 @@
    }
  
    // TODO R REMOVE when deopt change is fixed
@@ -5479,7 +5515,7 @@
    log_develop_trace(continuations)("-- RETRYING SLOW --");
    return freeze_slow();
  }
-@@ -641,6 +650,7 @@
+@@ -641,6 +657,7 @@
  // Returns size needed if the continuation fits, otherwise 0.
  int FreezeBase::size_if_fast_freeze_available() {
    stackChunkOop chunk = _cont.tail();
@@ -5487,7 +5523,7 @@
    if (chunk == nullptr || chunk->is_gc_mode() || chunk->requires_barriers() || chunk->has_mixed_frames()) {
      log_develop_trace(continuations)("chunk available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
      return 0;
-@@ -731,7 +741,8 @@
+@@ -731,7 +748,8 @@
    // Install new chunk
    _cont.set_tail(chunk);
  
@@ -5497,7 +5533,7 @@
      log_develop_trace(continuations)("Retrying slow. Barriers: %d", _barriers);
      return false;
    }
-@@ -758,6 +769,28 @@
+@@ -758,6 +776,28 @@
    assert(!chunk->requires_barriers(), "");
    assert(chunk == _cont.tail(), "");
  
@@ -5526,7 +5562,7 @@
    // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
    // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
    // will either see no continuation on the stack, or a consistent chunk.
-@@ -820,6 +853,8 @@
+@@ -820,6 +860,8 @@
      chunk->set_pc(ContinuationHelper::return_address_at(
                    _cont_stack_top - frame::sender_sp_ret_address_offset()));
    }
@@ -5535,7 +5571,7 @@
  
    if (_monitors_in_lockstack > 0) {
      freeze_lockstack(chunk);
-@@ -1170,7 +1205,7 @@
+@@ -1170,7 +1212,7 @@
    if (hf.is_compiled_frame()) {
      if (f.is_deoptimized_frame()) { // TODO DEOPT: long term solution: unroll on freeze and patch pc
        log_develop_trace(continuations)("Freezing deoptimized frame");
@@ -5544,7 +5580,7 @@
        assert(f.cb()->as_nmethod()->is_deopt_pc(ContinuationHelper::Frame::real_pc(f)), "");
      }
    }
-@@ -1222,6 +1257,17 @@
+@@ -1222,6 +1264,17 @@
    DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, is_bottom_frame);)
  
    frame hf = new_heap_frame<ContinuationHelper::InterpretedFrame>(f, caller);
@@ -5562,7 +5598,7 @@
    _total_align_size += frame::align_wiggle; // add alignment room for internal interpreted frame alignment on AArch64/PPC64
  
    intptr_t* heap_frame_top = ContinuationHelper::InterpretedFrame::frame_top(hf, callee_argsize, callee_interpreted);
-@@ -1231,6 +1277,12 @@
+@@ -1231,6 +1284,12 @@
    // Some architectures (like AArch64/PPC64/RISC-V) add padding between the locals and the fixed_frame to keep the fp 16-byte-aligned.
    // On those architectures we freeze the padding in order to keep the same fp-relative offsets in the fixed_frame.
    copy_to_chunk(stack_frame_top, heap_frame_top, fsize);
@@ -5575,7 +5611,7 @@
    assert(!is_bottom_frame || !caller.is_interpreted_frame() || (heap_frame_top + fsize) == (caller.unextended_sp() + argsize), "");
  
    relativize_interpreted_frame_metadata(f, hf);
-@@ -1277,10 +1329,39 @@
+@@ -1277,10 +1336,39 @@
    DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, argsize, is_bottom_frame);)
  
    frame hf = new_heap_frame<ContinuationHelper::CompiledFrame>(f, caller);
@@ -5615,7 +5651,7 @@
    assert(!is_bottom_frame || !caller.is_compiled_frame() || (heap_frame_top + fsize) == (caller.unextended_sp() + argsize), "");
  
    if (caller.is_interpreted_frame()) {
-@@ -1648,7 +1729,7 @@
+@@ -1648,7 +1736,7 @@
    ContinuationWrapper::SafepointOp so(current, cont);
  
    // Since we might safepoint set the anchor so that the stack can be walked.
@@ -5624,7 +5660,7 @@
  
    JRT_BLOCK
      JvmtiVTMSTransitionDisabler::VTMS_vthread_mount((jthread)vth.raw_value(), false);
-@@ -1663,19 +1744,33 @@
+@@ -1663,19 +1751,33 @@
  }
  #endif // INCLUDE_JVMTI
  
@@ -5660,7 +5696,7 @@
      if (!((f.is_compiled_frame() && !f.is_deoptimized_frame()) || (is_top_frame && (f.is_runtime_frame() || f.is_native_frame())))) {
        return false;
      }
-@@ -1761,8 +1856,9 @@
+@@ -1761,8 +1863,9 @@
  
    Freeze<ConfigT> freeze(current, cont, sp, preempt);
  
@@ -5672,7 +5708,7 @@
    if (fast && freeze.size_if_fast_freeze_available() > 0) {
      freeze.freeze_fast_existing_chunk();
      CONT_JFR_ONLY(freeze.jfr_info().post_jfr_event(&event, oopCont, current);)
-@@ -1994,7 +2090,19 @@
+@@ -1994,7 +2097,19 @@
    Thaw(JavaThread* thread, ContinuationWrapper& cont) : ThawBase(thread, cont) {}
  
    inline bool can_thaw_fast(stackChunkOop chunk) {
@@ -5693,7 +5729,7 @@
             &&  _thread->cont_fastpath_thread_state()
             && !chunk->has_thaw_slowpath_condition()
             && !PreserveFramePointer;
-@@ -2017,6 +2125,10 @@
+@@ -2017,6 +2132,10 @@
    assert(chunk != nullptr, "guaranteed by prepare_thaw");
    assert(!chunk->is_empty(), "guaranteed by prepare_thaw");
  
@@ -5704,7 +5740,7 @@
    _barriers = chunk->requires_barriers();
    return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
                                          : thaw_slow(chunk, kind);
-@@ -2100,7 +2212,8 @@
+@@ -2100,7 +2219,8 @@
        intptr_t* retaddr_slot = (chunk_sp
                                  + frame_size
                                  - frame::sender_sp_ret_address_offset());
@@ -5714,7 +5750,27 @@
               "unexpected pc");
      }
  #endif
-@@ -2196,11 +2309,21 @@
+@@ -2188,19 +2308,41 @@
+ 
+   ReconstructedStack rs(_cont.entrySP(), thaw_size, argsize);
+ 
++#ifdef SPARC
++  // Partial thaw may extend the entry below its canonical SP for stack
++  // arguments. Snapshot the live entry window before the bulk copy; it
++  // must also exist at bottom_sp() when RESTORE refills that window.
++  intptr_t entry_window[frame::register_save_words];
++  Copy::conjoint_words((HeapWord*)_cont.entrySP(), (HeapWord*)entry_window,
++                      frame::register_save_words);
++#endif
+   // also copy metadata words at frame bottom
+   copy_from_chunk(chunk_sp - frame::metadata_words_at_bottom, rs.top(), rs.total_size());
++#ifdef SPARC
++  intptr_t* heap_caller_sp = chunk_sp + thaw_size - argsize;
++  thaw_sparc_restore_caller_window(entry_window, rs.bottom_sp(), heap_caller_sp, argsize);
++#endif
+ 
+   // update the ContinuationEntry
+   _cont.set_argsize(argsize);
    log_develop_trace(continuations)("setting entry argsize: %d", _cont.argsize());
    assert(rs.bottom_sp() == _cont.entry()->bottom_sender_sp(), "");
  
@@ -5739,7 +5795,7 @@
  
    assert(is_last == _cont.is_empty(), "");
    assert(_cont.chunk_invariant(), "");
-@@ -2430,18 +2553,27 @@
+@@ -2430,18 +2572,27 @@
  inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
    assert(!bottom || caller.fp() == _cont.entryFP(), "");
    if (bottom) {
@@ -5768,7 +5824,7 @@
    }
  
    assert(!bottom || !_cont.is_empty() || Continuation::is_continuation_entry_frame(f, nullptr), "");
-@@ -2469,7 +2601,8 @@
+@@ -2469,7 +2620,8 @@
  intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::preempt_kind preempt_kind, bool fast_case) {
    assert(preempt_kind == Continuation::freeze_on_wait || preempt_kind == Continuation::freeze_on_monitorenter, "");
    frame top(sp);
@@ -5778,7 +5834,7 @@
  
  #if INCLUDE_JVMTI
    // Finish the VTMS transition.
-@@ -2512,7 +2645,7 @@
+@@ -2512,7 +2664,7 @@
  void ThawBase::throw_interrupted_exception(JavaThread* current, frame& top) {
    ContinuationWrapper::SafepointOp so(current, _cont);
    // Since we might safepoint set the anchor so that the stack can be walked.
@@ -5787,7 +5843,7 @@
    JRT_BLOCK
      THROW(vmSymbols::java_lang_InterruptedException());
    JRT_BLOCK_END
-@@ -2533,9 +2666,27 @@
+@@ -2533,9 +2685,27 @@
    _align_size += frame::align_wiggle; // possible added alignment for internal interpreted frame alignment om AArch64
  
    frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, is_bottom_frame);
@@ -5815,7 +5871,7 @@
    intptr_t* const heap_frame_top = hf.unextended_sp() + frame::metadata_words_at_top;
    intptr_t* const heap_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(hf);
  
-@@ -2543,11 +2694,26 @@
+@@ -2543,11 +2713,26 @@
    assert(!f.is_heap_frame(), "should not be");
  
    const int fsize = pointer_delta_as_int(heap_frame_bottom, heap_frame_top);
@@ -5843,7 +5899,7 @@
  
    // Make sure the relativized locals is already set.
    assert(f.interpreter_frame_local_at(0) == stack_frame_bottom - 1, "invalid frame bottom");
-@@ -2602,7 +2768,13 @@
+@@ -2602,7 +2787,13 @@
    // yet laid out in the stack, and so the original_pc is not stored in it.
    // As a result, f.is_deoptimized_frame() is always false and we must test hf to know if the frame is deoptimized.
    frame f = new_stack_frame<ContinuationHelper::CompiledFrame>(hf, caller, is_bottom_frame);
@@ -5857,7 +5913,7 @@
    intptr_t* const heap_frame_top = hf.unextended_sp();
  
    const int added_argsize = (is_bottom_frame || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-@@ -2620,6 +2792,16 @@
+@@ -2620,6 +2811,16 @@
    assert(!is_bottom_frame || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
  
    copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
@@ -5874,7 +5930,7 @@
  
    patch(f, caller, is_bottom_frame);
  
-@@ -2638,7 +2820,7 @@
+@@ -2638,7 +2839,7 @@
  
      f.deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
      assert(f.is_deoptimized_frame(), "");
@@ -5883,7 +5939,7 @@
      maybe_set_fastpath(f.sp());
    }
  
-@@ -2774,6 +2956,7 @@
+@@ -2774,6 +2975,7 @@
      assert(f.is_interpreted_frame(), "");
      f.set_sp(align_down(f.sp(), frame::frame_alignment));
    }
@@ -5891,7 +5947,7 @@
    push_return_frame(f);
    chunk->fix_thawed_frame(f, SmallRegisterMap::instance()); // can only fix caller after push_return_frame (due to callee saved regs)
  
-@@ -2790,8 +2973,8 @@
+@@ -2790,8 +2992,8 @@
  }
  
  void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
@@ -5902,7 +5958,7 @@
  
    LogTarget(Trace, continuations) lt;
    if (lt.develop_is_enabled()) {
-@@ -2802,7 +2985,7 @@
+@@ -2802,7 +3004,7 @@
  
    assert(f.sp() - frame::metadata_words_at_bottom >= _top_stack_address, "overwrote past thawing space"
      " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(f.sp() - frame::metadata_words), p2i(_top_stack_address));
@@ -5911,7 +5967,7 @@
    ContinuationHelper::push_pd(f);
  
    assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
-@@ -2985,7 +3168,8 @@
+@@ -2985,7 +3187,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;

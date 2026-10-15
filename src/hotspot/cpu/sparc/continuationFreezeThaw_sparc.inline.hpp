@@ -170,6 +170,28 @@ static inline void freeze_sparc_move_caller_window(frame& caller,
   freeze_sparc_patch_link(caller, caller.fp());
 }
 
+// A compiled callee's incoming stack arguments are in its caller's ABI
+// argument area, not in the caller's first words (the L/I window save area).
+// Partial fast thaw must materialize that window at the extended entry SP
+// and install the arguments at the Java ABI offset in the relocated entry.
+static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
+                                                   intptr_t* caller_sp,
+                                                   intptr_t* heap_caller_sp,
+                                                   int argsize) {
+  assert(argsize >= 0, "nonnegative stack argument size");
+  Copy::conjoint_words((HeapWord*)saved_window, (HeapWord*)caller_sp,
+                      frame::register_save_words);
+  // Compiled Java calls reserve the 16-word window only. The six C ABI
+  // argument home words are not part of Java's out-preserve area.
+  constexpr int argument_offset = frame::register_save_words;
+  assert(SharedRuntime::out_preserve_stack_slots() ==
+         argument_offset * VMRegImpl::slots_per_word, "Java argument offset");
+  if (argsize > 0) {
+    Copy::conjoint_words((HeapWord*)(heap_caller_sp + argument_offset),
+                        (HeapWord*)(caller_sp + argument_offset), argsize);
+  }
+}
+
 template<typename FKind>
 frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
   assert(FKind::is_instance(f), "wrong frame kind");

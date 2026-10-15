@@ -17,7 +17,7 @@ for mode in interpreter c1 mixed c2; do
   esac
   echo "Running $mode; log: $out/$mode.log"
   "$timeout_cmd" --kill-after=5s 120s "$jdk/bin/java" --add-exports java.base/jdk.internal.vm=ALL-UNNAMED \
-    -Xmx256m "${flags[@]}" -cp "$out/classes" VirtualStackBoundarySmoke > "$out/$mode.log" 2>&1
+    -Xmx256m "-XX:ErrorFile=$out/hs_err_${mode}_pid%p.log" "${flags[@]}" -cp "$out/classes" VirtualStackBoundarySmoke > "$out/$mode.log" 2>&1
   rc=$?
   printf '%s exit=%s\n' "$mode" "$rc" >> "$out/results.txt"
   tail -20 "$out/$mode.log"
