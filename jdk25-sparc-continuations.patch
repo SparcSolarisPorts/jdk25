@@ -996,8 +996,8 @@
 +
 +// A compiled callee's incoming stack arguments are in its caller's ABI
 +// argument area, not in the caller's first words (the L/I window save area).
-+// Partial fast thaw must materialize that window at the extended entry SP
-+// and install the arguments at the Java ABI offset in the relocated entry.
++// Partial thaw must materialize that window at the extended caller SP
++// and install the arguments at the Java ABI offset in the relocated caller.
 +static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
 +                                                   intptr_t* caller_sp,
 +                                                   intptr_t* heap_caller_sp,
@@ -5955,13 +5955,15 @@
    intptr_t* const heap_frame_top = hf.unextended_sp();
  
    const int added_argsize = (is_bottom_frame || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-@@ -2620,6 +2816,18 @@
+@@ -2620,6 +2816,20 @@
    assert(!is_bottom_frame || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
  
    copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
 +#ifdef SPARC
-+  Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(),
-+                      frame::register_save_words);
++  // The generic contiguous copy ends inside the caller's L/I window on
++  // SPARC. Incoming arguments actually start above that 16-word window.
++  // Restore both regions explicitly when the caller was extended.
++  thaw_sparc_restore_caller_window(caller_window, caller.sp(), hf.fp(), added_argsize);
 +  // The canonical compiled payload starts at unextended_sp(), but a mixed
 +  // c2i frame keeps its live saved window at the lower physical SP. Restore
 +  // that window independently; the canonical slots may have been reused.
@@ -5974,7 +5976,7 @@
  
    patch(f, caller, is_bottom_frame);
  
-@@ -2638,7 +2846,7 @@
+@@ -2638,7 +2848,7 @@
  
      f.deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
      assert(f.is_deoptimized_frame(), "");
@@ -5983,7 +5985,7 @@
      maybe_set_fastpath(f.sp());
    }
  
-@@ -2774,6 +2982,7 @@
+@@ -2774,6 +2984,7 @@
      assert(f.is_interpreted_frame(), "");
      f.set_sp(align_down(f.sp(), frame::frame_alignment));
    }
@@ -5991,7 +5993,7 @@
    push_return_frame(f);
    chunk->fix_thawed_frame(f, SmallRegisterMap::instance()); // can only fix caller after push_return_frame (due to callee saved regs)
  
-@@ -2790,8 +2999,8 @@
+@@ -2790,8 +3001,8 @@
  }
  
  void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
@@ -6002,7 +6004,7 @@
  
    LogTarget(Trace, continuations) lt;
    if (lt.develop_is_enabled()) {
-@@ -2802,7 +3011,7 @@
+@@ -2802,7 +3013,7 @@
  
    assert(f.sp() - frame::metadata_words_at_bottom >= _top_stack_address, "overwrote past thawing space"
      " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(f.sp() - frame::metadata_words), p2i(_top_stack_address));
@@ -6011,7 +6013,7 @@
    ContinuationHelper::push_pd(f);
  
    assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
-@@ -2985,7 +3194,8 @@
+@@ -2985,7 +3196,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;

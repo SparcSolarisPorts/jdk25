@@ -13,6 +13,7 @@ def function(marker):
     return s[a:i]
 parts=[function('static inline void freeze_sparc_patch_link('),
        function('static inline void freeze_sparc_move_caller_window('),
+       function('static inline void thaw_sparc_restore_caller_window('),
        function('inline intptr_t* ThawBase::align('),
        function('template<typename FKind>\nframe ThawBase::new_stack_frame(')]
 shared=(stage/'src/hotspot/share/runtime/continuationFreezeThaw.cpp').read_text()
@@ -20,7 +21,7 @@ a=shared.index('  frame f = new_stack_frame<ContinuationHelper::CompiledFrame>')
 b=shared.index('  patch(f, caller, is_bottom_frame);',a)
 compiled=shared[a:b]
 assert compiled.index('(HeapWord*)caller_window') < compiled.index('copy_from_chunk(from, to, sz)')
-assert compiled.index('(HeapWord*)caller_window, (HeapWord*)caller.sp()') > compiled.index('copy_from_chunk(from, to, sz)')
+assert compiled.index('thaw_sparc_restore_caller_window(caller_window, caller.sp(), hf.fp(), added_argsize)') > compiled.index('copy_from_chunk(from, to, sz)')
 model=r'''
 #include <cstdint>
 #include <cstring>
@@ -29,12 +30,14 @@ model=r'''
 #define assert(c, ...) do { if (!(c)) std::abort(); } while(0)
 using HeapWord=intptr_t;
 constexpr int STACK_BIAS=2047,freeze_sparc_fp_slot=14,max_jint=2147483647;
+struct VMRegImpl {static constexpr int slots_per_word=2;};
+struct SharedRuntime {static int out_preserve_stack_slots(){return 32;}};
 int pointer_delta_as_int(intptr_t* a,intptr_t* b){return int(a-b);}
 bool is_aligned(intptr_t* p,int n){return uintptr_t(p)%n==0;}
 intptr_t* align_down(intptr_t* p,int n){return (intptr_t*)(uintptr_t(p)&~uintptr_t(n-1));}
 struct Copy {static void conjoint_words(HeapWord* a,HeapWord* b,int n){memmove(b,a,n*sizeof(*a));}};
 struct frame {
- static constexpr int frame_alignment=16;
+ static constexpr int frame_alignment=16,register_save_words=16;
  intptr_t *s,*u,*f; bool interp=false,heap=false; int args=0,adjustment=0;
  frame(intptr_t* a,intptr_t* b,intptr_t* c,int=0,int=0,int=0,bool h=false):s(a),u(b),f(c),heap(h){}
  intptr_t* sp()const{return s;} intptr_t* unextended_sp()const{return u;} intptr_t* fp()const{return f;}
@@ -71,8 +74,9 @@ int main(){
   assert(memcmp(caller.sp(),expected,sizeof expected)==0,"copied original window, not shifted argument area");
   // Exercise the compiled payload overlap and the caller-window restore.
   intptr_t saved[16];Copy::conjoint_words(caller.sp(),saved,16);
-  for(int i=0;i<args;i++)caller.sp()[i]=0x90000+i;
-  Copy::conjoint_words(saved,caller.sp(),16);
+  for(int i=0;i<args;i++){caller.sp()[i]=0x90000+i;hf.fp()[16+i]=0xa0000+i;}
+  thaw_sparc_restore_caller_window(saved,caller.sp(),hf.fp(),args);
+  for(int i=0;i<args;i++)assert(caller.sp()[16+i]==0xa0000+i,"arguments above window");
   assert(memcmp(caller.sp(),expected,sizeof expected)==0,"window survives payload copy");
   count++;
  }

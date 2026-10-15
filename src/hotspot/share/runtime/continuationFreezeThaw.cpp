@@ -2817,8 +2817,10 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
   copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
 #ifdef SPARC
-  Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(),
-                      frame::register_save_words);
+  // The generic contiguous copy ends inside the caller's L/I window on
+  // SPARC. Incoming arguments actually start above that 16-word window.
+  // Restore both regions explicitly when the caller was extended.
+  thaw_sparc_restore_caller_window(caller_window, caller.sp(), hf.fp(), added_argsize);
   // The canonical compiled payload starts at unextended_sp(), but a mixed
   // c2i frame keeps its live saved window at the lower physical SP. Restore
   // that window independently; the canonical slots may have been reused.

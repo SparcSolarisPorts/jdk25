@@ -172,8 +172,8 @@ static inline void freeze_sparc_move_caller_window(frame& caller,
 
 // A compiled callee's incoming stack arguments are in its caller's ABI
 // argument area, not in the caller's first words (the L/I window save area).
-// Partial fast thaw must materialize that window at the extended entry SP
-// and install the arguments at the Java ABI offset in the relocated entry.
+// Partial thaw must materialize that window at the extended caller SP
+// and install the arguments at the Java ABI offset in the relocated caller.
 static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
                                                    intptr_t* caller_sp,
                                                    intptr_t* heap_caller_sp,

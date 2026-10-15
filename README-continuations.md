@@ -1,3 +1,47 @@
+v60: restore slow-thaw incoming arguments above the caller window
+================================================================
+Native v59 results (2026-10-15 01:44):
+- VirtualStackBoundarySmoke: interpreter/C1/C2 PASS; mixed still fails
+  with Pinned: NATIVE at the second nested yield.
+- StackArgumentThawSmoke: interpreter PASS; all four compiled modes crash.
+- ContinuationSmoke: all four modes PASS.
+- VirtualThreadMixedYieldSmoke: runner exit=0, including C1 and C2 PASS.
+The new C2 boundary pass is progress; the remaining failures are open.
+
+Change:
+- In compiled slow thaw, the generic contiguous copy includes added_argsize
+  words immediately above the callee's frame. On SPARC those words begin
+  at the caller's register-save window, not at the incoming-argument area.
+- After copying, use the existing SPARC restoration helper with hf.fp()
+  as the frozen caller boundary. It restores the saved caller L/I window
+  and copies added_argsize words from hf.fp()+16 to caller.sp()+16.
+- Internal compiled callers whose window was not extended retain their
+  ordinary payload copy; no extra argument copy is requested for them.
+- Fast thaw, compiled execution, OSR and test expectations are unchanged.
+
+Validation:
+- Actual slow-thaw placement and argument helper: 388 host layout cases,
+  including odd/even argument counts, caller kinds and physical-SP offsets.
+- Actual helper independent check: 0..96 argument words PASS.
+- Register-name and logical vframe-boundary checks PASS.
+- Native Solaris/SPARC execution remains required. This candidate does not
+  claim to fix Pinned: NATIVE or establish that compiled argument tests pass.
+
+Extract over the checkout, then run the existing independent-group runner:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-v59-regressions.sh
+    else
+      tail -80 /tmp/jdk25-build.log
+    fi
+
+If the compiled-argument cases still crash, the most useful next evidence
+is hs_err_c1_pid*.log and hs_err_c2_pid*.log from the new argument-results
+folder. No core files are needed.
+
+Earlier release notes follow.
+
 v59: preserve slow-thaw caller windows through placement and copying
 ==================================================================
 Native v58 evidence received:
