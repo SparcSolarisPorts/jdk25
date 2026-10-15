@@ -1123,7 +1123,7 @@
  }
  
  template<typename FKind>
-@@ -226,7 +297,19 @@
+@@ -226,30 +297,49 @@
    assert(FKind::is_instance(hf), "wrong frame kind");
  
    int fsize = FKind::size(hf);
@@ -1144,7 +1144,12 @@
  
    if (!FKind::interpreted &&
        (bottom || caller.is_interpreted_frame())) {
-@@ -236,10 +319,15 @@
+     const int argsize = hf.compiled_frame_stack_argsize();
++    // Keep caller.sp() at the source window until the final aligned
++    // destination is known. Moving it here makes the window copy read
++    // argument data instead of the saved L/I registers.
+     frame_sp -= argsize;
+-    caller.set_sp(caller.sp() - argsize);
      frame_sp = align(hf, frame_sp, caller, bottom);
    }
  
@@ -1162,7 +1167,18 @@
    return result;
  }
  
-@@ -257,8 +345,7 @@
+ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp,
+                                   frame& caller, bool bottom) {
+   (void)hf;
++  (void)caller;
+   (void)bottom;
+   if (!is_aligned(frame_sp, frame::frame_alignment)) {
+     --frame_sp;
+-    caller.set_sp(caller.sp() - 1);
+   }
+   assert(is_aligned(frame_sp, frame::frame_alignment),
+          "SPARC stack must remain 16-byte aligned");
+@@ -257,8 +347,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, const frame& caller) {
@@ -1172,7 +1188,7 @@
  }
  
  inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-@@ -296,10 +383,18 @@
+@@ -296,10 +385,18 @@
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llocals_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_lmonitors_slot, false);
    freeze_sparc_derelativize_slot(hf, f, freeze_sparc_llast_sp_slot, true);
@@ -3004,6 +3020,27 @@
      _location_valid[0] = 0;  // avoid the shift_individual_registers game
    }
  
+--- a/src/hotspot/cpu/sparc/register_sparc.cpp
++++ b/src/hotspot/cpu/sparc/register_sparc.cpp
+@@ -33,7 +33,7 @@
+     "L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7",
+     "I0", "I1", "I2", "I3", "I4", "I5", "FP", "I7"
+   };
+-  return names[encoding() + 1];
++  return is_valid() ? names[encoding()] : "noreg";
+ }
+ 
+ 
+@@ -45,7 +45,7 @@
+     "F30", "F31",  "F32", "F33?", "F34", "F35?", "F36", "F37?", "F38", "F39?",
+     "F40", "F41?", "F42", "F43?", "F44", "F45?", "F46", "F47?", "F48", "F49?",
+     "F50", "F51?", "F52", "F53?", "F54", "F55?", "F56", "F57?", "F58", "F59?",
+-    "F60", "F61?", "F62"
++    "F60", "F61?", "F62", "F63?"
+   };
+-  return names[encoding() + 1];
++  return is_valid() ? names[encoding()] : "noreg";
+ }
 --- a/src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 @@ -33,8 +33,13 @@
@@ -5899,11 +5936,16 @@
  
    // Make sure the relativized locals is already set.
    assert(f.interpreter_frame_local_at(0) == stack_frame_bottom - 1, "invalid frame bottom");
-@@ -2602,7 +2787,13 @@
+@@ -2602,7 +2787,18 @@
    // yet laid out in the stack, and so the original_pc is not stored in it.
    // As a result, f.is_deoptimized_frame() is always false and we must test hf to know if the frame is deoptimized.
    frame f = new_stack_frame<ContinuationHelper::CompiledFrame>(hf, caller, is_bottom_frame);
 +#ifdef SPARC
++  // The added argument span can cross the relocated caller window.
++  // Retain the L/I registers just as the interpreted thaw path does.
++  intptr_t caller_window[frame::register_save_words];
++  Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window,
++                      frame::register_save_words);
 +  // A c2i adapter can move the physical window below the compiled payload.
 +  // Match the canonical source address; restore the physical window separately.
 +  intptr_t* const stack_frame_top = f.unextended_sp();
@@ -5913,11 +5955,13 @@
    intptr_t* const heap_frame_top = hf.unextended_sp();
  
    const int added_argsize = (is_bottom_frame || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-@@ -2620,6 +2811,16 @@
+@@ -2620,6 +2816,18 @@
    assert(!is_bottom_frame || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
  
    copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
 +#ifdef SPARC
++  Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(),
++                      frame::register_save_words);
 +  // The canonical compiled payload starts at unextended_sp(), but a mixed
 +  // c2i frame keeps its live saved window at the lower physical SP. Restore
 +  // that window independently; the canonical slots may have been reused.
@@ -5930,7 +5974,7 @@
  
    patch(f, caller, is_bottom_frame);
  
-@@ -2638,7 +2839,7 @@
+@@ -2638,7 +2846,7 @@
  
      f.deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
      assert(f.is_deoptimized_frame(), "");
@@ -5939,7 +5983,7 @@
      maybe_set_fastpath(f.sp());
    }
  
-@@ -2774,6 +2975,7 @@
+@@ -2774,6 +2982,7 @@
      assert(f.is_interpreted_frame(), "");
      f.set_sp(align_down(f.sp(), frame::frame_alignment));
    }
@@ -5947,7 +5991,7 @@
    push_return_frame(f);
    chunk->fix_thawed_frame(f, SmallRegisterMap::instance()); // can only fix caller after push_return_frame (due to callee saved regs)
  
-@@ -2790,8 +2992,8 @@
+@@ -2790,8 +2999,8 @@
  }
  
  void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
@@ -5958,7 +6002,7 @@
  
    LogTarget(Trace, continuations) lt;
    if (lt.develop_is_enabled()) {
-@@ -2802,7 +3004,7 @@
+@@ -2802,7 +3011,7 @@
  
    assert(f.sp() - frame::metadata_words_at_bottom >= _top_stack_address, "overwrote past thawing space"
      " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(f.sp() - frame::metadata_words), p2i(_top_stack_address));
@@ -5967,7 +6011,7 @@
    ContinuationHelper::push_pd(f);
  
    assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
-@@ -2985,7 +3187,8 @@
+@@ -2985,7 +3194,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;

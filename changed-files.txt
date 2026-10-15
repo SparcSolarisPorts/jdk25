@@ -29,6 +29,7 @@ src/hotspot/cpu/sparc/methodHandles_sparc.cpp
 src/hotspot/cpu/sparc/nativeInst_sparc.cpp
 src/hotspot/cpu/sparc/nativeInst_sparc.hpp
 src/hotspot/cpu/sparc/registerMap_sparc.hpp
+src/hotspot/cpu/sparc/register_sparc.cpp
 src/hotspot/cpu/sparc/sharedRuntime_sparc.cpp
 src/hotspot/cpu/sparc/sparc.ad
 src/hotspot/cpu/sparc/stackChunkFrameStream_sparc.inline.hpp

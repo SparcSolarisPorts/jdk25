@@ -33,7 +33,7 @@ const char* Register::name() const {
     "L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7",
     "I0", "I1", "I2", "I3", "I4", "I5", "FP", "I7"
   };
-  return names[encoding() + 1];
+  return is_valid() ? names[encoding()] : "noreg";
 }
 
 
@@ -45,7 +45,7 @@ const char* FloatRegister::name() const {
     "F30", "F31",  "F32", "F33?", "F34", "F35?", "F36", "F37?", "F38", "F39?",
     "F40", "F41?", "F42", "F43?", "F44", "F45?", "F46", "F47?", "F48", "F49?",
     "F50", "F51?", "F52", "F53?", "F54", "F55?", "F56", "F57?", "F58", "F59?",
-    "F60", "F61?", "F62"
+    "F60", "F61?", "F62", "F63?"
   };
-  return names[encoding() + 1];
+  return is_valid() ? names[encoding()] : "noreg";
 }

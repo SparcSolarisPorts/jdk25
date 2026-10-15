@@ -2788,6 +2788,11 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   // As a result, f.is_deoptimized_frame() is always false and we must test hf to know if the frame is deoptimized.
   frame f = new_stack_frame<ContinuationHelper::CompiledFrame>(hf, caller, is_bottom_frame);
 #ifdef SPARC
+  // The added argument span can cross the relocated caller window.
+  // Retain the L/I registers just as the interpreted thaw path does.
+  intptr_t caller_window[frame::register_save_words];
+  Copy::conjoint_words((HeapWord*)caller.sp(), (HeapWord*)caller_window,
+                      frame::register_save_words);
   // A c2i adapter can move the physical window below the compiled payload.
   // Match the canonical source address; restore the physical window separately.
   intptr_t* const stack_frame_top = f.unextended_sp();
@@ -2812,6 +2817,8 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
   copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
 #ifdef SPARC
+  Copy::conjoint_words((HeapWord*)caller_window, (HeapWord*)caller.sp(),
+                      frame::register_save_words);
   // The canonical compiled payload starts at unextended_sp(), but a mixed
   // c2i frame keeps its live saved window at the lower physical SP. Restore
   // that window independently; the canonical slots may have been reused.

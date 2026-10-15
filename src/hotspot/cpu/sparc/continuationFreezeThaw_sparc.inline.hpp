@@ -314,8 +314,10 @@ frame ThawBase::new_stack_frame(const frame& hf, frame& caller,
   if (!FKind::interpreted &&
       (bottom || caller.is_interpreted_frame())) {
     const int argsize = hf.compiled_frame_stack_argsize();
+    // Keep caller.sp() at the source window until the final aligned
+    // destination is known. Moving it here makes the window copy read
+    // argument data instead of the saved L/I registers.
     frame_sp -= argsize;
-    caller.set_sp(caller.sp() - argsize);
     frame_sp = align(hf, frame_sp, caller, bottom);
   }
 
@@ -334,10 +336,10 @@ frame ThawBase::new_stack_frame(const frame& hf, frame& caller,
 inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp,
                                   frame& caller, bool bottom) {
   (void)hf;
+  (void)caller;
   (void)bottom;
   if (!is_aligned(frame_sp, frame::frame_alignment)) {
     --frame_sp;
-    caller.set_sp(caller.sp() - 1);
   }
   assert(is_aligned(frame_sp, frame::frame_alignment),
          "SPARC stack must remain 16-byte aligned");

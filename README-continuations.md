@@ -1,3 +1,55 @@
+v59: preserve slow-thaw caller windows through placement and copying
+==================================================================
+Native v58 evidence received:
+- Source hashes match the supplied v58 files.
+- ContinuationSmoke and VirtualThreadMixedYieldSmoke pass every mode.
+- VirtualStackBoundarySmoke: interpreter/C1 pass; mixed reports Pinned:
+  NATIVE; C2 crashes in the return barrier.
+- StackArgumentThawSmoke: interpreter passes; C1/mixed/C2/C2-GC crash.
+These failures are NOT marked resolved by this release.
+
+Fixes:
+- new_stack_frame no longer decrements caller.sp() before relocating the
+  saved L/I window. That mutation made the copy source point into the
+  argument extension rather than the original saved window. Alignment
+  also leaves the source pointer intact until the final copy.
+- Compiled slow thaw snapshots the relocated caller window and restores
+  it after copying the compiled payload/argument span. The corresponding
+  interpreted-thaw and compiled-freeze paths already protect that window.
+- Register::name and FloatRegister::name now index their tables using the
+  encoding itself, rather than encoding+1. I0 was printed as I1 and I5 as
+  FP; this was a diagnostic error, not a change to the calling convention.
+  Invalid sentinels return noreg, and the final floating-name slot is filled.
+
+Validation on the host:
+- Actual slow-thaw placement functions: 388 argument/alignment/caller cases.
+- Reintroducing the old caller-SP mutation makes that regression fail.
+- Actual name methods: all 32 integer and 64 floating register slots,
+  including invalid sentinels.
+- Existing stack-argument helper and vframe-boundary predicate checks pass.
+- No Solaris/SPARC build or machine-code execution was possible here.
+- Fast thaw, C1/C2, OSR and locking remain enabled. This release does not
+  claim to complete stack-argument handling or monitor preemption.
+
+After extracting over the checkout, rebuild and run:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-v59-regressions.sh
+    else
+      ggrep -n -B 4 -A 8 'error:' /tmp/jdk25-build.log
+      tail -40 /tmp/jdk25-build.log
+    fi
+
+The runner executes all four independent groups, even after a failure.
+The boundary and stack-argument modes retain their 120-second timeouts.
+The 26-case jtreg runner still defaults to eight concurrent tests; rerun
+it after these continuation regressions pass:
+
+    bash tests/rerun-priority-crashes-v52.sh
+
+Earlier release notes follow for history, including unverified hypotheses.
+
 v58: partial fast-thaw entry window and Java stack arguments
 ===========================================================
 Native v57 output from 2026-10-15 01:07:
