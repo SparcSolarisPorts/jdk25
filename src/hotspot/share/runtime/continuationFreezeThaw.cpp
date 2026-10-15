@@ -1000,6 +1000,15 @@ inline freeze_result FreezeBase::recurse_freeze_java_frame(const frame& f, frame
     return finalize_freeze(f, caller, argsize); // recursion end
   } else {
     frame senderf = sender<FKind>(f);
+#ifdef SPARC
+    // A relocated enterSpecial window can be below _bottom_address. Stop
+    // at the matching entry before its native wrapper is treated as a
+    // frame to freeze (which would falsely report native pinning).
+    if (senderf.unextended_sp() == _cont.entrySP() &&
+        Continuation::is_continuation_enterSpecial(senderf)) {
+      return finalize_freeze(f, caller, argsize);
+    }
+#endif
     assert(FKind::interpreted || senderf.sp() == senderf.unextended_sp(), "");
     freeze_result result = recurse_freeze(senderf, caller, argsize, FKind::interpreted, false); // recursive call
     return result;
@@ -2862,7 +2871,13 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     // can only fix caller once this frame is thawed (due to callee saved regs); this happens on the stack
     _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance());
   } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
+#ifdef SPARC
+    // Incoming arguments follow the caller's L/I window. Clearing at the
+    // window base drops bitmap roots belonging to the still-frozen caller.
+    address start = (address)(hf.fp() + frame::register_save_words);
+#else
     address start = (address)(heap_frame_top + ContinuationHelper::CompiledFrame::size(hf) + frame::metadata_words_at_top);
+#endif
     int stack_args_slots = f.cb()->as_nmethod()->num_stack_arg_slots(false /* rounded */);
     int argsize_in_bytes = stack_args_slots * VMRegImpl::stack_slot_size;
     clear_bitmap_bits(start, start + argsize_in_bytes);

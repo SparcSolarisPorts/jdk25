@@ -1,3 +1,51 @@
+v64: relocated-entry boundary and stack-argument bitmap range
+============================================================
+Native v63 results from 2026-10-15 22:44 UTC:
+- Stack arguments PASS in interpreter, C1, mixed and C2; C2-GC crashes.
+- Nested boundary PASS in interpreter, C1 and C2; mixed Pinned: NATIVE.
+- Original continuations and mixed-yield groups PASS in every mode.
+These are individual native runs; repeated stability is not yet established.
+
+Changes:
+1. On SPARC, frame membership excludes the matching enterSpecial wrapper
+   even when its physical saved window lies below its canonical entry SP.
+   Both the entry nmethod identity and canonical address must match.
+   An inner entry still belongs to its outer continuation, and ordinary
+   native wrappers retain membership for real native-pinning detection.
+2. Slow freeze checks whether the sender is that matching entry before
+   recursing. Numeric frame-bottom comparisons alone can miss an entry
+   whose saved window was relocated during a previous thaw, causing its
+   special wrapper to be rejected as an unfrozen native frame.
+3. Compiled-argument bitmap cleanup now starts at hf.fp()+16 words, the
+   SPARC incoming-argument area. The former start at the window base can
+   clear live saved-register roots belonging to the still-frozen caller.
+   The generic address calculation is unchanged for other architectures.
+
+Validation:
+- Actual membership predicate compiled with and without SPARC: 65 window
+  shifts plus nested-entry, genuine native-wrapper and carrier cases.
+- Actual bitmap start: 192 argument-slot counts, saved-window roots and
+  adjacent data preserved while the intended argument bits are cleared.
+- Existing compiled-freeze and slow-thaw placement checks PASS.
+- No native Solaris/SPARC build or execution was possible here. The new
+  patches target the two remaining failures; neither is marked resolved
+  until native validation succeeds. Fast paths, C1/C2 and OSR stay enabled.
+
+Extract over the checkout, rebuild quietly and run all four groups:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-v59-regressions.sh
+    else
+      tail -80 /tmp/jdk25-build.log
+    fi
+
+The runner retains its v59 name and runs independent groups after failures.
+Focused jtreg concurrency remains eight by default. If C2-GC still crashes,
+keep its new hs_err report for comparing the decoded reference values.
+
+Earlier release notes follow.
+
 v63: preserve compiled register windows during mixed slow freeze
 ==============================================================
 Native v62 results:

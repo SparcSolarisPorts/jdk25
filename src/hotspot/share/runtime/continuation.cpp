@@ -246,6 +246,13 @@ static inline bool is_sp_in_continuation(const ContinuationEntry* entry, intptr_
 }
 
 bool Continuation::is_frame_in_continuation(const ContinuationEntry* entry, const frame& f) {
+#ifdef SPARC
+  // enterSpecial's physical window may be below its canonical entry SP
+  // after thaw. It remains the boundary, not a Java frame inside itself.
+  if (f.unextended_sp() == entry->entry_sp() && is_continuation_enterSpecial(f)) {
+    return false;
+  }
+#endif
   return is_sp_in_continuation(entry, f.sp());
 }
 
