@@ -5657,6 +5657,12 @@ class StubGenerator: public StubCodeGenerator {
     __ sub(L3, scratch_bytes + STACK_BIAS, L3);
     __ sub(L3, SP, L3);
     __ save(SP, L3, SP);
+    // Evict the entry window while its canonical save area is still intact.
+    // The earlier flush is followed by RESTORE, which makes that window
+    // resident again. Leaving it resident here permits a later native spill
+    // to overwrite stack arguments installed by the C++ thaw operation.
+    // Keep this flush in the scratch window: no RESTORE precedes thaw_entry.
+    __ flushw();
     if (return_barrier) {
       __ stf(FloatRegisterImpl::D, F0, SP, STACK_BIAS + result_offset);
     }

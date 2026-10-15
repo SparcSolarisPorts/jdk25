@@ -4109,7 +4109,7 @@
      }
  
      Label thaw_success;
-@@ -5612,54 +5642,119 @@
+@@ -5612,54 +5642,125 @@
      __ delayed()->nop();
      __ bind(thaw_success);
  
@@ -4132,6 +4132,12 @@
 +    __ sub(L3, scratch_bytes + STACK_BIAS, L3);
 +    __ sub(L3, SP, L3);
 +    __ save(SP, L3, SP);
++    // Evict the entry window while its canonical save area is still intact.
++    // The earlier flush is followed by RESTORE, which makes that window
++    // resident again. Leaving it resident here permits a later native spill
++    // to overwrite stack arguments installed by the C++ thaw operation.
++    // Keep this flush in the scratch window: no RESTORE precedes thaw_entry.
++    __ flushw();
      if (return_barrier) {
 -      __ sub(SP, 2 * wordSize, SP);
 -      __ st_ptr(O0, SP, STACK_BIAS + wordSize);
@@ -4261,7 +4267,7 @@
  
      return start;
    }
-@@ -5875,14 +5970,19 @@
+@@ -5875,14 +5976,19 @@
  
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_fastpath_offset()), G1);
    __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()));
@@ -4283,7 +4289,7 @@
  #ifndef PRODUCT
    Label ok;
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
-@@ -5894,11 +5994,11 @@
+@@ -5894,11 +6000,11 @@
  
    __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()), G1);
    __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));

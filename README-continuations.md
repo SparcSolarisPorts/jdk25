@@ -1,3 +1,50 @@
+v62: evict the entry window before C++ thaw copies Java frames
+============================================================
+Native v61 evidence:
+- Boundary interpreter/C1/C2 pass; mixed still reports Pinned: NATIVE.
+- Stack-argument interpreter and C1 pass; mixed/C2/C2-GC still crash.
+- Original continuation and mixed-yield groups return success.
+- Updated C2 dump has a valid saved I6, but incoming payload slots contain
+  canonical entry-window data rather than the original object references.
+  This distinguishes the remaining argument corruption from the v61
+  architectural-register reload problem.
+
+Change (one generated instruction):
+- After SAVE into the dedicated runtime scratch frame, issue FLUSHW before
+  calling Continuation::thaw_entry(). The entry's canonical save area is
+  still valid at that point, before the restored Java frames are copied.
+- The previous flush runs inside a temporary frame and is followed by
+  RESTORE. That RESTORE makes the entry resident again, allowing a later
+  native spill to overwrite the overlapping relocated argument region.
+- The new flush has no intervening RESTORE before the thaw runtime call.
+  The older entry is evicted before the copies; its eventual refill uses
+  the physical SP installed by the existing runtime-return stub.
+- v61's saved-entry reload stays in place. Fast freeze/thaw, C1/C2, OSR,
+  locking and all existing test expectations remain enabled.
+
+Validation on the host:
+- Source ordering check verifies SAVE -> FLUSHW -> thaw_entry, without an
+  intervening RESTORE.
+- Resident-window overlap model: 2328 cases across 0..96 argument words,
+  shallow/deep native paths and old/new eviction ordering. Old ordering
+  corrupts 576 cases; new ordering corrupts none in this model.
+- Existing final-spill, slow placement and argument-helper checks pass.
+- These are host ordering/layout checks, not execution on SPARC. Native
+  Solaris confirmation is required; mixed pinning remains unresolved.
+
+Extract over the checkout and run the same four independent groups:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-v59-regressions.sh
+    else
+      tail -80 /tmp/jdk25-build.log
+    fi
+
+The focused jtreg runner still defaults to eight concurrent tests.
+
+Earlier release notes follow.
+
 v61: reload entry registers after the runtime return
 ===================================================
 Native v60: boundary interpreter/C1 pass; mixed Pinned: NATIVE; C2
