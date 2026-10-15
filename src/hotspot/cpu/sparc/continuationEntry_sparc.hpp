@@ -32,7 +32,11 @@ class ContinuationEntryPD {
   intptr_t _abi_save_area[22];
   address _resume_pc;
   intptr_t* _thaw_bottom;
+  // Outside both the canonical and extended architectural spill windows.
+  intptr_t _thaw_entry_window[16];
  public:
+  static ByteSize thaw_entry_window_offset() { return byte_offset_of(ContinuationEntryPD, _thaw_entry_window); }
+  intptr_t* thaw_entry_window() { return _thaw_entry_window; }
   static ByteSize resume_pc_offset() { return byte_offset_of(ContinuationEntryPD, _resume_pc); }
   static ByteSize thaw_bottom_offset() { return byte_offset_of(ContinuationEntryPD, _thaw_bottom); }
   address resume_pc() const { return _resume_pc; }

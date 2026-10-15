@@ -1,3 +1,52 @@
+v61: reload entry registers after the runtime return
+===================================================
+Native v60: boundary interpreter/C1 pass; mixed Pinned: NATIVE; C2
+RESTORE crash. Stack arguments crash in all compiled modes. Original
+continuation and mixed-yield regressions pass all modes.
+
+The two return-barrier dumps show canonical-window data overlapping the
+extended entry window. Boundary I6 is 1 at canonical SP-16 bytes; C1 I6
+is 0x10000 at canonical SP-80 bytes. Valid links remain at canonical SP.
+A runtime spill/refill can overwrite relocated data after the C++ copy.
+
+Change:
+- Snapshot the 16 entry L/I registers in dedicated ContinuationEntryPD
+  storage above the ABI area before thaw copies frames.
+- After runtime RESTORE and physical-SP assignment, the stub reloads all
+  16 registers before rebuilding Java windows. Subsequent SAVE instructions
+  therefore spill the corrected resident entry window.
+- Refresh I0 from the GC-updated entry continuation root; the opaque
+  snapshot is not an additional set of GC roots.
+- PD grows 128 bytes. Generated frame sizes/oop maps use the existing
+  ContinuationEntry::size()/offset accessors.
+- No raw heap argument pointer is retained across the runtime call.
+- Fast paths, C1/C2 and OSR remain enabled.
+
+Validation:
+- Final-spill host model: 97 layouts; old ordering corrupts 96, final
+  architectural entry-register reload preserves the link in all 97.
+- Actual PD header compiles: window offset 192, PD size 320.
+- Existing placement, argument-helper, name and vframe checks pass.
+- Host layout/order checks do not execute SPARC machine code. Native
+  Solaris build and runtime confirmation are still required.
+- Stack-argument handling, mixed nested pinning and monitor preemption
+  remain open; this patch specifically addresses entry-window corruption.
+
+Extract over the checkout, then run:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-v59-regressions.sh
+    else
+      tail -80 /tmp/jdk25-build.log
+    fi
+
+All four groups run independently. The focused jtreg runner retains
+its default of eight concurrent tests. Keep new hs_err reports if a mode
+still crashes; core files are not needed.
+
+Earlier release notes follow.
+
 v60: restore slow-thaw incoming arguments above the caller window
 ================================================================
 Native v59 results (2026-10-15 01:44):

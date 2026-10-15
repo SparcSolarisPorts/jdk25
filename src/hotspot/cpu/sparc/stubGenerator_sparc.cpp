@@ -5686,6 +5686,21 @@ class StubGenerator: public StubCodeGenerator {
     __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_bottom_offset()), G1);
     __ sub(G1, STACK_BIAS, SP);
 
+    // A runtime spill at the old canonical SP overlaps an extended entry
+    // window. RESTORE may therefore have loaded stale L/I values. Reload
+    // the retained entry registers after the runtime has fully returned;
+    // subsequent SAVE instructions will spill them at the physical SP.
+    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
+    for (int reg = 0; reg < 8; reg++) {
+      __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_entry_window_offset()) + reg * wordSize,
+                as_lRegister(reg));
+      __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_entry_window_offset()) + (8 + reg) * wordSize,
+                as_iRegister(reg));
+    }
+    // I0 is enterSpecial's continuation oop. Use the GC-updated entry root,
+    // rather than the opaque saved register bits if thaw safepointed.
+    __ ld_ptr(G1, in_bytes(ContinuationEntry::cont_offset()), I0);
+
     // Find each child using its saved I6. Do not borrow Java spill slots for
     // reverse links: compiled frames may keep live values immediately above
     // the 16-word architectural save area. No safepoint occurs in this loop.

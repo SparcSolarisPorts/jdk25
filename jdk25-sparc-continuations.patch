@@ -849,7 +849,7 @@
  }
 --- a/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 +++ b/src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
-@@ -25,8 +25,19 @@
+@@ -25,8 +25,23 @@
  #ifndef CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
  #define CPU_SPARC_CONTINUATIONENTRY_SPARC_HPP
  
@@ -861,7 +861,11 @@
 +  intptr_t _abi_save_area[22];
 +  address _resume_pc;
 +  intptr_t* _thaw_bottom;
++  // Outside both the canonical and extended architectural spill windows.
++  intptr_t _thaw_entry_window[16];
 + public:
++  static ByteSize thaw_entry_window_offset() { return byte_offset_of(ContinuationEntryPD, _thaw_entry_window); }
++  intptr_t* thaw_entry_window() { return _thaw_entry_window; }
 +  static ByteSize resume_pc_offset() { return byte_offset_of(ContinuationEntryPD, _resume_pc); }
 +  static ByteSize thaw_bottom_offset() { return byte_offset_of(ContinuationEntryPD, _thaw_bottom); }
 +  address resume_pc() const { return _resume_pc; }
@@ -4105,7 +4109,7 @@
      }
  
      Label thaw_success;
-@@ -5612,54 +5642,104 @@
+@@ -5612,54 +5642,119 @@
      __ delayed()->nop();
      __ bind(thaw_success);
  
@@ -4172,6 +4176,21 @@
 +    // canonical SP. The slow thaw records that physical boundary explicitly.
 +    __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_bottom_offset()), G1);
 +    __ sub(G1, STACK_BIAS, SP);
++
++    // A runtime spill at the old canonical SP overlaps an extended entry
++    // window. RESTORE may therefore have loaded stale L/I values. Reload
++    // the retained entry registers after the runtime has fully returned;
++    // subsequent SAVE instructions will spill them at the physical SP.
++    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
++    for (int reg = 0; reg < 8; reg++) {
++      __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_entry_window_offset()) + reg * wordSize,
++                as_lRegister(reg));
++      __ ld_ptr(G1, in_bytes(ContinuationEntry::thaw_entry_window_offset()) + (8 + reg) * wordSize,
++                as_iRegister(reg));
++    }
++    // I0 is enterSpecial's continuation oop. Use the GC-updated entry root,
++    // rather than the opaque saved register bits if thaw safepointed.
++    __ ld_ptr(G1, in_bytes(ContinuationEntry::cont_offset()), I0);
 +
 +    // Find each child using its saved I6. Do not borrow Java spill slots for
 +    // reverse links: compiled frames may keep live values immediately above
@@ -4242,7 +4261,7 @@
  
      return start;
    }
-@@ -5875,14 +5955,19 @@
+@@ -5875,14 +5970,19 @@
  
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_fastpath_offset()), G1);
    __ st_ptr(G1, SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()));
@@ -4264,7 +4283,7 @@
  #ifndef PRODUCT
    Label ok;
    __ ld_ptr(G2_thread, in_bytes(JavaThread::cont_entry_offset()), G1);
-@@ -5894,11 +5979,11 @@
+@@ -5894,11 +5994,11 @@
  
    __ ld_ptr(SP, STACK_BIAS + in_bytes(ContinuationEntry::parent_cont_fastpath_offset()), G1);
    __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_fastpath_offset()));
@@ -5466,11 +5485,13 @@
    Unimplemented();
 --- a/src/hotspot/share/runtime/continuationEntry.hpp
 +++ b/src/hotspot/share/runtime/continuationEntry.hpp
-@@ -88,6 +88,13 @@
+@@ -88,6 +88,15 @@
    uint32_t _pin_count;
  
   public:
 +#ifdef SPARC
++  static ByteSize thaw_entry_window_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::thaw_entry_window_offset(); }
++  intptr_t* thaw_entry_window() { return _pd.thaw_entry_window(); }
 +  static ByteSize resume_pc_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::resume_pc_offset(); }
 +  address resume_pc() const { return _pd.resume_pc(); }
 +  void set_resume_pc(address pc) { _pd.set_resume_pc(pc); }
@@ -5766,18 +5787,24 @@
             &&  _thread->cont_fastpath_thread_state()
             && !chunk->has_thaw_slowpath_condition()
             && !PreserveFramePointer;
-@@ -2017,6 +2132,10 @@
+@@ -2017,6 +2132,16 @@
    assert(chunk != nullptr, "guaranteed by prepare_thaw");
    assert(!chunk->is_empty(), "guaranteed by prepare_thaw");
  
 +#ifdef SPARC
++  // The runtime's final spill/refill can overwrite the relocated entry
++  // window after our stack copies. Retain its registers outside that
++  // overlap for an explicit reload in the assembly stub after RESTORE.
++  Copy::conjoint_words((HeapWord*)_cont.entrySP(),
++                      (HeapWord*)_cont.entry()->thaw_entry_window(),
++                      frame::register_save_words);
 +  _cont.entry()->set_resume_pc(chunk->pc());
 +  _cont.entry()->set_thaw_bottom(_cont.entry()->bottom_sender_sp());
 +#endif
    _barriers = chunk->requires_barriers();
    return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
                                          : thaw_slow(chunk, kind);
-@@ -2100,7 +2219,8 @@
+@@ -2100,7 +2225,8 @@
        intptr_t* retaddr_slot = (chunk_sp
                                  + frame_size
                                  - frame::sender_sp_ret_address_offset());
@@ -5787,7 +5814,7 @@
               "unexpected pc");
      }
  #endif
-@@ -2188,19 +2308,41 @@
+@@ -2188,19 +2314,41 @@
  
    ReconstructedStack rs(_cont.entrySP(), thaw_size, argsize);
  
@@ -5832,7 +5859,7 @@
  
    assert(is_last == _cont.is_empty(), "");
    assert(_cont.chunk_invariant(), "");
-@@ -2430,18 +2572,27 @@
+@@ -2430,18 +2578,27 @@
  inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
    assert(!bottom || caller.fp() == _cont.entryFP(), "");
    if (bottom) {
@@ -5861,7 +5888,7 @@
    }
  
    assert(!bottom || !_cont.is_empty() || Continuation::is_continuation_entry_frame(f, nullptr), "");
-@@ -2469,7 +2620,8 @@
+@@ -2469,7 +2626,8 @@
  intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::preempt_kind preempt_kind, bool fast_case) {
    assert(preempt_kind == Continuation::freeze_on_wait || preempt_kind == Continuation::freeze_on_monitorenter, "");
    frame top(sp);
@@ -5871,7 +5898,7 @@
  
  #if INCLUDE_JVMTI
    // Finish the VTMS transition.
-@@ -2512,7 +2664,7 @@
+@@ -2512,7 +2670,7 @@
  void ThawBase::throw_interrupted_exception(JavaThread* current, frame& top) {
    ContinuationWrapper::SafepointOp so(current, _cont);
    // Since we might safepoint set the anchor so that the stack can be walked.
@@ -5880,7 +5907,7 @@
    JRT_BLOCK
      THROW(vmSymbols::java_lang_InterruptedException());
    JRT_BLOCK_END
-@@ -2533,9 +2685,27 @@
+@@ -2533,9 +2691,27 @@
    _align_size += frame::align_wiggle; // possible added alignment for internal interpreted frame alignment om AArch64
  
    frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, is_bottom_frame);
@@ -5908,7 +5935,7 @@
    intptr_t* const heap_frame_top = hf.unextended_sp() + frame::metadata_words_at_top;
    intptr_t* const heap_frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(hf);
  
-@@ -2543,11 +2713,26 @@
+@@ -2543,11 +2719,26 @@
    assert(!f.is_heap_frame(), "should not be");
  
    const int fsize = pointer_delta_as_int(heap_frame_bottom, heap_frame_top);
@@ -5936,7 +5963,7 @@
  
    // Make sure the relativized locals is already set.
    assert(f.interpreter_frame_local_at(0) == stack_frame_bottom - 1, "invalid frame bottom");
-@@ -2602,7 +2787,18 @@
+@@ -2602,7 +2793,18 @@
    // yet laid out in the stack, and so the original_pc is not stored in it.
    // As a result, f.is_deoptimized_frame() is always false and we must test hf to know if the frame is deoptimized.
    frame f = new_stack_frame<ContinuationHelper::CompiledFrame>(hf, caller, is_bottom_frame);
@@ -5955,7 +5982,7 @@
    intptr_t* const heap_frame_top = hf.unextended_sp();
  
    const int added_argsize = (is_bottom_frame || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-@@ -2620,6 +2816,20 @@
+@@ -2620,6 +2822,20 @@
    assert(!is_bottom_frame || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
  
    copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
@@ -5976,7 +6003,7 @@
  
    patch(f, caller, is_bottom_frame);
  
-@@ -2638,7 +2848,7 @@
+@@ -2638,7 +2854,7 @@
  
      f.deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
      assert(f.is_deoptimized_frame(), "");
@@ -5985,7 +6012,7 @@
      maybe_set_fastpath(f.sp());
    }
  
-@@ -2774,6 +2984,7 @@
+@@ -2774,6 +2990,7 @@
      assert(f.is_interpreted_frame(), "");
      f.set_sp(align_down(f.sp(), frame::frame_alignment));
    }
@@ -5993,7 +6020,7 @@
    push_return_frame(f);
    chunk->fix_thawed_frame(f, SmallRegisterMap::instance()); // can only fix caller after push_return_frame (due to callee saved regs)
  
-@@ -2790,8 +3001,8 @@
+@@ -2790,8 +3007,8 @@
  }
  
  void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
@@ -6004,7 +6031,7 @@
  
    LogTarget(Trace, continuations) lt;
    if (lt.develop_is_enabled()) {
-@@ -2802,7 +3013,7 @@
+@@ -2802,7 +3019,7 @@
  
    assert(f.sp() - frame::metadata_words_at_bottom >= _top_stack_address, "overwrote past thawing space"
      " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(f.sp() - frame::metadata_words), p2i(_top_stack_address));
@@ -6013,7 +6040,7 @@
    ContinuationHelper::push_pd(f);
  
    assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
-@@ -2985,7 +3196,8 @@
+@@ -2985,7 +3202,8 @@
  
  static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
    intptr_t* sp0 = sp;

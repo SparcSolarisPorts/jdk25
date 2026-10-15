@@ -89,6 +89,8 @@ class ContinuationEntry {
 
  public:
 #ifdef SPARC
+  static ByteSize thaw_entry_window_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::thaw_entry_window_offset(); }
+  intptr_t* thaw_entry_window() { return _pd.thaw_entry_window(); }
   static ByteSize resume_pc_offset() { return byte_offset_of(ContinuationEntry, _pd) + ContinuationEntryPD::resume_pc_offset(); }
   address resume_pc() const { return _pd.resume_pc(); }
   void set_resume_pc(address pc) { _pd.set_resume_pc(pc); }

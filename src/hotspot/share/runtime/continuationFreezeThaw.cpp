@@ -2133,6 +2133,12 @@ inline intptr_t* Thaw<ConfigT>::thaw(Continuation::thaw_kind kind) {
   assert(!chunk->is_empty(), "guaranteed by prepare_thaw");
 
 #ifdef SPARC
+  // The runtime's final spill/refill can overwrite the relocated entry
+  // window after our stack copies. Retain its registers outside that
+  // overlap for an explicit reload in the assembly stub after RESTORE.
+  Copy::conjoint_words((HeapWord*)_cont.entrySP(),
+                      (HeapWord*)_cont.entry()->thaw_entry_window(),
+                      frame::register_save_words);
   _cont.entry()->set_resume_pc(chunk->pc());
   _cont.entry()->set_thaw_bottom(_cont.entry()->bottom_sender_sp());
 #endif
