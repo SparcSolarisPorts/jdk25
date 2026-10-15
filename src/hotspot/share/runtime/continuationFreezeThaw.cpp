@@ -207,6 +207,22 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 template<typename ConfigT, bool preempt> static inline freeze_result freeze_internal(JavaThread* current, intptr_t* const sp);
 
 #ifdef SPARC
+// Product-build diagnostics, enabled only by -Xlog:continuations=debug.
+// Record raw bits without dereferencing Java object pointers.
+static void sparc_trace_stack_args(const char* phase, const frame& f) {
+  if (!log_is_enabled(Debug, continuations) || !f.is_compiled_frame()) return;
+  int count = f.compiled_frame_stack_argsize();
+  if (count == 0) return;
+  intptr_t* args = f.fp() + frame::register_save_words;
+  log_debug(continuations)("SPARC-ARGS %s sp=" INTPTR_FORMAT " usp=" INTPTR_FORMAT
+                          " fp=" INTPTR_FORMAT " args=" INTPTR_FORMAT " count=%d heap=%d",
+                          phase, p2i(f.sp()), p2i(f.unextended_sp()), p2i(f.fp()),
+                          p2i(args), count, f.is_heap_frame());
+  for (int i = 0; i < count; i++) {
+    log_debug(continuations)("SPARC-ARGS %s arg[%d]=" INTPTR_FORMAT, phase, i, args[i]);
+  }
+}
+
 static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
                                                    intptr_t* caller_sp,
                                                    intptr_t* heap_caller_sp,
@@ -1326,6 +1342,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
   // including metadata between f and its stackargs
   const int argsize = ContinuationHelper::CompiledFrame::stack_argsize(f) + frame::metadata_words_at_top;
   const int fsize = pointer_delta_as_int(stack_frame_bottom + argsize, stack_frame_top);
+  SPARC_ONLY(sparc_trace_stack_args("freeze-source", f);)
 
   log_develop_trace(continuations)("recurse_freeze_compiled_frame %s _size: %d fsize: %d argsize: %d",
                              ContinuationHelper::Frame::frame_method(f) != nullptr ?
@@ -2788,6 +2805,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance());
   }
 
+  SPARC_ONLY(sparc_trace_stack_args("thaw-source", hf);)
   const bool is_bottom_frame = recurse_thaw_java_frame<ContinuationHelper::CompiledFrame>(caller, num_frames);
 
   DEBUG_ONLY(before_thaw_java_frame(hf, caller, is_bottom_frame, num_frames);)
@@ -2847,6 +2865,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
 
   patch(f, caller, is_bottom_frame);
+  SPARC_ONLY(sparc_trace_stack_args("thaw-copied", f);)
 
   // f.is_deoptimized_frame() is always false and we must test hf.is_deoptimized_frame() (see comment above)
   assert(!f.is_deoptimized_frame(), "");
@@ -3007,7 +3026,9 @@ void ThawBase::finish_thaw(frame& f) {
   }
   SPARC_ONLY(_cont.entry()->set_resume_pc(f.raw_pc() + frame::pc_return_offset);)
   push_return_frame(f);
+  SPARC_ONLY(sparc_trace_stack_args("before-decode", f);)
   chunk->fix_thawed_frame(f, SmallRegisterMap::instance()); // can only fix caller after push_return_frame (due to callee saved regs)
+  SPARC_ONLY(sparc_trace_stack_args("after-decode", f);)
 
   assert(_cont.is_empty() == _cont.last_frame().is_empty(), "");
 

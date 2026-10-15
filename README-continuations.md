@@ -1,3 +1,42 @@
+v65 diagnostic build: trace the remaining GC stack-argument failure
+=================================================================
+Native v64: 15/16 regression cases pass. Nested mixed-mode boundary now
+passes. Only StackArgumentThawSmoke c2-gc fails. The separate run with
+-XX:-UseCompressedOops also crashes at deep+0x164, so the failure is not
+limited to compressed-reference decoding.
+
+This release adds diagnostics, not a claimed fix for that remaining case.
+All v64 fixes are retained; normal runs leave the new logging disabled.
+
+With -Xlog:continuations=debug, SPARC-ARGS lines report raw stack-argument
+bits at freeze-source, thaw-source, thaw-copied, before-decode and
+after-decode. They also report physical SP, unextended SP, FP, argument
+address, word count and whether the frame is on heap. Java object pointers
+are never dereferenced by the diagnostic helper. Native logging can affect
+window timing; a passing trace run is evidence to investigate, not proof
+that the uninstrumented failure disappeared.
+
+Build and run only the two diagnostic variants:
+
+    cd ~/git/jdk25
+    if gmake images test-image JOBS=8 > /tmp/jdk25-build.log 2>&1; then
+      bash tests/run-stack-argument-gc-trace.sh
+    else
+      tail -80 /tmp/jdk25-build.log
+    fi
+
+The runner retains C2 and continuations, uses a 120-second limit for each
+compressed/uncompressed variant, and writes output to files. If zip is
+available it creates evidence.zip containing only logs and results.txt,
+never core files, classes, or complete test-work directories. Send that ZIP
+or paste the SPARC-ARGS lines and the final result of each variant.
+
+Validation: runner bash syntax checked; existing entry-boundary and
+argument-bitmap host regressions pass. Native build/execution is pending.
+The focused jtreg runner's eight-job default is unchanged.
+
+Earlier release notes follow.
+
 v64: relocated-entry boundary and stack-argument bitmap range
 ============================================================
 Native v63 results from 2026-10-15 22:44 UTC:
