@@ -1,3 +1,10 @@
+## v74: generated projection diagnostics
+
+v73 caught an out-of-arena projection during C2 runtime-stub generation.
+v74 covers ADLC DEF/KILL insertion and checks before old-space reclamation.
+See `README-c2-generated-projections-v74.txt` for the temporary C1 build-tool
+command and C2-enabled capture. This is diagnostic, not a root-cause fix.
+
 ## v73: C2 projection provenance diagnostics
 
 Native v72 smoke verification passed all 24 modes. The remaining startup

@@ -5555,7 +5555,7 @@
  #include "oops/compressedOops.hpp"
  #include "opto/ad.hpp"
  #include "opto/addnode.hpp"
-@@ -43,6 +44,32 @@
+@@ -43,6 +44,37 @@
  #include "runtime/os.inline.hpp"
  #include "runtime/sharedRuntime.hpp"
  #include "utilities/align.hpp"
@@ -5570,8 +5570,13 @@
 +  // method or dump a possibly damaged node while reporting its provenance.
 +  const bool in_arena = C->node_arena()->contains(node);
 +  guarantee(in_arena,
-+            "SPARC projection outside node arena: stage=%s pos=%u count=%u node=" PTR_FORMAT " stub=%s",
-+            stage, position, number_of_projections(), p2i(node), stub);
++            "SPARC projection outside node arena: stage=%s pos=%u count=%u node=" PTR_FORMAT
++            " old=%d comp=%d resource=%d owner=" PTR_FORMAT " current=" PTR_FORMAT
++            " arena=" PTR_FORMAT " current_arena=" PTR_FORMAT " stub=%s",
++            stage, position, number_of_projections(), p2i(node),
++            C->old_arena()->contains(node), C->comp_arena()->contains(node),
++            Thread::current()->resource_area()->contains(node), p2i(C), p2i(Compile::current()),
++            p2i(C->node_arena()), p2i(Compile::current()->node_arena()), stub);
 +  const uint index = node->_idx;
 +  const uint unique = C->unique();
 +  log_debug(compilation)("SPARC-PROJ stage=%s compile=%d stub=%s pos=%u count=%u node=" PTR_FORMAT
@@ -5588,8 +5593,16 @@
  
  OptoReg::Name OptoReg::c_frame_pointer;
  
-@@ -427,6 +454,12 @@
+@@ -425,8 +457,20 @@
+   assert( C->root(), "" );
+   validate_null_checks();
  
++#ifdef SPARC
++  for (uint i = 0; i < number_of_projections(); i++) {
++    sparc_verify_projection(get_projection(i), i, "pre-reclaim");
++  }
++#endif
++
    // Now smoke old-space
    NOT_DEBUG( old->destruct_contents() );
 +
@@ -5601,6 +5614,21 @@
  
    // ------------------------
    // Set up save-on-entry registers.
+@@ -1900,6 +1944,14 @@
+ 
+   // Perform any 1-to-many expansions required
+   MachNode *ex = mach->Expand(s, _projection_list, mem);
++#ifdef SPARC
++  // ADLC-generated DEF/KILL projections append directly to Node_List instead
++  // of using Matcher::push_projection. Check that allocation path too.
++  for (uint i = number_of_projections_prior; i < number_of_projections(); i++) {
++    sparc_verify_projection(get_projection(i), i, "expand");
++  }
++#endif
++
+   if (ex != mach) {
+     assert(ex->ideal_reg() == mach->ideal_reg(), "ideal types should match");
+     if( ex->in(1)->is_Con() )
 --- a/src/hotspot/share/opto/matcher.hpp
 +++ b/src/hotspot/share/opto/matcher.hpp
 @@ -250,8 +250,16 @@

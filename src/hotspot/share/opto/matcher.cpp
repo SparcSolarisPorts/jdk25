@@ -55,8 +55,13 @@ void Matcher::sparc_verify_projection(Node* node, uint position, const char* sta
   // method or dump a possibly damaged node while reporting its provenance.
   const bool in_arena = C->node_arena()->contains(node);
   guarantee(in_arena,
-            "SPARC projection outside node arena: stage=%s pos=%u count=%u node=" PTR_FORMAT " stub=%s",
-            stage, position, number_of_projections(), p2i(node), stub);
+            "SPARC projection outside node arena: stage=%s pos=%u count=%u node=" PTR_FORMAT
+            " old=%d comp=%d resource=%d owner=" PTR_FORMAT " current=" PTR_FORMAT
+            " arena=" PTR_FORMAT " current_arena=" PTR_FORMAT " stub=%s",
+            stage, position, number_of_projections(), p2i(node),
+            C->old_arena()->contains(node), C->comp_arena()->contains(node),
+            Thread::current()->resource_area()->contains(node), p2i(C), p2i(Compile::current()),
+            p2i(C->node_arena()), p2i(Compile::current()->node_arena()), stub);
   const uint index = node->_idx;
   const uint unique = C->unique();
   log_debug(compilation)("SPARC-PROJ stage=%s compile=%d stub=%s pos=%u count=%u node=" PTR_FORMAT
@@ -451,6 +456,12 @@ void Matcher::match( ) {
   assert( C->top(), "" );
   assert( C->root(), "" );
   validate_null_checks();
+
+#ifdef SPARC
+  for (uint i = 0; i < number_of_projections(); i++) {
+    sparc_verify_projection(get_projection(i), i, "pre-reclaim");
+  }
+#endif
 
   // Now smoke old-space
   NOT_DEBUG( old->destruct_contents() );
@@ -1933,6 +1944,14 @@ MachNode *Matcher::ReduceInst( State *s, int rule, Node *&mem ) {
 
   // Perform any 1-to-many expansions required
   MachNode *ex = mach->Expand(s, _projection_list, mem);
+#ifdef SPARC
+  // ADLC-generated DEF/KILL projections append directly to Node_List instead
+  // of using Matcher::push_projection. Check that allocation path too.
+  for (uint i = number_of_projections_prior; i < number_of_projections(); i++) {
+    sparc_verify_projection(get_projection(i), i, "expand");
+  }
+#endif
+
   if (ex != mach) {
     assert(ex->ideal_reg() == mach->ideal_reg(), "ideal types should match");
     if( ex->in(1)->is_Con() )

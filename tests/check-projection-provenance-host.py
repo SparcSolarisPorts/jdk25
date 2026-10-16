@@ -11,6 +11,8 @@ assert h.index('sparc_verify_projection(node, _projection_list.size(), "push")')
 g=(stage/'src/hotspot/share/opto/gcm.cpp').read_text()
 a=g.index('Node* projection = _matcher.get_projection(i);')
 assert g.index('sparc_verify_projection(projection, i, "gcm")',a) < g.index('unmap_node_from_block(projection)',a)
+assert 'sparc_verify_projection(get_projection(i), i, "expand")' in s
+assert s.index('"pre-reclaim"') < s.index('NOT_DEBUG( old->destruct_contents() );')
 model=r'''
 #include <cstdint>
 #include <cstdio>
@@ -22,10 +24,14 @@ static uintptr_t p2i(void* p){return reinterpret_cast<uintptr_t>(p);}
 #define guarantee(c, ...) do {if(!(c))throw std::runtime_error(#__VA_ARGS__);}while(0)
 struct Node {uint _idx;uint req()const{return 1;}uint outcnt()const{return 0;}};
 struct Arena {Node* owned;bool contains(void* n){return n==owned;}};
+struct Thread {static Thread* current(){static Thread t;return &t;}Arena* resource_area(){static Arena a{};return &a;}};
 struct Compile {
  Arena arena;uint limit;const char* stub_name(){return "test-stub";}
+ static Compile* current(){return active;}static Compile* active;
+ Arena* old_arena(){static Arena a{};return &a;}Arena* comp_arena(){static Arena a{};return &a;}
  Arena* node_arena(){return &arena;}uint unique(){return limit;}int compile_id(){return 3;}
 };
+Compile* Compile::active=nullptr;
 static void logger(const char*,...){}
 #define log_debug(tag) logger
 struct Matcher {
@@ -35,7 +41,7 @@ struct Matcher {
 '''
 checks=r'''
 int main(){
- Node node{0};Compile c{{&node},400};Matcher m{&c};
+ Node node{0};Compile c{{&node},400};Matcher m{&c};Compile::active=&c;
  for(uint i: {0u,1u,63u,64u,399u}){
   node._idx=i;m.sparc_verify_projection(&node,0,"push");
   m.sparc_verify_projection(&node,0,"post-match");
