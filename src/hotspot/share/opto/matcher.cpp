@@ -2786,7 +2786,19 @@ const RegMask* Matcher::regmask_for_ideal_register(uint ideal_reg, Node* ret) {
 
     default: ShouldNotReachHere();
   }
+#ifdef SPARC
+  const uint probe_projection_count = number_of_projections();
+#endif
   MachNode* mspill = match_tree(spill);
+#ifdef SPARC
+  // This match only probes a register mask; its instructions never enter the
+  // compiled graph. ADLC may append DEF/KILL projections while expanding the
+  // probe. Do not retain those nodes across the old/new node-arena swap.
+  // Preserve any projections that existed before this particular probe.
+  while (number_of_projections() > probe_projection_count) {
+    pop_projection();
+  }
+#endif
   assert(mspill != nullptr || C->failure_is_artificial(), "matching failed: %d", ideal_reg);
   if (C->failing()) {
     return nullptr;

@@ -1,3 +1,12 @@
+## v75: spill-mask probe projection lifetime fix
+
+The native v74 trace identifies an old-arena projection created by a synthetic
+register-mask probe before the matcher swaps arenas. v75 removes only the
+projections appended by each probe before returning its register mask. Real
+graph projections and all guards remain intact. See
+`README-c2-spill-mask-projections-v75.txt` for evidence and validation commands.
+Native confirmation is pending.
+
 ## v74: generated projection diagnostics
 
 v73 caught an out-of-arena projection during C2 runtime-stub generation.
