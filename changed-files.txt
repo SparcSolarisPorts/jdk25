@@ -54,7 +54,10 @@ src/hotspot/share/jfr/jni/jfrJavaSupport.cpp
 src/hotspot/share/oops/stackChunkOop.hpp
 src/hotspot/share/oops/stackChunkOop.inline.hpp
 src/hotspot/share/opto/block.cpp
+src/hotspot/share/opto/gcm.cpp
 src/hotspot/share/opto/library_call.cpp
+src/hotspot/share/opto/matcher.cpp
+src/hotspot/share/opto/matcher.hpp
 src/hotspot/share/prims/unsafe.cpp
 src/hotspot/share/runtime/arguments.cpp
 src/hotspot/share/runtime/continuation.cpp

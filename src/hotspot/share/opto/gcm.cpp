@@ -1757,7 +1757,11 @@ void PhaseCFG::global_code_motion() {
 
   // Initialize the node to block mapping for things on the proj_list
   for (uint i = 0; i < _matcher.number_of_projections(); i++) {
-    unmap_node_from_block(_matcher.get_projection(i));
+    Node* projection = _matcher.get_projection(i);
+#ifdef SPARC
+    _matcher.sparc_verify_projection(projection, i, "gcm");
+#endif
+    unmap_node_from_block(projection);
   }
 
   // Set the basic block for Nodes pinned into blocks

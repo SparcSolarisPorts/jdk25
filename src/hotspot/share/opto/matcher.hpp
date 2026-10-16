@@ -250,8 +250,16 @@ public:
     return _projection_list[pos];
   }
 
+#ifdef SPARC
+  // Diagnose invalid projection indices before they reach block-array growth.
+  void sparc_verify_projection(Node* node, uint position, const char* stage);
+#endif
+
   // Push a projection node onto the projection list
   void push_projection(Node* node) {
+#ifdef SPARC
+    sparc_verify_projection(node, _projection_list.size(), "push");
+#endif
     _projection_list.push(node);
   }
 

@@ -56,7 +56,8 @@ for mode in default bounded nmt; do
         "-Djava.library.path=$build/images/test/hotspot/jtreg/native" \
         -XX:+UnlockDiagnosticVMOptions -XX:+LogVMOutput -XX:-DisplayVMOutput \
         -XX:LogFile=vmprops.flags.final.vm.log -XX:+PrintFlagsFinal -XX:+WhiteBoxAPI \
-        "-XX:ErrorFile=$case_dir/hs_err_pid%p.log" "${flags[@]}" \
+        "-XX:ErrorFile=$case_dir/hs_err_pid%p.log" \
+        "-Xlog:compilation=debug:file=$case_dir/projections.log:uptime,level,tags" "${flags[@]}" \
         --add-exports java.base/jdk.internal.foreign=ALL-UNNAMED \
         --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
         com.sun.javatest.regtest.agent.GetJDKProperties \
@@ -77,7 +78,7 @@ for mode in default bounded nmt; do
 done
 objdump_cmd=$(command -v gobjdump || command -v objdump || true)
 if [[ -n "$objdump_cmd" ]]; then
-  for object in gcm block arena; do
+  for object in gcm block arena matcher node; do
     file="$build/hotspot/variant-server/libjvm/objs/$object.o"
     [[ -f "$file" ]] || continue
     "$timeout_cmd" --kill-after=5s 30s "$objdump_cmd" -dr -C "$file" \

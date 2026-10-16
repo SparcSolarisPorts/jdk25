@@ -1,3 +1,11 @@
+## v73: C2 projection provenance diagnostics
+
+Native v72 smoke verification passed all 24 modes. The remaining startup
+crash supplies UINT_MAX to Block_Array from the projection-unmapping loop.
+v73 records projection provenance at push, post-match and GCM boundaries.
+This is diagnostic, not a root-cause fix. See
+`README-c2-projection-provenance-v73.txt` for the short capture command.
+
 ## v72: partial-thaw refreeze boundary
 
 The v71 trace names `cont return barrier` as the rejected non-Java frame.

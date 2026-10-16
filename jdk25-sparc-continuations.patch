@@ -5452,6 +5452,21 @@
  }
  
  void Block_List::remove(uint i) {
+--- a/src/hotspot/share/opto/gcm.cpp
++++ b/src/hotspot/share/opto/gcm.cpp
+@@ -1757,7 +1757,11 @@
+ 
+   // Initialize the node to block mapping for things on the proj_list
+   for (uint i = 0; i < _matcher.number_of_projections(); i++) {
+-    unmap_node_from_block(_matcher.get_projection(i));
++    Node* projection = _matcher.get_projection(i);
++#ifdef SPARC
++    _matcher.sparc_verify_projection(projection, i, "gcm");
++#endif
++    unmap_node_from_block(projection);
+   }
+ 
+   // Set the basic block for Nodes pinned into blocks
 --- a/src/hotspot/share/opto/library_call.cpp
 +++ b/src/hotspot/share/opto/library_call.cpp
 @@ -2483,6 +2483,66 @@
@@ -5530,6 +5545,81 @@
  
      // Call the stub.
      make_runtime_call(RC_LEAF|RC_NO_FP, OptoRuntime::aescrypt_block_Type(),
+--- a/src/hotspot/share/opto/matcher.cpp
++++ b/src/hotspot/share/opto/matcher.cpp
+@@ -26,6 +26,7 @@
+ #include "gc/shared/c2/barrierSetC2.hpp"
+ #include "memory/allocation.inline.hpp"
+ #include "memory/resourceArea.hpp"
++#include "logging/log.hpp"
+ #include "oops/compressedOops.hpp"
+ #include "opto/ad.hpp"
+ #include "opto/addnode.hpp"
+@@ -43,6 +44,32 @@
+ #include "runtime/os.inline.hpp"
+ #include "runtime/sharedRuntime.hpp"
+ #include "utilities/align.hpp"
++
++#ifdef SPARC
++void Matcher::sparc_verify_projection(Node* node, uint position, const char* stage) {
++  const char* stub = C->stub_name() != nullptr ? C->stub_name() : "<method>";
++  guarantee(node != nullptr,
++            "SPARC projection null: stage=%s pos=%u count=%u stub=%s",
++            stage, position, number_of_projections(), stub);
++  // Check arena ownership before reading node fields. Do not invoke a virtual
++  // method or dump a possibly damaged node while reporting its provenance.
++  const bool in_arena = C->node_arena()->contains(node);
++  guarantee(in_arena,
++            "SPARC projection outside node arena: stage=%s pos=%u count=%u node=" PTR_FORMAT " stub=%s",
++            stage, position, number_of_projections(), p2i(node), stub);
++  const uint index = node->_idx;
++  const uint unique = C->unique();
++  log_debug(compilation)("SPARC-PROJ stage=%s compile=%d stub=%s pos=%u count=%u node=" PTR_FORMAT
++                         " index=%u unique=%u inputs=%u outputs=%u",
++                         stage, C->compile_id(), stub, position, number_of_projections(),
++                         p2i(node), index, unique, node->req(), node->outcnt());
++  guarantee(index < unique,
++            "SPARC projection invalid index: stage=%s pos=%u count=%u node=" PTR_FORMAT
++            " index=%u unique=%u inputs=%u outputs=%u stub=%s",
++            stage, position, number_of_projections(), p2i(node), index, unique,
++            node->req(), node->outcnt(), stub);
++}
++#endif
+ 
+ OptoReg::Name OptoReg::c_frame_pointer;
+ 
+@@ -427,6 +454,12 @@
+ 
+   // Now smoke old-space
+   NOT_DEBUG( old->destruct_contents() );
++
++#ifdef SPARC
++  for (uint i = 0; i < number_of_projections(); i++) {
++    sparc_verify_projection(get_projection(i), i, "post-match");
++  }
++#endif
+ 
+   // ------------------------
+   // Set up save-on-entry registers.
+--- a/src/hotspot/share/opto/matcher.hpp
++++ b/src/hotspot/share/opto/matcher.hpp
+@@ -250,8 +250,16 @@
+     return _projection_list[pos];
+   }
+ 
++#ifdef SPARC
++  // Diagnose invalid projection indices before they reach block-array growth.
++  void sparc_verify_projection(Node* node, uint position, const char* stage);
++#endif
++
+   // Push a projection node onto the projection list
+   void push_projection(Node* node) {
++#ifdef SPARC
++    sparc_verify_projection(node, _projection_list.size(), "push");
++#endif
+     _projection_list.push(node);
+   }
+ 
 --- a/src/hotspot/share/prims/unsafe.cpp
 +++ b/src/hotspot/share/prims/unsafe.cpp
 @@ -239,6 +239,16 @@
