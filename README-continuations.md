@@ -1,3 +1,22 @@
+# v71: compiled pin-frame tracing and safepoint branch correction
+
+The v70 single-carrier reproduction passes in interpreter mode, but fails
+in C1/mixed/C2 with or without the JVMTI agent. All 20 workers start, then
+one keeps sleeping while the remaining 19 stop progressing. JFR records
+native/VM-frame pinning in all compiled cases.
+
+SPARC debug logs now name the precise frame rejected by freeze/pin checks.
+`run-single-carrier-pin-trace.sh` compares normal C1/C2 with two explicitly
+labelled interpreted-yield0 diagnostic controls. **Compiled single-carrier
+starvation is still unresolved; no frame is made freezeable by this change.**
+
+A duplicated safepoint pin-query architecture branch is removed: it formerly
+included SPARC in one block and immediately called `Unimplemented()` in the
+next. Host checks verify one FP normalization for each supported define.
+This separate correction is not yet linked to the observed ordinary sleep
+failure. See `README-compiled-pin-trace-v71.txt` for the quiet rebuild and
+four-case trace command. All v69 source fixes and v70 diagnostics remain.
+
 # v69: bounded SPARC C2 block-array growth
 
 The recurring C2 startup crash happens before jtreg test execution. Both

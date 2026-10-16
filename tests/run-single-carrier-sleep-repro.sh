@@ -16,27 +16,33 @@ if ! "$timeout_cmd" --kill-after=5s 60s "$jdk/bin/javac" -d "$out/classes" \
   exit 1
 fi
 status=0
-for agent in plain jvmti; do
+read -r -a agents <<< "${JDK25_SINGLE_CARRIER_AGENTS:-plain jvmti}"
+read -r -a modes <<< "${JDK25_SINGLE_CARRIER_MODES:-interpreter c1 mixed c2}"
+for agent in "${agents[@]}"; do
   if [[ "$agent" == jvmti && ! -f "$native/libSuspendResume2.so" ]]; then
     echo "Missing native agent: $native/libSuspendResume2.so" | tee -a "$out/results.txt"
     status=1
     continue
   fi
-  for mode in interpreter c1 mixed c2; do
+  for mode in "${modes[@]}"; do
     flags=()
     case "$mode" in
       interpreter) flags+=(-Xint);;
-      c1) flags+=(-Xbatch -XX:TieredStopAtLevel=1);;
+      c1|c1-yield0-interpreted) flags+=(-Xbatch -XX:TieredStopAtLevel=1);;
       mixed) flags+=(-Xbatch);;
-      c2) flags+=(-Xbatch -XX:-TieredCompilation -XX:CompileThreshold=100);;
+      c2|c2-yield0-interpreted) flags+=(-Xbatch -XX:-TieredCompilation -XX:CompileThreshold=100);;
     esac
+    if [[ "$mode" == *-yield0-interpreted ]]; then
+      flags+=('-XX:CompileCommand=exclude,jdk.internal.vm.Continuation::yield0')
+    fi
     [[ "$agent" != jvmti ]] || flags+=("-agentpath:$native/libSuspendResume2.so")
     name="$agent-$mode"
     echo "Running $name; log: $out/$name.log"
     "$timeout_cmd" --kill-after=5s 60s "$jdk/bin/java" \
       -Xmx256m -Djdk.virtualThreadScheduler.parallelism=1 \
       -Djdk.virtualThreadScheduler.maxPoolSize=1 \
-      "${flags[@]}" "-XX:ErrorFile=$out/hs_err_${name}_pid%p.log" \
+      "${flags[@]}" "-Xlog:continuations=debug:file=$out/$name.frames.log:uptime,level,tags" \
+      "-XX:ErrorFile=$out/hs_err_${name}_pid%p.log" \
       -cp "$out/classes" SingleCarrierSleepSmoke "$out/$name.jfr" \
       > "$out/$name.log" 2>&1
     rc=$?

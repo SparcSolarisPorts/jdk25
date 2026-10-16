@@ -223,6 +223,30 @@ static void sparc_trace_stack_args(const char* phase, const frame& f) {
   }
 }
 
+// Name the exact frame rejected by the freeze/pin walk. JFR records the
+// eventual carrier park stack, which does not identify this rejected frame.
+static void sparc_trace_pinned_frame(const char* reason, const frame& f) {
+  if (!log_is_enabled(Debug, continuations)) return;
+  ResourceMark rm;
+  LogStream ls(Log(continuations)::debug());
+  ls.print_cr("SPARC-PIN reason=%s sp=" INTPTR_FORMAT " usp=" INTPTR_FORMAT
+              " fp=" INTPTR_FORMAT " pc=" INTPTR_FORMAT
+              " interpreted=%d native=%d compiled=%d",
+              reason, p2i(f.sp()), p2i(f.unextended_sp()), p2i(f.fp()), p2i(f.pc()),
+              f.is_interpreted_frame(), f.is_native_frame(), f.is_compiled_frame());
+  if (f.cb() != nullptr && f.cb()->is_nmethod()) {
+    Method* method = f.cb()->as_nmethod()->method();
+    if (method != nullptr) {
+      ls.print_cr("SPARC-PIN method=%s", method->name_and_sig_as_C_string());
+    }
+  } else if (f.is_interpreted_frame()) {
+    ls.print_cr("SPARC-PIN method=%s",
+                f.interpreter_frame_method()->name_and_sig_as_C_string());
+  }
+  f.print_value_on(&ls);
+  ls.cr();
+}
+
 static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
                                                    intptr_t* caller_sp,
                                                    intptr_t* heap_caller_sp,
@@ -981,6 +1005,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze(frame& f, frame& caller, int c
   if (f.is_compiled_frame()) {
     if (UNLIKELY(f.oop_map() == nullptr)) {
       // special native frame
+      SPARC_ONLY(sparc_trace_pinned_frame("missing-compiled-oop-map", f);)
       return freeze_pinned_native;
     }
     return recurse_freeze_compiled_frame(f, caller, callee_argsize, callee_interpreted);
@@ -993,6 +1018,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze(frame& f, frame& caller, int c
   } else {
     // Frame can't be frozen. Most likely the call_stub or upcall_stub
     // which indicates there are further natives frames up the stack.
+    SPARC_ONLY(sparc_trace_pinned_frame("non-java-frame-in-freeze", f);)
     return freeze_pinned_native;
   }
 }
@@ -1484,6 +1510,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_native_frame(frame& f, frame& 
     // having to block in the slow path. But that would require freezing those registers too
     // and then fixing them back on thaw in case of oops. To avoid complicating things and
     // given that this would be a rare case anyways just pin the vthread to the carrier.
+    SPARC_ONLY(sparc_trace_pinned_frame("unsupported-native-preempt-frame", f);)
     return freeze_pinned_native;
   }
 
@@ -1984,11 +2011,6 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 #else
     ShouldNotReachHere();
 #endif
-#if (defined(X86) || defined(AARCH64) || defined(RISCV64)) && !defined(ZERO)
-    f.set_fp(f.real_fp()); // Instead of this, maybe in ContinuationWrapper::set_last_frame always use the real_fp?
-#else
-    Unimplemented();
-#endif
     if (!Interpreter::contains(f.pc())) {
       assert(ContinuationHelper::Frame::is_stub(f.cb()), "must be");
       assert(f.oop_map() != nullptr, "must be");
@@ -1998,6 +2020,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 
   while (true) {
     if ((f.is_interpreted_frame() && f.interpreter_frame_method()->is_native()) || f.is_native_frame()) {
+      SPARC_ONLY(sparc_trace_pinned_frame("native-frame-in-pin-query", f);)
       return freeze_pinned_native;
     }
 
