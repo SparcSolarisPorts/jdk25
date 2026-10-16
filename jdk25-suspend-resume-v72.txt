@@ -1,0 +1,2 @@
+test/hotspot/jtreg/serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java#default
+test/hotspot/jtreg/serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java#default

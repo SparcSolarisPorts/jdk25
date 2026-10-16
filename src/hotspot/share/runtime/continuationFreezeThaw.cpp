@@ -1036,6 +1036,17 @@ inline freeze_result FreezeBase::recurse_freeze_java_frame(const frame& f, frame
 
   assert(FKind::frame_bottom(f) <= _bottom_address, "");
 
+#ifdef SPARC
+  // A partial thaw can relocate the physical entry window below the
+  // canonical entry SP. If this frame yields again, its saved return PC
+  // still names the return barrier, not another mounted Java/native frame.
+  // Stop before sender() constructs a frame for that synthetic PC. The
+  // remaining frozen callers are already represented by the chunk tail.
+  if (Continuation::is_return_barrier_entry(f.sender_pc())) {
+    return finalize_freeze(f, caller, argsize);
+  }
+#endif
+
   // We don't use FKind::frame_bottom(f) == _bottom_address because on x64 there's sometimes an extra word between
   // enterSpecial and an interpreted frame
   if (FKind::frame_bottom(f) >= _bottom_address - 1) {

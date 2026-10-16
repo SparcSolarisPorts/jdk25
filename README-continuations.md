@@ -1,3 +1,10 @@
+## v72: partial-thaw refreeze boundary
+
+The v71 trace names `cont return barrier` as the rejected non-Java frame.
+The SPARC slow freeze walker now finalizes at that saved return PC before
+constructing a sender. See `README-partial-thaw-refreeze-v72.txt` for evidence,
+validation limits and native commands. Solaris verification is pending.
+
 # v71: compiled pin-frame tracing and safepoint branch correction
 
 The v70 single-carrier reproduction passes in interpreter mode, but fails
