@@ -1,0 +1,1 @@
+test/hotspot/jtreg/serviceability/jvmti/vthread/RedefineClasses/RedefineRunningMethods.java

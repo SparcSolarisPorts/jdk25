@@ -18,7 +18,7 @@ while IFS= read -r test; do
   [[ -n "$test" ]] && tests+=("${test#jtreg:}")
 done < "${JDK25_TEST_LIST:-$root/jdk25-priority-1-2-remaining.txt}"
 ((${#tests[@]} > 0)) || { echo "Empty test selection" >&2; exit 1; }
-out="$root/priority-1-2-rerun-$(date +%Y%m%d-%H%M%S)"
+out=${JDK25_RESULTS_DIR:-"$root/priority-1-2-rerun-$(date +%Y%m%d-%H%M%S)"}
 mkdir -p "$out"
 printf '%s\n' "${tests[@]}" > "$out/tests.txt"
 echo "Running ${#tests[@]} selected cases; log: $out/run.log"
@@ -28,6 +28,9 @@ if [[ ${JDK25_SAFEPOINT_DIAGNOSTICS:-0} == 1 ]]; then
   # its VM option interface so the tested JVM actually receives them.
   diagnostic_options+=( -vmoption:-XX:+SafepointTimeout
     -vmoption:-XX:SafepointTimeoutDelay=2000 )
+fi
+if [[ ${JDK25_CONTINUATION_TRACE:-0} == 1 ]]; then
+  diagnostic_options+=( '-vmoption:-Xlog:continuations=debug:file=continuations-%p.log:uptime,level,tags' )
 fi
 "$runner" -Xmx512m -jar "$jtreg_home/lib/jtreg.jar" \
   -jdk:"$jdk" -agentvm -conc:"${JDK25_TEST_JOBS:-16}" \

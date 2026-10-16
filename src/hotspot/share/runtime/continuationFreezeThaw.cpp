@@ -247,6 +247,20 @@ static void sparc_trace_pinned_frame(const char* reason, const frame& f) {
   ls.cr();
 }
 
+// Compact state transitions for reproducing a stale return barrier under
+// class redefinition. This helper is silent unless continuations=debug.
+static inline void sparc_trace_thaw_state(const char* phase, JavaThread* thread,
+                                         ContinuationEntry* entry, oop cont,
+                                         stackChunkOop chunk) {
+  if (!log_is_enabled(Debug, continuations)) return;
+  log_debug(continuations)("SPARC-CONT phase=%s thread=" PTR_FORMAT " entry=" PTR_FORMAT
+                           " cont=" PTR_FORMAT " tail=" PTR_FORMAT " done=%d empty=%d parent=" PTR_FORMAT,
+                           phase, p2i(thread), p2i(entry), p2i((oopDesc*)cont), p2i(chunk),
+                           cont != nullptr ? jdk_internal_vm_Continuation::done(cont) : -1,
+                           chunk != nullptr ? chunk->is_empty() : -1,
+                           p2i(chunk != nullptr ? chunk->parent() : nullptr));
+}
+
 static inline void thaw_sparc_restore_caller_window(intptr_t* saved_window,
                                                    intptr_t* caller_sp,
                                                    intptr_t* heap_caller_sp,
@@ -1885,6 +1899,8 @@ bool FreezeBase::check_valid_fast_path() {
 
 static inline freeze_result freeze_epilog(ContinuationWrapper& cont) {
   verify_continuation(cont.continuation());
+  SPARC_ONLY(sparc_trace_thaw_state("frozen", JavaThread::current(), cont.entry(),
+                                    cont.continuation(), cont.tail());)
   assert(!cont.is_empty(), "");
 
   log_develop_debug(continuations)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
@@ -2079,12 +2095,27 @@ static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier)
   verify_continuation(continuation);
 
   stackChunkOop chunk = jdk_internal_vm_Continuation::tail(continuation);
+#ifdef SPARC
+  sparc_trace_thaw_state(return_barrier ? "prepare-barrier" : "prepare-top",
+                         thread, ce, continuation, chunk);
+  guarantee(chunk != nullptr,
+            "SPARC thaw has no tail: barrier=%d thread=" PTR_FORMAT " entry=" PTR_FORMAT
+            " cont=" PTR_FORMAT " done=%d",
+            return_barrier, p2i(thread), p2i(ce), p2i((oopDesc*)continuation),
+            jdk_internal_vm_Continuation::done(continuation));
+#endif
   assert(chunk != nullptr, "");
 
   // The tail can be empty because it might still be available for another freeze.
   // However, here we want to thaw, so we get rid of it (it will be GCed).
   if (UNLIKELY(chunk->is_empty())) {
     chunk = chunk->parent();
+#ifdef SPARC
+    sparc_trace_thaw_state("prepare-parent", thread, ce, continuation, chunk);
+    guarantee(chunk != nullptr,
+              "SPARC thaw empty tail has no parent: barrier=%d entry=" PTR_FORMAT " cont=" PTR_FORMAT,
+              return_barrier, p2i(ce), p2i((oopDesc*)continuation));
+#endif
     assert(chunk != nullptr, "");
     assert(!chunk->is_empty(), "");
     jdk_internal_vm_Continuation::set_tail(continuation, chunk);
@@ -2236,8 +2267,11 @@ inline intptr_t* Thaw<ConfigT>::thaw(Continuation::thaw_kind kind) {
   _cont.entry()->set_thaw_bottom(_cont.entry()->bottom_sender_sp());
 #endif
   _barriers = chunk->requires_barriers();
-  return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
-                                        : thaw_slow(chunk, kind);
+  intptr_t* result = (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
+                                                   : thaw_slow(chunk, kind);
+  SPARC_ONLY(sparc_trace_thaw_state("thawed", _thread, _cont.entry(),
+                                    _cont.continuation(), _cont.tail());)
+  return result;
 }
 
 class ReconstructedStack : public StackObj {

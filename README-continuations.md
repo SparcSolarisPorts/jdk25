@@ -1,3 +1,11 @@
+## v76: redefinition return-barrier trace
+
+v75 native startup verification passed nine probes and both suspension tests.
+The captured full batch has 24 passes, one redefinition crash and one unfinished
+code-cache stress case. v76 adds focused transition tracing for the redefinition
+crash; it is diagnostic, not a claimed fix. See
+`README-redefine-return-barrier-v76.txt`.
+
 ## v75: spill-mask probe projection lifetime fix
 
 The native v74 trace identifies an old-arena projection created by a synthetic
