@@ -7,15 +7,30 @@ out=$(mktemp -d "$root/redefine-continuation-results-$(date +%Y%m%d-%H%M%S)-XXXX
 # Prevent huge cores in this capture and its children only.
 ulimit -c 0
 echo "Original redefinition test; ${JDK25_TEST_JOBS:-16} jobs; 15-minute batch cap"
+# Collect native evidence early if this normally short test stops responding.
+(
+  sleep 30
+  for pid in $(pgrep -f "[j]ava.*MainWrapper.*$out/" || true); do
+    if command -v pstack >/dev/null 2>&1; then
+      "$timeout_cmd" --kill-after=5s 15s pstack "$pid" > "$out/native-$pid-pstack.log" 2>&1
+    fi
+    "$timeout_cmd" --kill-after=5s 15s "$root/build/solaris-sparcv9-server-release/images/jdk/bin/jcmd" \
+      "$pid" Thread.print -l > "$out/native-$pid-threads.log" 2>&1
+  done
+) &
+capture_pid=$!
+
 JDK25_TEST_LIST="$root/jdk25-redefine-continuation-v76.txt" \
 JDK25_RESULTS_DIR="$out" JDK25_CONTINUATION_TRACE=1 \
 JDK25_TEST_JOBS="${JDK25_TEST_JOBS:-16}" \
   "$timeout_cmd" --kill-after=15s 15m bash "$root/tests/rerun-priority-1-2.sh"
 rc=$?
+kill "$capture_pid" 2>/dev/null || true
+wait "$capture_pid" 2>/dev/null || true
 [[ $rc != 124 && $rc != 137 ]] || echo 'Batch limit reached; unfinished test is not a pass.'
 evidence="$out/text-evidence"
 mkdir -p "$evidence"
-for f in "$out/run.log" "$out/tests.txt" "$root/source-sha256.json"; do
+for f in "$out/run.log" "$out/tests.txt" "$root/source-sha256.json" "$out"/native-*.log; do
   [[ ! -f "$f" ]] || cp "$f" "$evidence/"
 done
 if [[ -d "$out/work" ]]; then

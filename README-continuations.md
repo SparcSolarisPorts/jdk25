@@ -1,3 +1,11 @@
+## v77: mounted-entry GC root ownership
+
+The SPARC entry OopMap duplicated `_cont`/`_chunk` roots already visited by
+JavaThread. v77 keeps the sized map empty, matching other continuation ports,
+and leaves JavaThread as the owner of these roots. New tests force full G1 GC
+inside nested mounted continuations. See `README-mounted-entry-roots-v77.txt`.
+Native confirmation is pending.
+
 ## v76: redefinition return-barrier trace
 
 v75 native startup verification passed nine probes and both suspension tests.

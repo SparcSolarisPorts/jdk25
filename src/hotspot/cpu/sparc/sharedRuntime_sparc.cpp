@@ -1589,12 +1589,11 @@ static OopMap* sparc_continuation_enter_setup(MacroAssembler* masm) {
   __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_entry_offset()));
   fill_continuation_entry(masm);
 
-  OopMap* map = new OopMap(bytes / VMRegImpl::stack_slot_size, 0);
-  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset()) /
-                                 VMRegImpl::stack_slot_size));
-  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) /
-                                 VMRegImpl::stack_slot_size));
-  return map;
+  // JavaThread::oops_do_no_frames visits every mounted entry's _cont and
+  // _chunk slots. Listing the same addresses in this frame's OopMap visits
+  // them twice, which is unsafe during full-GC pointer adjustment.
+  // Keep the sized, empty map, as on the other continuation ports.
+  return new OopMap(bytes / VMRegImpl::stack_slot_size, 0);
 }
 
 // A normal return from the mounted portion is not an exit from the whole

@@ -3061,7 +3061,7 @@
  #if INCLUDE_JFR
  #include "jfr/support/jfrIntrinsics.hpp"
  #endif
-@@ -1567,12 +1572,239 @@
+@@ -1567,12 +1572,238 @@
  //    transition back to thread_in_Java
  //    return to caller
  //
@@ -3082,12 +3082,11 @@
 +  __ st_ptr(G1, G2_thread, in_bytes(JavaThread::cont_entry_offset()));
 +  fill_continuation_entry(masm);
 +
-+  OopMap* map = new OopMap(bytes / VMRegImpl::stack_slot_size, 0);
-+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::cont_offset()) /
-+                                 VMRegImpl::stack_slot_size));
-+  map->set_oop(VMRegImpl::stack2reg(in_bytes(ContinuationEntry::chunk_offset()) /
-+                                 VMRegImpl::stack_slot_size));
-+  return map;
++  // JavaThread::oops_do_no_frames visits every mounted entry's _cont and
++  // _chunk slots. Listing the same addresses in this frame's OopMap visits
++  // them twice, which is unsafe during full-GC pointer adjustment.
++  // Keep the sized, empty map, as on the other continuation ports.
++  return new OopMap(bytes / VMRegImpl::stack_slot_size, 0);
 +}
 +
 +// A normal return from the mounted portion is not an exit from the whole
@@ -3301,7 +3300,7 @@
    if (method->is_method_handle_intrinsic()) {
      vmIntrinsics::ID iid = method->intrinsic_id();
      intptr_t start = (intptr_t)__ pc();
-@@ -2438,7 +2670,7 @@
+@@ -2438,7 +2669,7 @@
    //   - Deoptimization::fetch_unroll_info
    //   - Deoptimization::unpack_frames
  
@@ -3310,7 +3309,7 @@
  
    int start = __ offset();
  
-@@ -2750,7 +2982,7 @@
+@@ -2750,7 +2981,7 @@
  // Tricky, tricky, tricky...
  
  SafepointBlob* SharedRuntime::generate_handler_blob(SharedStubId id, address call_ptr) {
@@ -3319,7 +3318,7 @@
  
    // allocate space for the code
    ResourceMark rm;
-@@ -2761,7 +2993,7 @@
+@@ -2761,7 +2992,7 @@
    MacroAssembler* masm                = new MacroAssembler(&buffer);
    int             frame_size_words;
    OopMapSet *oop_maps = new OopMapSet();
@@ -3328,7 +3327,7 @@
  
    int start = __ offset();
  
-@@ -2870,7 +3102,7 @@
+@@ -2870,7 +3101,7 @@
    MacroAssembler* masm                = new MacroAssembler(&buffer);
    int             frame_size_words;
    OopMapSet *oop_maps = new OopMapSet();
