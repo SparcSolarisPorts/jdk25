@@ -1,3 +1,11 @@
+## v78: remaining code-cache crash capture
+
+The latest full batch completed with 25 passes and one code-cache stress failure.
+Its 64-byte core has no usable stack. v78 adds a bounded GDB signal-ring capture
+for the first failing action, reusing the original classes and argument file.
+VM sources are unchanged from v77; no rebuild is needed. See
+`README-codecache-debugger-v78.txt`.
+
 ## v77: mounted-entry GC root ownership
 
 The SPARC entry OopMap duplicated `_cont`/`_chunk` roots already visited by
