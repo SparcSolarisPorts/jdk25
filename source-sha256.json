@@ -54,6 +54,7 @@
   "src/hotspot/share/jfr/jni/jfrJavaSupport.cpp": "63d083a8d81d6f05935e7ff209a8dd047c63ebd3df367910265022b330469ded",
   "src/hotspot/share/oops/stackChunkOop.hpp": "41a52a5058441a1e354979aea33328bf4926c611948f7bd7bcf695ff4694052e",
   "src/hotspot/share/oops/stackChunkOop.inline.hpp": "7ee20035304b8ec2d928bd2508cb617be3575062b12f8375706cbb35a5d03d83",
+  "src/hotspot/share/opto/block.cpp": "78f25bb43c4f7428628616d5187a43ceeb20700c74ecd7776f58077114782c01",
   "src/hotspot/share/opto/library_call.cpp": "791c4fdaa0b218b6206a6f30f6a8b8a6ffe61c7b1f44cc22344a6bfbefe2fccb",
   "src/hotspot/share/prims/unsafe.cpp": "fb6a8a068de5f4e7b331db0b96c2fd3dc4dff985e90eec8b0ae90448ebb2203c",
   "src/hotspot/share/runtime/arguments.cpp": "2337e45e49e072cbb40a4643b938b8c5986f611418a71daacf86e481e2195896",

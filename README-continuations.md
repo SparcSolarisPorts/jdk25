@@ -1,3 +1,21 @@
+# v69: bounded SPARC C2 block-array growth
+
+The recurring C2 startup crash happens before jtreg test execution. Both
+register dumps are consistent with a 64-to-1 capacity shrink underflowing
+the block-array zero-fill count to `0x7fffffe08` bytes. The reason for the
+bad capacity remains unconfirmed.
+
+SPARC block arrays now grow by checked unsigned doubling, reject overflow
+and non-increasing capacities before allocation, and use local checked
+sizes for zeroing. C2 remains enabled. Host tests of the actual grow body
+passed 802 checks across SPARC and generic branches. A standalone native
+CLZ diagnostic is included; **Solaris/SPARC verification is pending**.
+
+See `README-c2-array-growth-v69.txt` for quiet rebuild, native helper test,
+30-startup capture and the 26-case rerun with 16 jobs. All v68 fixes remain.
+The five monitor/JVMTI failures passed natively with v68; its blocking
+fallback still does not provide monitor-driven unmounting.
+
 # v68: monitor preemption must have a cleanup target
 
 The 26-case native batch reached test execution: **10 passed, 5 failed,

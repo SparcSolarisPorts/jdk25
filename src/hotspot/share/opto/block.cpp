@@ -45,11 +45,30 @@ void Block_Array::grow(uint i) {
     _size = 1;
     _blocks = (Block**)_arena->Amalloc( _size * sizeof(Block*) );
     _blocks[0] = nullptr;
+    if (i < _size) return;
   }
-  uint old = _size;
-  _size = next_power_of_2(i);
-  _blocks = (Block**)_arena->Arealloc( _blocks, old*sizeof(Block*),_size*sizeof(Block*));
-  Copy::zero_to_bytes( &_blocks[old], (_size-old)*sizeof(Block*) );
+  const uint old = _size;
+#ifdef SPARC
+  // Keep native compiler array growth independent of the CLZ helper used by
+  // next_power_of_2(). A capacity that wraps or shrinks turns the unsigned
+  // zero-fill count into a multi-gigabyte write. Bound every doubling before
+  // allocating, and retain the checked capacity locally across Arealloc.
+  uint new_size = 1;
+  while (new_size <= i) {
+    guarantee(new_size <= max_juint / 2,
+              "Block_Array capacity overflow: index=%u old=%u", i, old);
+    new_size <<= 1;
+  }
+#else
+  const uint new_size = next_power_of_2(i);
+#endif
+  guarantee(new_size > old,
+            "Block_Array capacity must grow: index=%u old=%u new=%u", i, old, new_size);
+  Block** new_blocks = (Block**)_arena->Arealloc(_blocks, old * sizeof(Block*),
+                                               new_size * sizeof(Block*));
+  Copy::zero_to_bytes(&new_blocks[old], (new_size - old) * sizeof(Block*));
+  _blocks = new_blocks;
+  _size = new_size;
 }
 
 void Block_List::remove(uint i) {
