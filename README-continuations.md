@@ -1,3 +1,24 @@
+# v68: monitor preemption must have a cleanup target
+
+The 26-case native batch reached test execution: **10 passed, 5 failed,
+9 timed out, 2 had no final result**. The aborting monitor/JVMTI cases reported
+threads terminating unexpectedly; they did not repeat the C2 startup crash.
+
+`Continuation::try_preempt` now rejects monitor preemption before freezing
+when `StubRoutines::cont_preempt_stub()` is null. SPARC currently has no such
+stub. Previously it could report `freeze_ok` without diverting execution out
+of the monitor operation, allowing Java to continue without ownership.
+
+This enables the existing blocking fallback. **Monitor-driven unmounting is
+still incomplete and can pin a carrier.** Ordinary continuation fast paths,
+C1/C2, lightweight locking and compact headers remain enabled. This release
+does not claim to implement the missing preemption return/resume adapters or
+to resolve tests specifically requiring unmounted monitor waits.
+
+See `README-monitor-ownership-v68.txt` for the rebuild command, four-mode
+ownership smoke and unchanged five-case jtreg rerun (16 jobs, 15-minute outer
+limit). Native verification is pending. All v66 source fixes are retained.
+
 v66: retain bottom compiled arguments when allocating a fresh chunk
 ==================================================================
 The v65 compressed and uncompressed traces establish this sequence:

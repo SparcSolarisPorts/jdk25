@@ -36,6 +36,7 @@
 #include "runtime/javaThread.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/osThread.hpp"
+#include "runtime/stubRoutines.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
 
@@ -146,7 +147,13 @@ static void verify_preempt_preconditions(JavaThread* current, oop continuation) 
 freeze_result Continuation::try_preempt(JavaThread* current, oop continuation) {
   verify_preempt_preconditions(current, continuation);
 
-  if (LockingMode == LM_LEGACY) {
+  // A successful preemption requires generated code that leaves the frozen
+  // Java frames and returns to enterSpecial. Without that cleanup target,
+  // monitorenter/wait would return to Java before the monitor operation has
+  // completed. In particular, never publish freeze_ok with a null alternate
+  // return address. Ports without this stub must use the blocking monitor
+  // path until their preemption return/resume adapters are implemented.
+  if (LockingMode == LM_LEGACY || StubRoutines::cont_preempt_stub() == nullptr) {
     return freeze_unsupported;
   }
 

@@ -1,0 +1,80 @@
+Native run 20261016-000114: 10 passed; 5 failed; 9 errors (test timeouts); 2 unfinished.
+No test failure has been declared fixed by this report.
+
+test/hotspot/jtreg/compiler/codecache/stress/UnexpectedDeoptimizationAllTest.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/compiler/vectorapi/TestBiMorphicMismatchedMemSegment.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/HeapDump/UnmountedVThreadNativeMethodAtTop.java
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480318 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/DynamicCodeGenerated/DynamicCodeGeneratedTest.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/jvmti/GetOwnedMonitorInfo/GetOwnedMonitorInfoTest.java
+  UNFINISHED: no final .jtr result
+
+test/hotspot/jtreg/serviceability/jvmti/ObjectMonitorUsage/ObjectMonitorUsage.java
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480322 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480333 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/events/MonitorWaited/monitorwaited01/monitorwaited01.java
+  Failed. Execution failed\: `main' threw exception\: java.lang.RuntimeException\: Unexpected status\: 2
+
+test/hotspot/jtreg/serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480359 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/thread/GetCurrentContendedMonitor/contmon01/contmon01.java
+  Failed. Unexpected exit from test [exit code\: 6]
+
+test/hotspot/jtreg/serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java
+  Failed. Execution failed\: `main' threw exception\: java.lang.RuntimeException\: Failed
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/GetThreadState/GetThreadStateTest.java#default
+  Failed. Execution failed\: `main' threw exception\: java.lang.Exception\: JUnit test failure
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/GetThreadState/GetThreadStateTest.java#no-vmcontinuations
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/InterruptThreadTest/InterruptThreadTest.java#default
+  Failed. Unexpected exit from test [exit code\: 6]
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/PopFrameTest/PopFrameTest.java#default
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480328 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/RedefineClasses/RedefineRunningMethods.java
+  Passed. Execution successful
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java#default
+  UNFINISHED: no final .jtr result
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java#default
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480322 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/ThreadListStackTracesTest/ThreadListStackTracesTest.java
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480316 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/ToggleNotifyJvmtiTest/ToggleNotifyJvmtiTest.java
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 490738 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
+  Error. '/export/home/solaris/git/jdk25/build/solaris-sparcv9-server-release/images/jdk/bin/java' timed out after 480000 ms (elapsed time including timeout handling 480322 ms)
+
+test/hotspot/jtreg/serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java#default
+  Passed. Execution successful
