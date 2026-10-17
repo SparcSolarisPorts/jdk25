@@ -33,11 +33,12 @@
 
 # Keep the fault label on the load, outside the return delay slot.
 # The shared SafeFetch handler matches the saved PC to this exact label.
+# The SPARC V9 ABI requires a signed int return to be sign-extended.
 # Support for int SafeFetch32(int* address, int defaultval);
     .type    SafeFetch32_impl,#function
 SafeFetch32_impl:
 _SafeFetch32_fault:
-    ld [%o0], %o0
+    ldsw [%o0], %o0
     retl
     nop
 _SafeFetch32_continuation:

@@ -1,3 +1,9 @@
+v81 changes Solaris/SPARC SafeFetch32 from ld to ldsw for ABI-correct signed
+int returns. Native v80 probe crashes are resolved; remaining results show
+two signed-return assertions and a CompressedKlass assertion whose detailed
+output is still needed. See README-safefetch-sign-v81.txt. Full gtest rerun
+uses tests/rerun-gtest-v80.sh. This is not an all-pass claim.
+
 v80 fixes the Solaris/SPARC static SafeFetch fault PC labels and prevents
 compressed-class encoding metadata endpoints from wrapping at high addresses.
 Native results: all 29 jcstress categories passed; gtest had 20 passing,
