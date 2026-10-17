@@ -1,3 +1,10 @@
+v83 completes the high-address encoding correction for the prescribed CDS path:
+SPARC validates full encoding windows before archive placement and reserves
+sufficient address headroom during relocation, immediately freeing unused
+virtual space. It preserves archived narrow Klass IDs and low-address fast
+paths. Native v82 has 1027/1028 main gtests passing; see
+README-cds-encoding-window-v83.txt for the precise last failure and validation.
+
 v82 supersedes v80's clipped encoding endpoint: SPARC now lowers an overflowing
 encoding base before IDs are calculated, preserving the full encoding span
 and actual class placement. Native v81 has 1027/1028 main native checks passing,

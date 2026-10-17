@@ -22,6 +22,7 @@
 
 #include "memory/metaspace.hpp"
 #include "oops/compressedKlass.hpp"
+#include "runtime/os.hpp"
 #include "utilities/globalDefinitions.hpp"
 
 // Try unscaled encoding below 4G first. The previous native-heap obstruction
@@ -33,7 +34,23 @@ char* CompressedKlassPointers::reserve_address_space_for_compressed_classes(size
     if (result != nullptr) {
       return result;
     }
-    return reserve_address_space_for_zerobased_encoding(size, aslr);
+    result = reserve_address_space_for_zerobased_encoding(size, aslr);
+    if (result != nullptr) {
+      return result;
+    }
   }
-  return nullptr;
+
+  // In the CDS relocation path the mapping start is also the prescribed
+  // encoding base; rebasing it would invalidate archived narrow Klass IDs.
+  // Reserve a full encoding window so the OS places that base far enough
+  // below the top of user address space, then immediately release the unused
+  // tail. Only the requested class/archive space remains reserved; no physical
+  // memory is committed by this placement reservation.
+  const size_t reserve_size = MAX2(size, max_encoding_range_size());
+  char* result = os::reserve_memory_aligned(reserve_size, Metaspace::reserve_alignment(), mtClass);
+  if (result != nullptr && reserve_size > size) {
+    guarantee(os::release_memory(result + size, reserve_size - size),
+              "Could not release unused SPARC class encoding window");
+  }
+  return result;
 }

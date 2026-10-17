@@ -274,6 +274,21 @@ public:
   static bool check_klass_decode_mode(address base, int shift, const size_t range);
   // Called after initialization.
   static bool set_klass_decode_mode();
+#elif defined(SPARC)
+  // CDS must preserve its precomputed IDs relative to the mapping base. Reject
+  // a requested location that would wrap the complete encoding interval;
+  // archive reservation can then relocate it without changing those IDs.
+  static bool check_klass_decode_mode(address base, int shift, const size_t range) {
+    if (shift < 0 || shift > max_shift()) {
+      return false;
+    }
+    const uintptr_t span = nth_bit(narrow_klass_pointer_bits() + shift);
+    return range <= span && p2u(base) <= ~(uintptr_t)0 - span;
+  }
+  static bool set_klass_decode_mode() {
+    return check_klass_decode_mode(_base, _shift,
+                                  p2u(_klass_range_end) - p2u(_klass_range_start));
+  }
 #else
   static bool check_klass_decode_mode(address base, int shift, const size_t range) { return true; }
   static bool set_klass_decode_mode() { return true; }

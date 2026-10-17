@@ -53,6 +53,7 @@ src/hotspot/share/c1/c1_Runtime1.cpp
 src/hotspot/share/jfr/dcmd/jfrDcmds.cpp
 src/hotspot/share/jfr/jni/jfrJavaSupport.cpp
 src/hotspot/share/oops/compressedKlass.cpp
+src/hotspot/share/oops/compressedKlass.hpp
 src/hotspot/share/oops/compressedKlass.inline.hpp
 src/hotspot/share/oops/stackChunkOop.hpp
 src/hotspot/share/oops/stackChunkOop.inline.hpp
