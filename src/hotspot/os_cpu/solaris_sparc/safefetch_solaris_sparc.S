@@ -31,12 +31,15 @@
 	.text
 
 
+# Keep the fault label on the load, outside the return delay slot.
+# The shared SafeFetch handler matches the saved PC to this exact label.
 # Support for int SafeFetch32(int* address, int defaultval);
     .type    SafeFetch32_impl,#function
 SafeFetch32_impl:
 _SafeFetch32_fault:
-    retl
     ld [%o0], %o0
+    retl
+    nop
 _SafeFetch32_continuation:
     retl
     mov %o1, %o0
@@ -45,8 +48,9 @@ _SafeFetch32_continuation:
     .type    SafeFetchN_impl,#function
 SafeFetchN_impl:
 _SafeFetchN_fault:
-    retl
     ldx [%o0], %o0
+    retl
+    nop
 _SafeFetchN_continuation:
     retl
     mov %o1, %o0

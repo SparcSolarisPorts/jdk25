@@ -1,3 +1,9 @@
+v80 fixes the Solaris/SPARC static SafeFetch fault PC labels and prevents
+compressed-class encoding metadata endpoints from wrapping at high addresses.
+Native results: all 29 jcstress categories passed; gtest had 20 passing,
+4 failing and 6 inapplicable wrappers. See README-gtest-safefetch-v80.txt
+for the two source fixes, host checks, and required native gtest rerun.
+
 ## v78: remaining code-cache crash capture
 
 The latest full batch completed with 25 passes and one code-cache stress failure.

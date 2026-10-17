@@ -5051,6 +5051,36 @@
  
    const ucontext_t *uc = (const ucontext_t*)context;
    st->print_cr("Registers:");
+--- a/src/hotspot/os_cpu/solaris_sparc/safefetch_solaris_sparc.S
++++ b/src/hotspot/os_cpu/solaris_sparc/safefetch_solaris_sparc.S
+@@ -31,12 +31,15 @@
+ 	.text
+ 
+ 
++# Keep the fault label on the load, outside the return delay slot.
++# The shared SafeFetch handler matches the saved PC to this exact label.
+ # Support for int SafeFetch32(int* address, int defaultval);
+     .type    SafeFetch32_impl,#function
+ SafeFetch32_impl:
+ _SafeFetch32_fault:
++    ld [%o0], %o0
+     retl
+-    ld [%o0], %o0
++    nop
+ _SafeFetch32_continuation:
+     retl
+     mov %o1, %o0
+@@ -45,8 +48,9 @@
+     .type    SafeFetchN_impl,#function
+ SafeFetchN_impl:
+ _SafeFetchN_fault:
++    ldx [%o0], %o0
+     retl
+-    ldx [%o0], %o0
++    nop
+ _SafeFetchN_continuation:
+     retl
+     mov %o1, %o0
 --- a/src/hotspot/os_cpu/solaris_sparc/vm_version_solaris_sparc.cpp
 +++ b/src/hotspot/os_cpu/solaris_sparc/vm_version_solaris_sparc.cpp
 @@ -155,9 +155,9 @@
@@ -5352,6 +5382,36 @@
    write_specialized_field(args, h_oop, &fd, static_field);
  }
  
+--- a/src/hotspot/share/oops/compressedKlass.cpp
++++ b/src/hotspot/share/oops/compressedKlass.cpp
+@@ -96,7 +96,7 @@
+ 
+   // Check that Klass range is fully engulfed in the encoding range
+   const address encoding_start = _base;
+-  const address encoding_end = (address)(p2u(_base) + (uintptr_t)nth_bit(narrow_klass_pointer_bits() + _shift));
++  const address encoding_end = encoding_range_end();
+   ASSERT_HERE_2(_klass_range_start >= _base && _klass_range_end <= encoding_end,
+                 "Resulting encoding range does not fully cover the class range");
+ 
+--- a/src/hotspot/share/oops/compressedKlass.inline.hpp
++++ b/src/hotspot/share/oops/compressedKlass.inline.hpp
+@@ -95,7 +95,15 @@
+ 
+ inline address CompressedKlassPointers::encoding_range_end() {
+   const int max_bits = narrow_klass_pointer_bits() + _shift;
+-  return (address)((uintptr_t)_base + nth_bit(max_bits));
++  const uintptr_t base = (uintptr_t)_base;
++  const uintptr_t span = nth_bit(max_bits);
++  // Solaris/SPARC can reserve class space near the top of the address space.
++  // The theoretical encoding interval may then extend past UINTPTR_MAX even
++  // though the actual Klass range is fully representable. Clip the reporting
++  // and validation endpoint instead of wrapping it to a small address. The
++  // final byte cannot contain an aligned Klass and is conservatively excluded.
++  const uintptr_t max_address = ~(uintptr_t)0;
++  return (address)(base + MIN2(span, max_address - base));
+ }
+ 
+ #endif // SHARE_OOPS_COMPRESSEDKLASS_INLINE_HPP
 --- a/src/hotspot/share/oops/stackChunkOop.hpp
 +++ b/src/hotspot/share/oops/stackChunkOop.hpp
 @@ -63,6 +63,12 @@
