@@ -95,15 +95,9 @@ inline void CompressedKlassPointers::check_valid_narrow_klass_id(narrowKlass nk)
 
 inline address CompressedKlassPointers::encoding_range_end() {
   const int max_bits = narrow_klass_pointer_bits() + _shift;
-  const uintptr_t base = (uintptr_t)_base;
-  const uintptr_t span = nth_bit(max_bits);
-  // Solaris/SPARC can reserve class space near the top of the address space.
-  // The theoretical encoding interval may then extend past UINTPTR_MAX even
-  // though the actual Klass range is fully representable. Clip the reporting
-  // and validation endpoint instead of wrapping it to a small address. The
-  // final byte cannot contain an aligned Klass and is conservatively excluded.
-  const uintptr_t max_address = ~(uintptr_t)0;
-  return (address)(base + MIN2(span, max_address - base));
+  // This API describes the full encoding span, not just the live Klass range.
+  // SPARC initialization places high-address encoding bases to avoid wrapping.
+  return (address)((uintptr_t)_base + nth_bit(max_bits));
 }
 
 #endif // SHARE_OOPS_COMPRESSEDKLASS_INLINE_HPP

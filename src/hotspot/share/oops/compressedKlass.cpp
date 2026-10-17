@@ -205,6 +205,22 @@ char* CompressedKlassPointers::reserve_address_space_for_16bit_move(size_t size,
   return reserve_address_space_X(nth_bit(32), nth_bit(48), size, nth_bit(32), aslr);
 }
 
+#ifdef SPARC
+// Solaris can map class space close enough to UINTPTR_MAX that placing the
+// encoding base at its start would wrap the full encoding interval. Move the
+// encoding base down, without relocating class space or changing the shift.
+// Align to the decode scale as well as Klass alignment so IDs stay reversible.
+static address sparc_nonwrapping_klass_base(address base, int bits, int shift) {
+  const uintptr_t span = nth_bit(bits + shift);
+  const uintptr_t max_base = ~(uintptr_t)0 - span;
+  if (p2u(base) <= max_base) {
+    return base;
+  }
+  const uintptr_t alignment = nth_bit(MAX2(3, shift));
+  return (address)align_down(max_base, alignment);
+}
+#endif
+
 void CompressedKlassPointers::initialize(address addr, size_t len) {
 
   if (len > max_klass_range_size()) {
@@ -270,6 +286,12 @@ void CompressedKlassPointers::initialize(address addr, size_t len) {
     }
 #endif // AARCH64
   }
+
+#ifdef SPARC
+  _base = sparc_nonwrapping_klass_base(_base, narrow_klass_pointer_bits(), _shift);
+  guarantee(_klass_range_start >= _base && _klass_range_end <= encoding_range_end(),
+            "SPARC encoding interval must cover class space without wrapping");
+#endif
 
   calc_lowest_highest_narrow_klass_id();
 

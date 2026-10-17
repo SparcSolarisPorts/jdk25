@@ -1,3 +1,9 @@
+v82 supersedes v80's clipped encoding endpoint: SPARC now lowers an overflowing
+encoding base before IDs are calculated, preserving the full encoding span
+and actual class placement. Native v81 has 1027/1028 main native checks passing,
+all NMT wrappers passing; the last failure is the full-span contract corrected
+here. See README-klass-full-span-v82.txt. Native confirmation remains pending.
+
 v81 changes Solaris/SPARC SafeFetch32 from ld to ldsw for ABI-correct signed
 int returns. Native v80 probe crashes are resolved; remaining results show
 two signed-return assertions and a CompressedKlass assertion whose detailed

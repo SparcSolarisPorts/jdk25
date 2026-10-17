@@ -5394,25 +5394,53 @@
    ASSERT_HERE_2(_klass_range_start >= _base && _klass_range_end <= encoding_end,
                  "Resulting encoding range does not fully cover the class range");
  
+@@ -204,6 +204,22 @@
+ char* CompressedKlassPointers::reserve_address_space_for_16bit_move(size_t size, bool aslr) {
+   return reserve_address_space_X(nth_bit(32), nth_bit(48), size, nth_bit(32), aslr);
+ }
++
++#ifdef SPARC
++// Solaris can map class space close enough to UINTPTR_MAX that placing the
++// encoding base at its start would wrap the full encoding interval. Move the
++// encoding base down, without relocating class space or changing the shift.
++// Align to the decode scale as well as Klass alignment so IDs stay reversible.
++static address sparc_nonwrapping_klass_base(address base, int bits, int shift) {
++  const uintptr_t span = nth_bit(bits + shift);
++  const uintptr_t max_base = ~(uintptr_t)0 - span;
++  if (p2u(base) <= max_base) {
++    return base;
++  }
++  const uintptr_t alignment = nth_bit(MAX2(3, shift));
++  return (address)align_down(max_base, alignment);
++}
++#endif
+ 
+ void CompressedKlassPointers::initialize(address addr, size_t len) {
+ 
+@@ -271,6 +287,12 @@
+ #endif // AARCH64
+   }
+ 
++#ifdef SPARC
++  _base = sparc_nonwrapping_klass_base(_base, narrow_klass_pointer_bits(), _shift);
++  guarantee(_klass_range_start >= _base && _klass_range_end <= encoding_range_end(),
++            "SPARC encoding interval must cover class space without wrapping");
++#endif
++
+   calc_lowest_highest_narrow_klass_id();
+ 
+   // Initialize klass decode mode and check compability with decode instructions
 --- a/src/hotspot/share/oops/compressedKlass.inline.hpp
 +++ b/src/hotspot/share/oops/compressedKlass.inline.hpp
-@@ -95,7 +95,15 @@
+@@ -95,6 +95,8 @@
  
  inline address CompressedKlassPointers::encoding_range_end() {
    const int max_bits = narrow_klass_pointer_bits() + _shift;
--  return (address)((uintptr_t)_base + nth_bit(max_bits));
-+  const uintptr_t base = (uintptr_t)_base;
-+  const uintptr_t span = nth_bit(max_bits);
-+  // Solaris/SPARC can reserve class space near the top of the address space.
-+  // The theoretical encoding interval may then extend past UINTPTR_MAX even
-+  // though the actual Klass range is fully representable. Clip the reporting
-+  // and validation endpoint instead of wrapping it to a small address. The
-+  // final byte cannot contain an aligned Klass and is conservatively excluded.
-+  const uintptr_t max_address = ~(uintptr_t)0;
-+  return (address)(base + MIN2(span, max_address - base));
++  // This API describes the full encoding span, not just the live Klass range.
++  // SPARC initialization places high-address encoding bases to avoid wrapping.
+   return (address)((uintptr_t)_base + nth_bit(max_bits));
  }
  
- #endif // SHARE_OOPS_COMPRESSEDKLASS_INLINE_HPP
 --- a/src/hotspot/share/oops/stackChunkOop.hpp
 +++ b/src/hotspot/share/oops/stackChunkOop.hpp
 @@ -63,6 +63,12 @@
