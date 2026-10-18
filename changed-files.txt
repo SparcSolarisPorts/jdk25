@@ -48,6 +48,7 @@ src/hotspot/os_cpu/solaris_sparc/javaThread_solaris_sparc.hpp
 src/hotspot/os_cpu/solaris_sparc/os_solaris_sparc.cpp
 src/hotspot/os_cpu/solaris_sparc/safefetch_solaris_sparc.S
 src/hotspot/os_cpu/solaris_sparc/vm_version_solaris_sparc.cpp
+src/hotspot/share/c1/c1_LIR.hpp
 src/hotspot/share/c1/c1_LIRGenerator.cpp
 src/hotspot/share/c1/c1_Runtime1.cpp
 src/hotspot/share/jfr/dcmd/jfrDcmds.cpp

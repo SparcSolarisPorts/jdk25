@@ -901,6 +901,9 @@ class    LIR_OpAssert;
 // LIR operation codes
 enum LIR_Code {
     lir_none
+#ifdef SPARC
+  , lir_sparc_unsafe_access
+#endif
   , begin_op0
       , lir_label
       , lir_nop

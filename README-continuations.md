@@ -1,3 +1,11 @@
+v84 replaces the multi-instruction SPARC C1 Unsafe alignment branches with a
+single allocator-visible operation. This prevents internal fast/slow branches
+from skipping allocator-inserted spill/reload moves while retaining aligned
+hardware accesses and unaligned byte fallbacks. The Marlin mixed/OSR crash is
+the native regression target; native confirmation is pending. See
+README-c1-unsafe-lir-v84.txt for evidence, host checks and rerun commands.
+Native v83 gtest result: 24 applicable wrappers passed; 6 inapplicable.
+
 v83 completes the high-address encoding correction for the prescribed CDS path:
 SPARC validates full encoding windows before archive placement and reserves
 sufficient address headroom during relocation, immediately freeing unused

@@ -7,11 +7,12 @@ mkdir -p "$out/classes"
 "$jdk/bin/javac" --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
   -d "$out/classes" "$root/tests/UnsafeAlignmentSmoke.java" || exit 1
 failed=0
-for mode in interpreter c1 mixed c2; do
+for mode in interpreter c1 c1-full-profile mixed c2; do
   flags=()
   case "$mode" in
     interpreter) flags=(-Xint);;
     c1) flags=(-Xbatch -XX:TieredStopAtLevel=1);;
+    c1-full-profile) flags=(-Xbatch -XX:TieredStopAtLevel=3);;
     mixed) flags=(-Xbatch);;
     c2) flags=(-Xbatch -XX:-TieredCompilation);;
   esac

@@ -45,6 +45,9 @@
 #include "utilities/bitMap.inline.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
+#ifdef SPARC
+#include "c1/c1_MacroAssembler.hpp"
+#endif
 
 #ifdef ASSERT
 #define __ gen()->lir(__FILE__, __LINE__)->
@@ -2032,6 +2035,83 @@ void LIRGenerator::do_Throw(Throw* x) {
 }
 
 
+#ifdef SPARC
+// Keep both alignment paths inside one allocator-visible instruction. Branches
+// across ordinary LIR instructions can skip split-interval spill/reload moves.
+class LIR_OpSparcUnsafeAccess : public LIR_Op {
+  LIR_Opr _addr;
+  LIR_Opr _value;
+  LIR_Opr _tmp;
+  BasicType _type;
+  bool _store;
+ public:
+  LIR_OpSparcUnsafeAccess(LIR_Opr addr, LIR_Opr value, LIR_Opr tmp,
+                         BasicType type, bool store)
+    : LIR_Op(lir_sparc_unsafe_access, store ? LIR_OprFact::illegalOpr : value, nullptr),
+      _addr(addr), _value(store ? value : LIR_OprFact::illegalOpr), _tmp(tmp), _type(type), _store(store) {}
+
+  void visit(LIR_OpVisitState* state) override {
+    state->do_input(_addr);
+    // The load result must not overwrite the address before all bytes are read.
+    state->do_temp(_addr);
+    if (_store) { state->do_input(_value); state->do_temp(_value); }
+    else state->do_output(_result);
+    state->do_temp(_tmp);
+  }
+
+  const char* name() const override { return "sparc_unsafe_access"; }
+  void print_instr(outputStream* out) const override {
+    _addr->print(out); out->print(" %s ", _store ? "store" : "load"); (_store ? _value : _result)->print(out);
+  }
+
+  void emit_code(LIR_Assembler* assembler) override {
+    C1_MacroAssembler* m = assembler->masm();
+    Register addr = _addr->as_pointer_register();
+    Register value = (_store ? _value : _result)->as_pointer_register();
+    Register tmp = _tmp->as_pointer_register();
+    assert_different_registers(addr, value, tmp);
+    int width = type2aelembytes(_type);
+    Label slow, done;
+    m->andcc(addr, width - 1, G0);
+    m->br(Assembler::notZero, false, Assembler::pn, slow);
+    m->delayed()->nop();
+    if (_store) {
+      if (width == 8) m->stx(value, addr, 0);
+      else if (width == 4) m->stw(value, addr, 0);
+      else m->sth(value, addr, 0);
+    } else {
+      if (width == 8) m->ldx(addr, 0, value);
+      else if (width == 4) m->ldsw(addr, 0, value);
+      else if (_type == T_CHAR) m->lduh(addr, 0, value);
+      else m->ldsh(addr, 0, value);
+    }
+    m->br(Assembler::always, false, Assembler::pt, done);
+    m->delayed()->nop();
+    m->bind(slow);
+    if (_store) {
+      for (int i = 0; i < width; ++i) {
+        m->srlx(value, (width - 1 - i) * 8, tmp);
+        m->stb(tmp, addr, i);
+      }
+    } else {
+      m->mov(G0, value);
+      for (int i = 0; i < width; ++i) {
+        m->ldub(addr, i, tmp);
+        m->sllx(value, 8, value);
+        m->or3(value, tmp, value);
+      }
+      if (_type == T_SHORT) {
+        m->sll(value, 16, value);
+        m->sra(value, 16, value);
+      } else if (width == 4) {
+        m->sra(value, 0, value);
+      }
+    }
+    m->bind(done);
+  }
+};
+#endif
+
 void LIRGenerator::do_UnsafeGet(UnsafeGet* x) {
   BasicType type = x->basic_type();
   LIRItem src(x->object(), this);
@@ -2054,48 +2134,17 @@ void LIRGenerator::do_UnsafeGet(UnsafeGet* x) {
 
   LIR_Opr result = rlock_result(x, type);
 #ifdef SPARC
-  // Plain primitive Unsafe offsets need not be naturally aligned. Keep the
-  // ordinary load on the aligned path; assemble bytes only on the slow path.
   if (!x->is_raw() && !x->is_volatile() &&
       (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
        type == T_FLOAT || type == T_DOUBLE)) {
-    const int width = type2aelembytes(type);
-    const BasicType bits_type = width == 8 ? T_LONG : T_INT;
-    LabelObj* slow = new LabelObj();
-    LabelObj* done = new LabelObj();
-    LIR_Opr alignment = new_register(T_LONG);
-    __ logical_and(off.result(), LIR_OprFact::longConst(width - 1), alignment);
-    __ cmp(lir_cond_notEqual, alignment, LIR_OprFact::longConst(0));
-    __ branch(lir_cond_notEqual, slow->label());
-    access_load_at(decorators, type, src, off.result(), result);
-    __ branch(lir_cond_always, done->label());
-    __ branch_destination(slow->label());
-    LIR_Opr bits = new_register(bits_type);
-    __ move(width == 8 ? LIR_OprFact::longConst(0) : LIR_OprFact::intConst(0), bits);
-    for (int i = 0; i < width; ++i) {
-      LIR_Opr byte_offset = new_register(T_LONG);
-      __ add(off.result(), LIR_OprFact::longConst(i), byte_offset);
-      LIR_Opr byte_value = new_register(T_INT);
-      access_load_at(decorators, T_BYTE, src, byte_offset, byte_value);
-      __ logical_and(byte_value, LIR_OprFact::intConst(255), byte_value);
-      LIR_Opr part = byte_value;
-      if (width == 8) {
-        part = new_register(T_LONG);
-        __ convert(Bytecodes::_i2l, byte_value, part);
-      }
-      __ shift_left(bits, 8, bits);
-      __ logical_or(bits, part, bits);
-    }
-    if (type == T_SHORT) {
-      __ shift_left(bits, 16, bits);
-      __ shift_right(bits, LIR_OprFact::intConst(16), bits, LIR_OprFact::illegalOpr);
-    }
+    BasicType bits_type = type2aelembytes(type) == 8 ? T_LONG : T_INT;
+    LIR_Opr addr = new_pointer_register();
+    __ leal(LIR_OprFact::address(generate_address(src.result(), off.result(), 0, 0, type)), addr);
+    LIR_Opr bits = is_floating_point_type(type) ? new_register(bits_type) : result;
+    __ append(new LIR_OpSparcUnsafeAccess(addr, bits, new_pointer_register(), type, false));
     if (is_floating_point_type(type)) {
       __ move(force_to_spill(bits, type), result);
-    } else {
-      __ move(bits, result);
     }
-    __ branch_destination(done->label());
     return;
   }
 #endif
@@ -2147,35 +2196,15 @@ void LIRGenerator::do_UnsafePut(UnsafePut* x) {
   if (!x->is_volatile() &&
       (type == T_SHORT || type == T_CHAR || type == T_INT || type == T_LONG ||
        type == T_FLOAT || type == T_DOUBLE)) {
-    const int width = type2aelembytes(type);
-    const BasicType bits_type = width == 8 ? T_LONG : T_INT;
-    LabelObj* slow = new LabelObj();
-    LabelObj* done = new LabelObj();
-    LIR_Opr alignment = new_register(T_LONG);
-    __ logical_and(off.result(), LIR_OprFact::longConst(width - 1), alignment);
-    __ cmp(lir_cond_notEqual, alignment, LIR_OprFact::longConst(0));
-    __ branch(lir_cond_notEqual, slow->label());
-    access_store_at(decorators, type, src, off.result(), data.result());
-    __ branch(lir_cond_always, done->label());
-    __ branch_destination(slow->label());
+    BasicType bits_type = type2aelembytes(type) == 8 ? T_LONG : T_INT;
+    LIR_Opr addr = new_pointer_register();
+    __ leal(LIR_OprFact::address(generate_address(src.result(), off.result(), 0, 0, type)), addr);
     LIR_Opr bits = data.result();
     if (is_floating_point_type(type)) {
       bits = new_register(bits_type);
       __ move(force_to_spill(data.result(), bits_type), bits);
     }
-    for (int i = 0; i < width; ++i) {
-      LIR_Opr part = new_register(bits_type);
-      __ unsigned_shift_right(bits, LIR_OprFact::intConst((width - 1 - i) * 8), part, LIR_OprFact::illegalOpr);
-      LIR_Opr byte_value = part;
-      if (width == 8) {
-        byte_value = new_register(T_INT);
-        __ convert(Bytecodes::_l2i, part, byte_value);
-      }
-      LIR_Opr byte_offset = new_register(T_LONG);
-      __ add(off.result(), LIR_OprFact::longConst(i), byte_offset);
-      access_store_at(decorators, T_BYTE, src, byte_offset, byte_value);
-    }
-    __ branch_destination(done->label());
+    __ append(new LIR_OpSparcUnsafeAccess(addr, bits, new_pointer_register(), type, true));
     return;
   }
 #endif
