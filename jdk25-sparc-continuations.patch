@@ -5211,17 +5211,18 @@
        , lir_nop
 --- a/src/hotspot/share/c1/c1_LIRGenerator.cpp
 +++ b/src/hotspot/share/c1/c1_LIRGenerator.cpp
-@@ -45,6 +45,9 @@
+@@ -45,6 +45,10 @@
  #include "utilities/bitMap.inline.hpp"
  #include "utilities/macros.hpp"
  #include "utilities/powerOfTwo.hpp"
 +#ifdef SPARC
++#include "asm/macroAssembler.inline.hpp"
 +#include "c1/c1_MacroAssembler.hpp"
 +#endif
  
  #ifdef ASSERT
  #define __ gen()->lir(__FILE__, __LINE__)->
-@@ -2032,6 +2035,83 @@
+@@ -2032,6 +2036,83 @@
  }
  
  
@@ -5305,7 +5306,7 @@
  void LIRGenerator::do_UnsafeGet(UnsafeGet* x) {
    BasicType type = x->basic_type();
    LIRItem src(x->object(), this);
-@@ -2053,6 +2133,21 @@
+@@ -2053,6 +2134,21 @@
    }
  
    LIR_Opr result = rlock_result(x, type);
@@ -5327,7 +5328,7 @@
    if (!x->is_raw()) {
      access_load_at(decorators, type, src, off.result(), result);
    } else {
-@@ -2097,6 +2192,22 @@
+@@ -2097,6 +2193,22 @@
    if (x->is_volatile()) {
      decorators |= MO_SEQ_CST;
    }

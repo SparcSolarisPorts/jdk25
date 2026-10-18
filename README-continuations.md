@@ -1,3 +1,9 @@
+v85 fixes the v84 link failure by including asm/macroAssembler.inline.hpp in
+the SPARC C1 generator that now emits assembler instructions directly. The
+missing MacroAssembler::mov(Register, Register) definition caused both libjvm
+and gtest libjvm to fail linking. The v84 access operation is unchanged.
+See README-c1-inline-link-v85.txt. Native build/rerun remains required.
+
 v84 replaces the multi-instruction SPARC C1 Unsafe alignment branches with a
 single allocator-visible operation. This prevents internal fast/slow branches
 from skipping allocator-inserted spill/reload moves while retaining aligned

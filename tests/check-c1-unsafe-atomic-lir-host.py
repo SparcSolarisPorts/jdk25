@@ -7,6 +7,11 @@ root = Path(__file__).resolve().parents[2]
 source = root / 'verify/src/hotspot/share/c1/c1_LIRGenerator.cpp'
 if not source.exists(): source = root / 'src/hotspot/share/c1/c1_LIRGenerator.cpp'
 s = source.read_text()
+# The recorded assembler cannot detect missing production inline definitions.
+# SPARC mov(Register, Register) is defined in macroAssembler.inline.hpp;
+# including only its declaration compiles but fails to link libjvm (v84).
+assert '#include "asm/macroAssembler.inline.hpp"' in s, 'SPARC assembler inline definitions required'
+
 start = s.index('class LIR_OpSparcUnsafeAccess')
 end = s.index('\n};', start) + 3
 op = s[start:end]

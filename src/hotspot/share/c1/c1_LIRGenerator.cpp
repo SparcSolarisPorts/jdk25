@@ -46,6 +46,7 @@
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
 #ifdef SPARC
+#include "asm/macroAssembler.inline.hpp"
 #include "c1/c1_MacroAssembler.hpp"
 #endif
 
