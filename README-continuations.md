@@ -1,3 +1,9 @@
+v87 fixes the libffi setup failure on Solaris: configure uses MAKE=gmake,
+dependency tracking is disabled for the dependency build, and each build
+stage explicitly stops on failure. No VM/Panama bridge source change.
+Use the same build-libffi-v86.sh/configure-panama-v86.sh commands; see
+README-libffi-gnu-make-v87.txt for the cause and validation.
+
 v86 integrates the libffi-backed Panama native linker for Solaris/SPARC64.
 It enables standard Linker.nativeLinker() selection and fixes the fallback
 bridge's narrow integer returns, heap offsets and callback thread ownership.
