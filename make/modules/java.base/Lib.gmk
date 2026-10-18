@@ -165,8 +165,10 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBSYSLOOKUP, \
     LD_SET_ORIGIN := false, \
     LDFLAGS_linux := -Wl$(COMMA)--no-as-needed, \
     LDFLAGS_aix := -brtl -bexpfull, \
+    LDFLAGS_solaris := -Wl$(COMMA)-z$(COMMA)record, \
     LIBS_linux := $(LIBDL) $(LIBM), \
     LIBS_aix := -ldecNumber $(LIBM), \
+    LIBS_solaris := -ldl -lm, \
 ))
 
 TARGETS += $(BUILD_LIBSYSLOOKUP)

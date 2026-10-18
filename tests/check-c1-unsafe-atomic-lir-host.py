@@ -3,7 +3,9 @@
 its emitted paths, and check the allocator operand contract. No SPARC VM claim."""
 from pathlib import Path
 import subprocess, tempfile
-root = Path(__file__).resolve().parents[2]
+root = Path(__file__).resolve().parents[1]
+if not (root/'src/hotspot/share/c1/c1_LIRGenerator.cpp').exists() and not (root/'verify').exists():
+    root = root.parent
 source = root / 'verify/src/hotspot/share/c1/c1_LIRGenerator.cpp'
 if not source.exists(): source = root / 'src/hotspot/share/c1/c1_LIRGenerator.cpp'
 s = source.read_text()

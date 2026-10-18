@@ -1347,6 +1347,18 @@
  }
  
  inline intptr_t* ContinuationHelper::InterpretedFrame::callers_sp(const frame& f) {
+--- a/src/hotspot/cpu/sparc/foreignGlobals_sparc.cpp
++++ b/src/hotspot/cpu/sparc/foreignGlobals_sparc.cpp
+@@ -30,7 +30,8 @@
+   return false;
+ }
+ 
+-// The Foreign Function & Memory API is not supported on SPARC.
++// The optimized HotSpot linker is not implemented on SPARC. Keep isSupported
++// false so Java selects the libffi FallbackLinker when it is configured.
+ const ABIDescriptor ForeignGlobals::parse_abi_descriptor(jobject jabi) {
+   Unimplemented();
+   return ABIDescriptor();
 --- a/src/hotspot/cpu/sparc/frame_sparc.cpp
 +++ b/src/hotspot/cpu/sparc/frame_sparc.cpp
 @@ -28,14 +28,17 @@
@@ -6959,6 +6971,233 @@
    // handle frames with inlining
    if (_mode == compiled_mode    && fill_in_compiled_inlined_sender()) return;
  
+--- a/src/java.base/share/legal/libffi.md
++++ b/src/java.base/share/legal/libffi.md
+@@ -0,0 +1,28 @@
++## libffi v3.4.8
++
++### libffi license
++
++```text
++libffi - Copyright (c) 1996-2024  Anthony Green, Red Hat, Inc and others.
++See source files for details.
++
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of this software and associated documentation files (the
++``Software''), to deal in the Software without restriction, including
++without limitation the rights to use, copy, modify, merge, publish,
++distribute, sublicense, and/or sell copies of the Software, and to
++permit persons to whom the Software is furnished to do so, subject to
++the following conditions:
++
++The above copyright notice and this permission notice shall be
++included in all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++
++```
+--- a/src/java.base/share/native/libfallbackLinker/fallbackLinker.c
++++ b/src/java.base/share/native/libfallbackLinker/fallbackLinker.c
+@@ -31,6 +31,7 @@
+ #include <stdalign.h>
+ #include <stdint.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <wchar.h>
+ #ifdef _WIN64
+ #include <Windows.h>
+@@ -107,6 +108,45 @@
+ #endif
+   if (captured_state_mask & ERRNO) {
+     *value_ptr = errno;
++  }
++}
++
++// libffi widens integral results smaller than ffi_arg to an entire word.
++// Java's layout buffer has exactly the declared size. This matters both for
++// allocation bounds and the low-address/high-word distinction on big endian.
++static int needs_ffi_arg_result(const ffi_type* type) {
++  switch (type->type) {
++    case FFI_TYPE_UINT8: case FFI_TYPE_SINT8:
++    case FFI_TYPE_UINT16: case FFI_TYPE_SINT16:
++    case FFI_TYPE_UINT32: case FFI_TYPE_SINT32:
++    case FFI_TYPE_INT:
++      return type->size < sizeof(ffi_arg);
++    default:
++      return 0;
++  }
++}
++
++static void unpack_ffi_arg(void* dest, ffi_arg value, const ffi_type* type) {
++  // memcpy avoids assuming the caller's declared-size buffer is word aligned.
++  if (type->size == 1) {
++    uint8_t v = (uint8_t)value; memcpy(dest, &v, sizeof(v));
++  } else if (type->size == 2) {
++    uint16_t v = (uint16_t)value; memcpy(dest, &v, sizeof(v));
++  } else {
++    uint32_t v = (uint32_t)value; memcpy(dest, &v, sizeof(v));
++  }
++}
++
++static ffi_arg pack_ffi_arg(const void* src, const ffi_type* type) {
++  switch (type->type) {
++    case FFI_TYPE_SINT8: { int8_t v; memcpy(&v, src, sizeof(v)); return (ffi_arg)(ffi_sarg)v; }
++    case FFI_TYPE_UINT8: { uint8_t v; memcpy(&v, src, sizeof(v)); return v; }
++    case FFI_TYPE_SINT16: { int16_t v; memcpy(&v, src, sizeof(v)); return (ffi_arg)(ffi_sarg)v; }
++    case FFI_TYPE_UINT16: { uint16_t v; memcpy(&v, src, sizeof(v)); return v; }
++    case FFI_TYPE_SINT32: case FFI_TYPE_INT: {
++      int32_t v; memcpy(&v, src, sizeof(v)); return (ffi_arg)(ffi_sarg)v;
++    }
++    default: { uint32_t v; memcpy(&v, src, sizeof(v)); return v; }
+   }
+ }
+ 
+@@ -130,7 +170,8 @@
+         jboolean isCopy;
+         jbyte* arrayPtr = (*env)->GetPrimitiveArrayCritical(env, hb, &isCopy);
+         carrays[i] = arrayPtr;
+-        int offset = *((int*)aptrs[i]);
++        jlong offset;
++        memcpy(&offset, aptrs[i], sizeof(offset));
+         *((void**)aptrs[i]) = arrayPtr + offset;
+       }
+     }
+@@ -142,38 +183,66 @@
+     }
+   }
+ 
+-  ffi_call(jlong_to_ptr(cif), jlong_to_ptr(fn), jlong_to_ptr(rvalue), jlong_to_ptr(avalues));
++  ffi_cif* call_cif = jlong_to_ptr(cif);
++  ffi_arg word_result = 0;
++  int narrow_result = rvalue != 0 && needs_ffi_arg_result(call_cif->rtype);
++  ffi_call(call_cif, jlong_to_ptr(fn), narrow_result ? &word_result : jlong_to_ptr(rvalue), jlong_to_ptr(avalues));
+ 
+   if (captured_state_mask != 0) {
+     do_capture_state(captured_state_addr, captured_state_mask);
++  }
++  if (narrow_result) {
++    unpack_ffi_arg(jlong_to_ptr(rvalue), word_result, call_cif->rtype);
+   }
+ 
+   if (heapBases != NULL) {
+     for (int i = 0; i < numArgs; i++) {
+       jarray hb = (jarray) (*env)->GetObjectArrayElement(env, heapBases, i);
+       if (hb != NULL) {
+-        (*env)->ReleasePrimitiveArrayCritical(env, hb, carrays[i], JNI_COMMIT);
++        (*env)->ReleasePrimitiveArrayCritical(env, hb, carrays[i], 0);
+       }
+     }
+     if (capture_state_heap_base != NULL) {
+-        (*env)->ReleasePrimitiveArrayCritical(env, capture_state_heap_base, carrays[capture_state_hb_offset], JNI_COMMIT);
++        (*env)->ReleasePrimitiveArrayCritical(env, capture_state_heap_base, carrays[capture_state_hb_offset], 0);
+     }
+     free(carrays);
+   }
+ }
+ 
+ static void do_upcall(ffi_cif* cif, void* ret, void** args, void* user_data) {
+-  // attach thread
+-  JNIEnv* env;
+-  (*VM)->AttachCurrentThreadAsDaemon(VM, (void**) &env, NULL);
+-
+-  // call into doUpcall in LibFallback
+-  jobject upcall_data = (jobject) user_data;
++  JNIEnv* env = NULL;
++  jint status = (*VM)->GetEnv(VM, (void**)&env, JNI_VERSION_1_8);
++  int attached_here = status == JNI_EDETACHED;
++  if ((attached_here && (*VM)->AttachCurrentThreadAsDaemon(VM, (void**)&env, NULL) != JNI_OK) ||
++      (!attached_here && status != JNI_OK)) {
++    // A closure cannot report an attachment failure to its arbitrary C caller.
++    abort();
++  }
++  if ((*env)->PushLocalFrame(env, 16) != JNI_OK) {
++    (*env)->FatalError(env, "FFM upcall could not allocate a JNI local frame");
++    return;
++  }
++
++  // Java writes the declared-width value; libffi closures consume ffi_arg for
++  // narrow integers. Do not write a byte into the high end of its return word.
++  ffi_arg word_result = 0;
++  int narrow_result = needs_ffi_arg_result(cif->rtype);
++  void* java_ret = narrow_result ? &word_result : ret;
+   (*env)->CallStaticVoidMethod(env, LibFallback_class, LibFallback_doUpcall_ID,
+-    ptr_to_jlong(ret), ptr_to_jlong(args), upcall_data);
+-
+-  // always detach for now
+-  (*VM)->DetachCurrentThread(VM);
++    ptr_to_jlong(java_ret), ptr_to_jlong(args), (jobject)user_data);
++  if ((*env)->ExceptionCheck(env)) {
++    (*env)->FatalError(env, "Uncaught exception in FFM upcall bridge");
++    return;
++  }
++  if (narrow_result) {
++    ffi_arg result = pack_ffi_arg(&word_result, cif->rtype);
++    memcpy(ret, &result, sizeof(result));
++  }
++  (*env)->PopLocalFrame(env, NULL);
++  // An upcall on an existing Java thread must never detach that thread.
++  if (attached_here) {
++    (*VM)->DetachCurrentThread(VM);
++  }
+ }
+ 
+ static void free_closure(JNIEnv* env, void* closure, jobject upcall_data) {
+@@ -199,7 +268,7 @@
+   ptrs[0] = ptr_to_jlong(closure);
+   ptrs[1] = ptr_to_jlong(code);
+   ptrs[2] = ptr_to_jlong(global_upcall_data);
+-  (*env)->ReleaseLongArrayElements(env, jptrs, ptrs, JNI_COMMIT);
++  (*env)->ReleaseLongArrayElements(env, jptrs, ptrs, 0);
+ 
+   return status;
+ }
+--- a/make/autoconf/jdk-options.m4
++++ b/make/autoconf/jdk-options.m4
+@@ -1079,7 +1079,10 @@
+ [
+   FALLBACK_LINKER_DEFAULT=false
+ 
+-  if HOTSPOT_CHECK_JVM_VARIANT(zero); then
++  # Solaris/SPARC uses the libffi FFM backend; HotSpot assembly stubs are
++  # deliberately still reported unsupported so CABI selects FallbackLinker.
++  if HOTSPOT_CHECK_JVM_VARIANT(zero) || \
++      (test "x$OPENJDK_TARGET_OS" = xsolaris && test "x$OPENJDK_TARGET_CPU" = xsparcv9); then
+     FALLBACK_LINKER_DEFAULT=true
+   fi
+ 
+--- a/make/autoconf/lib-ffi.m4
++++ b/make/autoconf/lib-ffi.m4
+@@ -124,6 +124,11 @@
+     AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <ffi.h>],
+         [
+           ffi_call(NULL, NULL, NULL, NULL);
++          /* FFM upcalls need executable closures as well as downcalls. */
++          void* code = NULL;
++          ffi_closure* closure = ffi_closure_alloc(sizeof(ffi_closure), &code);
++          ffi_prep_closure_loc(closure, NULL, NULL, NULL, code);
++          ffi_closure_free(closure);
+           return 0;
+         ])],
+         [LIBFFI_WORKS=yes],
+--- a/make/modules/java.base/Lib.gmk
++++ b/make/modules/java.base/Lib.gmk
+@@ -165,8 +165,10 @@
+     LD_SET_ORIGIN := false, \
+     LDFLAGS_linux := -Wl$(COMMA)--no-as-needed, \
+     LDFLAGS_aix := -brtl -bexpfull, \
++    LDFLAGS_solaris := -Wl$(COMMA)-z$(COMMA)record, \
+     LIBS_linux := $(LIBDL) $(LIBM), \
+     LIBS_aix := -ldecNumber $(LIBM), \
++    LIBS_solaris := -ldl -lm, \
+ ))
+ 
+ TARGETS += $(BUILD_LIBSYSLOOKUP)
 --- a/make/modules/jdk.javadoc/Gendata.gmk
 +++ b/make/modules/jdk.javadoc/Gendata.gmk
 @@ -47,8 +47,25 @@

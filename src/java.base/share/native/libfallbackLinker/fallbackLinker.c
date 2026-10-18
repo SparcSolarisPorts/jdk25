@@ -31,6 +31,7 @@
 #include <stdalign.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <wchar.h>
 #ifdef _WIN64
 #include <Windows.h>
@@ -110,6 +111,45 @@ static void do_capture_state(int32_t* value_ptr, int captured_state_mask) {
   }
 }
 
+// libffi widens integral results smaller than ffi_arg to an entire word.
+// Java's layout buffer has exactly the declared size. This matters both for
+// allocation bounds and the low-address/high-word distinction on big endian.
+static int needs_ffi_arg_result(const ffi_type* type) {
+  switch (type->type) {
+    case FFI_TYPE_UINT8: case FFI_TYPE_SINT8:
+    case FFI_TYPE_UINT16: case FFI_TYPE_SINT16:
+    case FFI_TYPE_UINT32: case FFI_TYPE_SINT32:
+    case FFI_TYPE_INT:
+      return type->size < sizeof(ffi_arg);
+    default:
+      return 0;
+  }
+}
+
+static void unpack_ffi_arg(void* dest, ffi_arg value, const ffi_type* type) {
+  // memcpy avoids assuming the caller's declared-size buffer is word aligned.
+  if (type->size == 1) {
+    uint8_t v = (uint8_t)value; memcpy(dest, &v, sizeof(v));
+  } else if (type->size == 2) {
+    uint16_t v = (uint16_t)value; memcpy(dest, &v, sizeof(v));
+  } else {
+    uint32_t v = (uint32_t)value; memcpy(dest, &v, sizeof(v));
+  }
+}
+
+static ffi_arg pack_ffi_arg(const void* src, const ffi_type* type) {
+  switch (type->type) {
+    case FFI_TYPE_SINT8: { int8_t v; memcpy(&v, src, sizeof(v)); return (ffi_arg)(ffi_sarg)v; }
+    case FFI_TYPE_UINT8: { uint8_t v; memcpy(&v, src, sizeof(v)); return v; }
+    case FFI_TYPE_SINT16: { int16_t v; memcpy(&v, src, sizeof(v)); return (ffi_arg)(ffi_sarg)v; }
+    case FFI_TYPE_UINT16: { uint16_t v; memcpy(&v, src, sizeof(v)); return v; }
+    case FFI_TYPE_SINT32: case FFI_TYPE_INT: {
+      int32_t v; memcpy(&v, src, sizeof(v)); return (ffi_arg)(ffi_sarg)v;
+    }
+    default: { uint32_t v; memcpy(&v, src, sizeof(v)); return v; }
+  }
+}
+
 JNIEXPORT void JNICALL
 Java_jdk_internal_foreign_abi_fallback_LibFallback_doDowncall(JNIEnv* env, jclass cls, jlong cif, jlong fn, jlong rvalue,
                                                               jlong avalues,
@@ -130,7 +170,8 @@ Java_jdk_internal_foreign_abi_fallback_LibFallback_doDowncall(JNIEnv* env, jclas
         jboolean isCopy;
         jbyte* arrayPtr = (*env)->GetPrimitiveArrayCritical(env, hb, &isCopy);
         carrays[i] = arrayPtr;
-        int offset = *((int*)aptrs[i]);
+        jlong offset;
+        memcpy(&offset, aptrs[i], sizeof(offset));
         *((void**)aptrs[i]) = arrayPtr + offset;
       }
     }
@@ -142,38 +183,66 @@ Java_jdk_internal_foreign_abi_fallback_LibFallback_doDowncall(JNIEnv* env, jclas
     }
   }
 
-  ffi_call(jlong_to_ptr(cif), jlong_to_ptr(fn), jlong_to_ptr(rvalue), jlong_to_ptr(avalues));
+  ffi_cif* call_cif = jlong_to_ptr(cif);
+  ffi_arg word_result = 0;
+  int narrow_result = rvalue != 0 && needs_ffi_arg_result(call_cif->rtype);
+  ffi_call(call_cif, jlong_to_ptr(fn), narrow_result ? &word_result : jlong_to_ptr(rvalue), jlong_to_ptr(avalues));
 
   if (captured_state_mask != 0) {
     do_capture_state(captured_state_addr, captured_state_mask);
+  }
+  if (narrow_result) {
+    unpack_ffi_arg(jlong_to_ptr(rvalue), word_result, call_cif->rtype);
   }
 
   if (heapBases != NULL) {
     for (int i = 0; i < numArgs; i++) {
       jarray hb = (jarray) (*env)->GetObjectArrayElement(env, heapBases, i);
       if (hb != NULL) {
-        (*env)->ReleasePrimitiveArrayCritical(env, hb, carrays[i], JNI_COMMIT);
+        (*env)->ReleasePrimitiveArrayCritical(env, hb, carrays[i], 0);
       }
     }
     if (capture_state_heap_base != NULL) {
-        (*env)->ReleasePrimitiveArrayCritical(env, capture_state_heap_base, carrays[capture_state_hb_offset], JNI_COMMIT);
+        (*env)->ReleasePrimitiveArrayCritical(env, capture_state_heap_base, carrays[capture_state_hb_offset], 0);
     }
     free(carrays);
   }
 }
 
 static void do_upcall(ffi_cif* cif, void* ret, void** args, void* user_data) {
-  // attach thread
-  JNIEnv* env;
-  (*VM)->AttachCurrentThreadAsDaemon(VM, (void**) &env, NULL);
+  JNIEnv* env = NULL;
+  jint status = (*VM)->GetEnv(VM, (void**)&env, JNI_VERSION_1_8);
+  int attached_here = status == JNI_EDETACHED;
+  if ((attached_here && (*VM)->AttachCurrentThreadAsDaemon(VM, (void**)&env, NULL) != JNI_OK) ||
+      (!attached_here && status != JNI_OK)) {
+    // A closure cannot report an attachment failure to its arbitrary C caller.
+    abort();
+  }
+  if ((*env)->PushLocalFrame(env, 16) != JNI_OK) {
+    (*env)->FatalError(env, "FFM upcall could not allocate a JNI local frame");
+    return;
+  }
 
-  // call into doUpcall in LibFallback
-  jobject upcall_data = (jobject) user_data;
+  // Java writes the declared-width value; libffi closures consume ffi_arg for
+  // narrow integers. Do not write a byte into the high end of its return word.
+  ffi_arg word_result = 0;
+  int narrow_result = needs_ffi_arg_result(cif->rtype);
+  void* java_ret = narrow_result ? &word_result : ret;
   (*env)->CallStaticVoidMethod(env, LibFallback_class, LibFallback_doUpcall_ID,
-    ptr_to_jlong(ret), ptr_to_jlong(args), upcall_data);
-
-  // always detach for now
-  (*VM)->DetachCurrentThread(VM);
+    ptr_to_jlong(java_ret), ptr_to_jlong(args), (jobject)user_data);
+  if ((*env)->ExceptionCheck(env)) {
+    (*env)->FatalError(env, "Uncaught exception in FFM upcall bridge");
+    return;
+  }
+  if (narrow_result) {
+    ffi_arg result = pack_ffi_arg(&word_result, cif->rtype);
+    memcpy(ret, &result, sizeof(result));
+  }
+  (*env)->PopLocalFrame(env, NULL);
+  // An upcall on an existing Java thread must never detach that thread.
+  if (attached_here) {
+    (*VM)->DetachCurrentThread(VM);
+  }
 }
 
 static void free_closure(JNIEnv* env, void* closure, jobject upcall_data) {
@@ -199,7 +268,7 @@ Java_jdk_internal_foreign_abi_fallback_LibFallback_createClosure(JNIEnv* env, jc
   ptrs[0] = ptr_to_jlong(closure);
   ptrs[1] = ptr_to_jlong(code);
   ptrs[2] = ptr_to_jlong(global_upcall_data);
-  (*env)->ReleaseLongArrayElements(env, jptrs, ptrs, JNI_COMMIT);
+  (*env)->ReleaseLongArrayElements(env, jptrs, ptrs, 0);
 
   return status;
 }

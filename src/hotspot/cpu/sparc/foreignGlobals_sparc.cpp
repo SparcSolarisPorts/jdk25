@@ -30,7 +30,8 @@ bool ForeignGlobals::is_foreign_linker_supported() {
   return false;
 }
 
-// The Foreign Function & Memory API is not supported on SPARC.
+// The optimized HotSpot linker is not implemented on SPARC. Keep isSupported
+// false so Java selects the libffi FallbackLinker when it is configured.
 const ABIDescriptor ForeignGlobals::parse_abi_descriptor(jobject jabi) {
   Unimplemented();
   return ABIDescriptor();

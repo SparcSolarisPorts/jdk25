@@ -1,3 +1,13 @@
+v86 integrates the libffi-backed Panama native linker for Solaris/SPARC64.
+It enables standard Linker.nativeLinker() selection and fixes the fallback
+bridge's narrow integer returns, heap offsets and callback thread ownership.
+Includes a pinned libffi build/configure workflow and native ABI regression.
+Real Linux/x86-64 fallback runs passed 76 checks in interpreter/C1/mixed/C2;
+Solaris/SPARC native confirmation is pending. By-value unions retain the
+upstream fallback restriction; this is not an optimized HotSpot stub port.
+See README-panama-native-linker-v86.txt for scope and first-run commands.
+Native v85 Unsafe/Marlin/continuation regression results all passed.
+
 v85 fixes the v84 link failure by including asm/macroAssembler.inline.hpp in
 the SPARC C1 generator that now emits assembler instructions directly. The
 missing MacroAssembler::mov(Register, Register) definition caused both libjvm

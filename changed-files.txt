@@ -11,6 +11,7 @@ src/hotspot/cpu/sparc/continuationEntry_sparc.hpp
 src/hotspot/cpu/sparc/continuationEntry_sparc.inline.hpp
 src/hotspot/cpu/sparc/continuationFreezeThaw_sparc.inline.hpp
 src/hotspot/cpu/sparc/continuationHelper_sparc.inline.hpp
+src/hotspot/cpu/sparc/foreignGlobals_sparc.cpp
 src/hotspot/cpu/sparc/frame_sparc.cpp
 src/hotspot/cpu/sparc/frame_sparc.hpp
 src/hotspot/cpu/sparc/frame_sparc.inline.hpp
@@ -73,6 +74,11 @@ src/hotspot/share/runtime/stackChunkFrameStream.hpp
 src/hotspot/share/runtime/stackChunkFrameStream.inline.hpp
 src/hotspot/share/runtime/vframe.cpp
 src/hotspot/share/runtime/vframe.inline.hpp
+src/java.base/share/legal/libffi.md
+src/java.base/share/native/libfallbackLinker/fallbackLinker.c
+make/autoconf/jdk-options.m4
+make/autoconf/lib-ffi.m4
+make/modules/java.base/Lib.gmk
 make/modules/jdk.javadoc/Gendata.gmk
 test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
 test/lib/jdk/test/lib/thread/VThreadPinner.java

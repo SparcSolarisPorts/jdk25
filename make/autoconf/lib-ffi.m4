@@ -124,6 +124,11 @@ AC_DEFUN_ONCE([LIB_SETUP_LIBFFI],
     AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <ffi.h>],
         [
           ffi_call(NULL, NULL, NULL, NULL);
+          /* FFM upcalls need executable closures as well as downcalls. */
+          void* code = NULL;
+          ffi_closure* closure = ffi_closure_alloc(sizeof(ffi_closure), &code);
+          ffi_prep_closure_loc(closure, NULL, NULL, NULL, code);
+          ffi_closure_free(closure);
           return 0;
         ])],
         [LIBFFI_WORKS=yes],

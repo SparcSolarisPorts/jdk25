@@ -1079,7 +1079,10 @@ AC_DEFUN_ONCE([JDKOPT_SETUP_FALLBACK_LINKER],
 [
   FALLBACK_LINKER_DEFAULT=false
 
-  if HOTSPOT_CHECK_JVM_VARIANT(zero); then
+  # Solaris/SPARC uses the libffi FFM backend; HotSpot assembly stubs are
+  # deliberately still reported unsupported so CABI selects FallbackLinker.
+  if HOTSPOT_CHECK_JVM_VARIANT(zero) || \
+      (test "x$OPENJDK_TARGET_OS" = xsolaris && test "x$OPENJDK_TARGET_CPU" = xsparcv9); then
     FALLBACK_LINKER_DEFAULT=true
   fi
 
