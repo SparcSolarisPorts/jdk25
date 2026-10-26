@@ -3656,13 +3656,10 @@
  
  //----------OS and Locking Instructions----------------------------------------
  
-@@ -9551,6 +9659,19 @@
-   // The hack duplicates the exception oop into G3, so that CreateEx can use it there.
-   // ins_encode( form3_rs1_simm13_rd( jump_target, 0x00, R_G0 ), move_return_pc_to_o1() );
-   ins_avoid_back_to_back(AVOID_BEFORE);
-+  ins_pipe(tail_call);
-+%}
-+
+@@ -9554,6 +9662,19 @@
+   ins_pipe(tail_call);
+ %}
+ 
 +// Forward a pending exception from a generated runtime stub.
 +instruct ForwardExceptionjmp()
 +%{
@@ -3673,10 +3670,44 @@
 +    __ jump_to(AddressLiteral(StubRoutines::forward_exception_entry()), G3);
 +    __ delayed()->nop();
 +  %}
-   ins_pipe(tail_call);
++  ins_pipe(tail_call);
++%}
++
+ // Create exception oop: created by stack-crawling runtime code.
+ // Created exception is now available to this handler, and is setup
+ // just prior to jumping to this handler.  No code emitted.
+@@ -9884,7 +10005,7 @@
+     __ signx($len$$Register);
+     __ string_compress_16($src$$Register, $dst$$Register, $len$$Register, $result$$Register,
+                           $tmp1$$Register, $tmp2$$Register, $tmp3$$Register, $tmp4$$Register,
+-                          $ftmp1$$FloatRegister, $ftmp2$$FloatRegister, $ftmp3$$FloatRegister, Ldone);
++                          reg_to_DoubleFloatRegister_object($ftmp1$$reg), reg_to_DoubleFloatRegister_object($ftmp2$$reg), reg_to_DoubleFloatRegister_object($ftmp3$$reg), Ldone);
+     __ cmp_and_brx_short($len$$Register, 0, Assembler::equal, Assembler::pn, Ldone);
+     __ string_compress($src$$Register, $dst$$Register, $len$$Register, $result$$Register, $tmp1$$Register, Ldone);
+     __ bind(Ldone);
+@@ -9909,9 +10030,11 @@
+   ins_pipe(long_memory_op);
  %}
  
-@@ -10282,80 +10403,82 @@
++// fpmerge reads single registers, so its source pairs must stay in F0-F29.
++// Double destinations may use the upper bank, with their ADLC encodings decoded.
+ // fast byte[] to char[] inflation using VIS instructions
+ instruct string_inflate_fast(Universe dummy, o0RegP src, o1RegP dst, g3RegI len,
+-                             iRegL tmp, regD ftmp1, regD ftmp2, regD ftmp3, regD ftmp4, flagsReg ccr) %{
++                             iRegL tmp, regD_low ftmp1, regD ftmp2, regD ftmp3, regD_low ftmp4, flagsReg ccr) %{
+   predicate(UseVIS >= 3);
+   match(Set dummy (StrInflatedCopy src (Binary dst len)));
+   effect(TEMP tmp, TEMP ftmp1, TEMP ftmp2, TEMP ftmp3, TEMP ftmp4, USE_KILL src, USE_KILL dst, USE_KILL len, KILL ccr);
+@@ -9921,7 +10044,7 @@
+     Label Ldone;
+     __ signx($len$$Register);
+     __ string_inflate_16($src$$Register, $dst$$Register, $len$$Register, $tmp$$Register,
+-                         $ftmp1$$FloatRegister, $ftmp2$$FloatRegister, $ftmp3$$FloatRegister, $ftmp4$$FloatRegister, Ldone);
++                         reg_to_DoubleFloatRegister_object($ftmp1$$reg), reg_to_DoubleFloatRegister_object($ftmp2$$reg), reg_to_DoubleFloatRegister_object($ftmp3$$reg), reg_to_DoubleFloatRegister_object($ftmp4$$reg), Ldone);
+     __ cmp_and_brx_short($len$$Register, 0, Assembler::equal, Assembler::pn, Ldone);
+     __ string_inflate($src$$Register, $dst$$Register, $len$$Register, $tmp$$Register, Ldone);
+     __ bind(Ldone);
+@@ -10282,80 +10405,82 @@
  // ====================VECTOR INSTRUCTIONS=====================================
  
  // Load Aligned Packed values into a Double Register
@@ -5234,6 +5265,19 @@
  
  #ifdef ASSERT
  #define __ gen()->lir(__FILE__, __LINE__)->
+@@ -2015,9 +2019,9 @@
+     __ null_check(exception_opr, new CodeEmitInfo(info, x->state()->copy(ValueStack::ExceptionState, x->state()->bci())));
+   }
+ 
+-  if (compilation()->env()->jvmti_can_post_on_exceptions()) {
+-    // we need to go through the exception lookup path to get JVMTI
+-    // notification done
++  if (compilation()->env()->jvmti_can_post_on_exceptions() || AbortVMOnException != nullptr) {
++    // Runtime1's exception lookup performs JVMTI notification and the
++    // AbortVMOnException check. Direct unwinding would bypass both.
+     unwind = false;
+   }
+ 
 @@ -2032,6 +2036,83 @@
  }
  
@@ -7247,6 +7291,258 @@
  	        -classpath $(BUILDTOOLS_OUTPUTDIR)/create_symbols_javadoc \
  	        build.tools.symbolgenerator.JavadocElementList \
  	        $(ELEMENT_LISTS_DIR)/element-list-$(JDK_SOURCE_TARGET_VERSION).txt \
+--- a/test/hotspot/jtreg/compiler/c2/Test8004741.java
++++ b/test/hotspot/jtreg/compiler/c2/Test8004741.java
+@@ -32,13 +32,13 @@
+  * @build jdk.test.whitebox.WhiteBox
+  * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
+  *
+- * @run main/othervm -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
++ * @run main/othervm/native -agentlib:Test8004741 -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
+  *    -XX:-TieredCompilation -XX:+StressCompiledExceptionHandlers
+  *    -XX:+SafepointALot -XX:GuaranteedSafepointInterval=100
+  *    -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
+  *    compiler.c2.Test8004741
+  *
+- * @run main/othervm -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
++ * @run main/othervm/native -agentlib:Test8004741 -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
+  *    -XX:-TieredCompilation -XX:+StressCompiledExceptionHandlers
+  *    -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
+  *    compiler.c2.Test8004741
+@@ -130,13 +130,17 @@
+    * No single trial is definitive, since the ThreadDeath
+    * exception might not land in the tested region of code.
+    */
++  // Thread.stop() has thrown UnsupportedOperationException since JDK 20.
++  // Keep the asynchronous ThreadDeath/exception-table stress through JVMTI.
++  private static native void stopThread(Thread target, ThreadDeath exception);
++
+   public static void threadTest() throws InterruptedException {
+     Test8004741 t = new Test8004741();
+     t.start();
+     t.waitFor(RUNNING);
+     Thread.sleep(100);
+     System.out.println("stopping thread");
+-    t.stop();
++    stopThread(t, new ThreadDeath());
+     t.waitFor(STOPPING);
+     t.join();
+   }
+--- a/test/hotspot/jtreg/compiler/c2/libTest8004741.cpp
++++ b/test/hotspot/jtreg/compiler/c2/libTest8004741.cpp
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (c) 2026, OpenJDK Solaris SPARC contributors. All rights reserved.
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This code is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 only, as
++ * published by the Free Software Foundation.
++ *
++ * This code is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * version 2 for more details (a copy is included in the LICENSE file that
++ * accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License version
++ * 2 along with this work; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
++ * or visit www.oracle.com if you need additional information or have any
++ * questions.
++ */
++#include <jni.h>
++#include <jvmti.h>
++
++static jvmtiEnv* test_jvmti = nullptr;
++
++extern "C" JNIEXPORT jint JNICALL
++Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
++  if (vm->GetEnv(reinterpret_cast<void**>(&test_jvmti), JVMTI_VERSION_1_2) != JNI_OK) {
++    return JNI_ERR;
++  }
++  jvmtiCapabilities caps = {};
++  caps.can_signal_thread = 1;
++  return test_jvmti->AddCapabilities(&caps) == JVMTI_ERROR_NONE ? JNI_OK : JNI_ERR;
++}
++
++extern "C" JNIEXPORT void JNICALL
++Java_compiler_c2_Test8004741_stopThread(JNIEnv* env, jclass klass,
++                                     jthread target, jthrowable exception) {
++  if (test_jvmti == nullptr || test_jvmti->StopThread(target, exception) != JVMTI_ERROR_NONE) {
++    jclass error = env->FindClass("java/lang/AssertionError");
++    if (error != nullptr) env->ThrowNew(error, "JVMTI StopThread failed");
++  }
++}
+--- a/test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java
++++ b/test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java
+@@ -48,6 +48,15 @@
+     private static final String NON_METHOD = "CodeHeap 'non-nmethods'";
+     private static final String PROFILED = "CodeHeap 'profiled nmethods'";
+     private static final String NON_PROFILED = "CodeHeap 'non-profiled nmethods'";
++
++    // Fixed small heaps below are independent of host CPU count. Compiler
++    // buffers are charged to the non-nmethod heap; bound their count explicitly.
++    private static ProcessBuilder codeCacheProcess(String... args) throws Exception {
++        String[] options = new String[args.length + 1];
++        options[0] = "-XX:CICompilerCount=2";
++        System.arraycopy(args, 0, options, 1, args.length);
++        return ProcessTools.createLimitedTestJavaProcessBuilder(options);
++    }
+ 
+     private static void verifySegmentedCodeCache(ProcessBuilder pb, boolean enabled) throws Exception {
+         OutputAnalyzer out = new OutputAnalyzer(pb.start());
+@@ -119,31 +128,31 @@
+         ProcessBuilder pb;
+ 
+         // Disabled with ReservedCodeCacheSize < 240MB
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:ReservedCodeCacheSize=239m",
++        pb = codeCacheProcess("-XX:ReservedCodeCacheSize=239m",
+                                                               "-XX:+PrintCodeCache",
+                                                               "-version");
+         verifySegmentedCodeCache(pb, false);
+ 
+         // Disabled without TieredCompilation
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:-TieredCompilation",
++        pb = codeCacheProcess("-XX:-TieredCompilation",
+                                                               "-XX:+PrintCodeCache",
+                                                               "-version");
+         verifySegmentedCodeCache(pb, false);
+ 
+         // Enabled with TieredCompilation and ReservedCodeCacheSize >= 240MB
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+TieredCompilation",
++        pb = codeCacheProcess("-XX:+TieredCompilation",
+                                                               "-XX:ReservedCodeCacheSize=240m",
+                                                               "-XX:+PrintCodeCache",
+                                                               "-version");
+         verifySegmentedCodeCache(pb, true);
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+TieredCompilation",
++        pb = codeCacheProcess("-XX:+TieredCompilation",
+                                                               "-XX:ReservedCodeCacheSize=400m",
+                                                               "-XX:+PrintCodeCache",
+                                                               "-version");
+         verifySegmentedCodeCache(pb, true);
+ 
+         // Always enabled if SegmentedCodeCache is set
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:-TieredCompilation",
+                                                               "-XX:ReservedCodeCacheSize=239m",
+                                                               "-XX:+PrintCodeCache",
+@@ -152,7 +161,7 @@
+ 
+         // The profiled and non-profiled code heaps should not be available in
+         // interpreter-only mode
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-Xint",
+                                                               "-XX:+PrintCodeCache",
+                                                               "-version");
+@@ -160,24 +169,24 @@
+ 
+         // If we stop compilation at CompLevel_none or CompLevel_simple we
+         // don't need a profiled code heap.
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:TieredStopAtLevel=0",
+                                                               "-XX:+PrintCodeCache",
+                                                               "-version");
+         verifyCodeHeapNotExists(pb, PROFILED);
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:TieredStopAtLevel=1",
+                                                               "-XX:+PrintCodeCache",
+                                                               "-version");
+         verifyCodeHeapNotExists(pb, PROFILED);
+ 
+         // Fails with too small non-nmethod code heap size
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:NonNMethodCodeHeapSize=100K",
++        pb = codeCacheProcess("-XX:NonNMethodCodeHeapSize=100K",
+                                                               "-version");
+         failsWith(pb, "Invalid NonNMethodCodeHeapSize");
+ 
+         // Fails if code heap sizes do not add up
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:ReservedCodeCacheSize=10M",
+                                                               // After fixing a round_down issue with large page sizes (JDK-8334564),
+                                                               // 5M is a bit too small for NonNMethodCodeHeap
+@@ -191,7 +200,7 @@
+         long minUseSpace = WHITE_BOX.getUintxVMFlag("CodeCacheMinimumUseSpace");
+         // minimum size: CodeCacheMinimumUseSpace DEBUG_ONLY(* 3)
+         long minSize = (Platform.isDebugBuild() ? 3 : 1) * minUseSpace;
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:NonNMethodCodeHeapSize=" + minSize,
+                                                               "-XX:ReservedCodeCacheSize=" + minSize,
+                                                               "-XX:InitialCodeCacheSize=100K",
+@@ -202,7 +211,7 @@
+ 
+         // Fails if there is not enough space for code cache.
+         // All segments are set to minimum allowed value, but VM still fails
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:ReservedCodeCacheSize=" + minSize,
+                                                               "-XX:InitialCodeCacheSize=100K",
+                                                               "-version");
+@@ -211,7 +220,7 @@
+ 
+         // Reserved code cache is set but not equal to the sum of other segments
+         // that are explicitly specified - fails
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:ReservedCodeCacheSize=100M",
+                                                               "-XX:NonNMethodCodeHeapSize=10M",
+                                                               "-XX:ProfiledCodeHeapSize=10M",
+@@ -221,7 +230,7 @@
+ 
+         // Reserved code cache is not set - it's automatically adjusted to the sum of other segments
+         // that are explicitly specified
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:NonNMethodCodeHeapSize=10M",
+                                                               "-XX:ProfiledCodeHeapSize=10M",
+                                                               "-XX:NonProfiledCodeHeapSize=10M",
+@@ -231,7 +240,7 @@
+ 
+         // Reserved code cache is set, NonNmethod segment size is set, two other segments is automatically
+         // adjusted to half of the remaining space
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:ReservedCodeCacheSize=100M",
+                                                               "-XX:NonNMethodCodeHeapSize=10M",
+                                                               "-XX:+PrintFlagsFinal",
+@@ -240,7 +249,7 @@
+ 
+         // Reserved code cache is set but NonNmethodCodeHeapSize is not set.
+         // It's calculated based on the number of compiler threads
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:ReservedCodeCacheSize=100M",
+                                                               "-XX:ProfiledCodeHeapSize=10M",
+                                                               "-XX:NonProfiledCodeHeapSize=10M",
+@@ -250,7 +259,7 @@
+ 
+         // A large NonNMethodCodeHeapSize can make the total code cache exceed the platform limit.
+         // The VM should fail fast during initialization.
+-        pb = ProcessTools.createLimitedTestJavaProcessBuilder("-XX:+SegmentedCodeCache",
++        pb = codeCacheProcess("-XX:+SegmentedCodeCache",
+                                                               "-XX:NonNMethodCodeHeapSize=3G",
+                                                               "-version");
+         failsWith(pb, "Code cache size exceeds platform limit");
+--- a/test/hotspot/jtreg/compiler/codecache/cli/common/CodeCacheCLITestCase.java
++++ b/test/hotspot/jtreg/compiler/codecache/cli/common/CodeCacheCLITestCase.java
+@@ -150,6 +150,8 @@
+         public String[] getTestOptions(CodeCacheOptions codeCacheOptions,
+                 String... additionalOptions) {
+             List<String> options = new LinkedList<>();
++            // Size checks use fixed small heaps, not per-host compiler buffers.
++            options.add("-XX:CICompilerCount=2");
+             Collections.addAll(options, testCaseSpecificOptions);
+             Collections.addAll(options, additionalOptions);
+             return codeCacheOptions.prepareOptions(
 --- a/test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
 +++ b/test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
 @@ -117,17 +117,33 @@

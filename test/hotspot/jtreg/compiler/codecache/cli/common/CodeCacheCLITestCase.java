@@ -150,6 +150,8 @@ public class CodeCacheCLITestCase {
         public String[] getTestOptions(CodeCacheOptions codeCacheOptions,
                 String... additionalOptions) {
             List<String> options = new LinkedList<>();
+            // Size checks use fixed small heaps, not per-host compiler buffers.
+            options.add("-XX:CICompilerCount=2");
             Collections.addAll(options, testCaseSpecificOptions);
             Collections.addAll(options, additionalOptions);
             return codeCacheOptions.prepareOptions(

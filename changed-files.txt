@@ -80,6 +80,10 @@ make/autoconf/jdk-options.m4
 make/autoconf/lib-ffi.m4
 make/modules/java.base/Lib.gmk
 make/modules/jdk.javadoc/Gendata.gmk
+test/hotspot/jtreg/compiler/c2/Test8004741.java
+test/hotspot/jtreg/compiler/c2/libTest8004741.cpp
+test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java
+test/hotspot/jtreg/compiler/codecache/cli/common/CodeCacheCLITestCase.java
 test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java
 test/lib/jdk/test/lib/thread/VThreadPinner.java
 test/lib/jdk/test/lib/thread/libVThreadPinner.c

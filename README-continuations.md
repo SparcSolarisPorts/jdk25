@@ -1,3 +1,10 @@
+v88 fixes SPARC C2 string scratch-register decoding and C1 AbortVMOnException
+checking, modernizes Test8004741 with JVMTI StopThread, and makes code-cache
+sizing tests independent of host compiler-thread count. The new tier1 runner
+retains 24 jobs / timeoutFactor=1 / two-hour cap, with bounded per-VM defaults,
+a bounded idle agent pool, live results and a heartbeat. Native verification
+is pending; see README-tier1-recovery-v88.txt and tier1-triage-v88.csv.
+
 v87 fixes the libffi setup failure on Solaris: configure uses MAKE=gmake,
 dependency tracking is disabled for the dependency build, and each build
 stage explicitly stops on failure. No VM/Panama bridge source change.

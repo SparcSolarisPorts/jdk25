@@ -53,6 +53,9 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
         except OSError as e:omitted.append(str(path)+': '+str(e))
     add_file('run.log',log,2*1024*1024)
     add_file('list.log',out/'list.log',512*1024)
+    add_file('resource-history.log',out/'resource-history.log',512*1024)
+    add_file('run-environment.txt',out/'environment.txt',64*1024)
+    add_file('results.txt',out/'results.txt',64*1024)
     add_file('build-tail.log',Path('/tmp/jdk25-build.log'),96*1024)
     add('reported-failed-tests.txt',''.join('test/hotspot/jtreg/'+p+'\n' for p in sorted(reported_bad)))
     records=[]; selected=[]
@@ -88,8 +91,11 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
             fatal.update(p for p in parent.glob('hs_err*.log') if p.stat().st_mtime>=since)
         except OSError:pass
     fatal_index=[]
-    for i,p in enumerate(sorted(fatal,key=lambda p:p.stat().st_mtime,reverse=True)):
-        if i>=80:omitted.append('Additional crash report: '+str(p));continue
+    def mtime_or_zero(p):
+        try:return p.stat().st_mtime
+        except OSError:return 0
+    for i,p in enumerate(sorted(fatal,key=mtime_or_zero,reverse=True)):
+        if i>=160:omitted.append('Additional crash report: '+str(p));continue
         add_file('crashes/%03d-%s'%(i,p.name),p,256*1024)
         try:
             with p.open('rb') as f:h=f.read(16384).decode(errors='replace')
@@ -98,7 +104,7 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
             fatal_index.append({'path':str(p),'JRE':version.group(1) if version else '', 'frame':frame.group(1) if frame else ''})
         except OSError:pass
     add('crash-index.json',json.dumps(fatal_index,indent=2))
-    commands=[['uname','-a'],['isainfo','-b'],['swap','-s'],['swap','-l'],['df','-h','/tmp'],
+    commands=[['uname','-a'],['isainfo','-b'],['/usr/sbin/swap','-s'],['/usr/sbin/swap','-l'],['df','-h','/tmp'],
               ['ps','-eo','pid,ppid,nlwp,pcpu,vsz,rss,comm'],
               ['git','rev-parse','HEAD'],['git','status','--short'],
               ['/usr/jdk/jdk-21/bin/java','-version'],

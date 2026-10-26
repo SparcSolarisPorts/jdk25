@@ -2019,9 +2019,9 @@ void LIRGenerator::do_Throw(Throw* x) {
     __ null_check(exception_opr, new CodeEmitInfo(info, x->state()->copy(ValueStack::ExceptionState, x->state()->bci())));
   }
 
-  if (compilation()->env()->jvmti_can_post_on_exceptions()) {
-    // we need to go through the exception lookup path to get JVMTI
-    // notification done
+  if (compilation()->env()->jvmti_can_post_on_exceptions() || AbortVMOnException != nullptr) {
+    // Runtime1's exception lookup performs JVMTI notification and the
+    // AbortVMOnException check. Direct unwinding would bypass both.
     unwind = false;
   }
 

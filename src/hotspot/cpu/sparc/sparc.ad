@@ -10005,7 +10005,7 @@ instruct string_compress_fast(o0RegP src, o1RegP dst, g3RegI len, notemp_iRegI r
     __ signx($len$$Register);
     __ string_compress_16($src$$Register, $dst$$Register, $len$$Register, $result$$Register,
                           $tmp1$$Register, $tmp2$$Register, $tmp3$$Register, $tmp4$$Register,
-                          $ftmp1$$FloatRegister, $ftmp2$$FloatRegister, $ftmp3$$FloatRegister, Ldone);
+                          reg_to_DoubleFloatRegister_object($ftmp1$$reg), reg_to_DoubleFloatRegister_object($ftmp2$$reg), reg_to_DoubleFloatRegister_object($ftmp3$$reg), Ldone);
     __ cmp_and_brx_short($len$$Register, 0, Assembler::equal, Assembler::pn, Ldone);
     __ string_compress($src$$Register, $dst$$Register, $len$$Register, $result$$Register, $tmp1$$Register, Ldone);
     __ bind(Ldone);
@@ -10030,9 +10030,11 @@ instruct string_inflate(Universe dummy, o0RegP src, o1RegP dst, g3RegI len,
   ins_pipe(long_memory_op);
 %}
 
+// fpmerge reads single registers, so its source pairs must stay in F0-F29.
+// Double destinations may use the upper bank, with their ADLC encodings decoded.
 // fast byte[] to char[] inflation using VIS instructions
 instruct string_inflate_fast(Universe dummy, o0RegP src, o1RegP dst, g3RegI len,
-                             iRegL tmp, regD ftmp1, regD ftmp2, regD ftmp3, regD ftmp4, flagsReg ccr) %{
+                             iRegL tmp, regD_low ftmp1, regD ftmp2, regD ftmp3, regD_low ftmp4, flagsReg ccr) %{
   predicate(UseVIS >= 3);
   match(Set dummy (StrInflatedCopy src (Binary dst len)));
   effect(TEMP tmp, TEMP ftmp1, TEMP ftmp2, TEMP ftmp3, TEMP ftmp4, USE_KILL src, USE_KILL dst, USE_KILL len, KILL ccr);
@@ -10042,7 +10044,7 @@ instruct string_inflate_fast(Universe dummy, o0RegP src, o1RegP dst, g3RegI len,
     Label Ldone;
     __ signx($len$$Register);
     __ string_inflate_16($src$$Register, $dst$$Register, $len$$Register, $tmp$$Register,
-                         $ftmp1$$FloatRegister, $ftmp2$$FloatRegister, $ftmp3$$FloatRegister, $ftmp4$$FloatRegister, Ldone);
+                         reg_to_DoubleFloatRegister_object($ftmp1$$reg), reg_to_DoubleFloatRegister_object($ftmp2$$reg), reg_to_DoubleFloatRegister_object($ftmp3$$reg), reg_to_DoubleFloatRegister_object($ftmp4$$reg), Ldone);
     __ cmp_and_brx_short($len$$Register, 0, Assembler::equal, Assembler::pn, Ldone);
     __ string_inflate($src$$Register, $dst$$Register, $len$$Register, $tmp$$Register, Ldone);
     __ bind(Ldone);

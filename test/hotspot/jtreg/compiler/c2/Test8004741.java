@@ -32,13 +32,13 @@
  * @build jdk.test.whitebox.WhiteBox
  * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
  *
- * @run main/othervm -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
+ * @run main/othervm/native -agentlib:Test8004741 -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
  *    -XX:-TieredCompilation -XX:+StressCompiledExceptionHandlers
  *    -XX:+SafepointALot -XX:GuaranteedSafepointInterval=100
  *    -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
  *    compiler.c2.Test8004741
  *
- * @run main/othervm -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
+ * @run main/othervm/native -agentlib:Test8004741 -Xmx128m -Xbatch -XX:+IgnoreUnrecognizedVMOptions -XX:+UnlockDiagnosticVMOptions
  *    -XX:-TieredCompilation -XX:+StressCompiledExceptionHandlers
  *    -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
  *    compiler.c2.Test8004741
@@ -130,13 +130,17 @@ public class Test8004741 extends Thread {
    * No single trial is definitive, since the ThreadDeath
    * exception might not land in the tested region of code.
    */
+  // Thread.stop() has thrown UnsupportedOperationException since JDK 20.
+  // Keep the asynchronous ThreadDeath/exception-table stress through JVMTI.
+  private static native void stopThread(Thread target, ThreadDeath exception);
+
   public static void threadTest() throws InterruptedException {
     Test8004741 t = new Test8004741();
     t.start();
     t.waitFor(RUNNING);
     Thread.sleep(100);
     System.out.println("stopping thread");
-    t.stop();
+    stopThread(t, new ThreadDeath());
     t.waitFor(STOPPING);
     t.join();
   }
