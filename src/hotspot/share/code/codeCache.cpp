@@ -196,6 +196,31 @@ static void set_size_of_unset_code_heap(CodeHeapInfo* heap, size_t available_siz
   heap->size = (available_size > (used_size + min_size)) ? (available_size - used_size) : min_size;
 }
 
+// Explicit byte sizes must not be silently inflated by the preferred large
+// page size. Keep the largest supported page size compatible with the user's
+// cache/segment boundaries; aligned configurations retain their large pages.
+static size_t code_heap_page_size(size_t preferred, size_t cache_size, bool cache_size_set,
+                                 const CodeHeapInfo& non_nmethod,
+                                 const CodeHeapInfo& profiled,
+                                 const CodeHeapInfo& non_profiled) {
+  size_t ps = preferred;
+  while (ps > os::vm_page_size()) {
+    const size_t alignment = MAX2(ps, os::vm_allocation_granularity());
+    if ((!cache_size_set || is_aligned(cache_size, alignment)) &&
+        (!non_nmethod.set || !non_nmethod.enabled || is_aligned(non_nmethod.size, alignment)) &&
+        (!profiled.set || !profiled.enabled || is_aligned(profiled.size, alignment)) &&
+        (!non_profiled.set || !non_profiled.enabled || is_aligned(non_profiled.size, alignment))) {
+      return ps;
+    }
+    size_t smaller = os::page_sizes().next_smaller(ps);
+    if (smaller == 0) {
+      return os::vm_page_size();
+    }
+    ps = smaller;
+  }
+  return ps;
+}
+
 void CodeCache::initialize_heaps() {
 
   CodeHeapInfo non_nmethod = {NonNMethodCodeHeapSize, FLAG_IS_CMDLINE(NonNMethodCodeHeapSize), true};
@@ -203,10 +228,7 @@ void CodeCache::initialize_heaps() {
   CodeHeapInfo non_profiled = {NonProfiledCodeHeapSize, FLAG_IS_CMDLINE(NonProfiledCodeHeapSize), true};
 
   const bool cache_size_set   = FLAG_IS_CMDLINE(ReservedCodeCacheSize);
-  const size_t ps             = page_size(false, 8);
-  const size_t min_size       = MAX2(os::vm_allocation_granularity(), ps);
   const size_t min_cache_size = CodeCacheMinimumUseSpace DEBUG_ONLY(* 3); // Make sure we have enough space for VM internal code
-  size_t cache_size           = align_up(ReservedCodeCacheSize, min_size);
 
   // Prerequisites
   if (!heap_available(CodeBlobType::MethodProfiled)) {
@@ -220,6 +242,16 @@ void CodeCache::initialize_heaps() {
   }
 
   assert(heap_available(CodeBlobType::MethodNonProfiled), "MethodNonProfiled heap is always available for segmented code heap");
+
+  const size_t preferred_ps = page_size(false, 8);
+  const size_t ps = code_heap_page_size(preferred_ps, ReservedCodeCacheSize, cache_size_set,
+                                       non_nmethod, profiled, non_profiled);
+  const size_t min_size = MAX2(os::vm_allocation_granularity(), ps);
+  size_t cache_size = align_up(ReservedCodeCacheSize, min_size);
+  if (ps != preferred_ps) {
+    log_info(codecache)("Using smaller code cache pages (%zuK instead of %zuK) to preserve explicit sizes",
+                        ps/K, preferred_ps/K);
+  }
 
   size_t compiler_buffer_size = 0;
   COMPILER1_PRESENT(compiler_buffer_size += CompilationPolicy::c1_count() * Compiler::code_buffer_size());

@@ -134,7 +134,9 @@ void fieldDescriptor::print_on_for(outputStream* st, oop obj) {
     case T_CHAR:
       {
         jchar c = obj->char_field(offset());
-        st->print("%c %d", isprint(c) ? c : ' ', c);
+        // Java char is unsigned 16-bit; ctype accepts only unsigned-char values
+        // (or EOF). Solaris ctype tables cannot be indexed with arbitrary UTF-16.
+        st->print("%c %d", (c <= 0xff && isprint(static_cast<unsigned char>(c))) ? c : ' ', c);
       }
       break;
     case T_DOUBLE:

@@ -52,6 +52,7 @@ src/hotspot/os_cpu/solaris_sparc/vm_version_solaris_sparc.cpp
 src/hotspot/share/c1/c1_LIR.hpp
 src/hotspot/share/c1/c1_LIRGenerator.cpp
 src/hotspot/share/c1/c1_Runtime1.cpp
+src/hotspot/share/code/codeCache.cpp
 src/hotspot/share/jfr/dcmd/jfrDcmds.cpp
 src/hotspot/share/jfr/jni/jfrJavaSupport.cpp
 src/hotspot/share/oops/compressedKlass.cpp
@@ -70,6 +71,7 @@ src/hotspot/share/runtime/continuation.cpp
 src/hotspot/share/runtime/continuationEntry.hpp
 src/hotspot/share/runtime/continuationFreezeThaw.cpp
 src/hotspot/share/runtime/continuationHelper.inline.hpp
+src/hotspot/share/runtime/fieldDescriptor.cpp
 src/hotspot/share/runtime/stackChunkFrameStream.hpp
 src/hotspot/share/runtime/stackChunkFrameStream.inline.hpp
 src/hotspot/share/runtime/vframe.cpp

@@ -1,3 +1,10 @@
+v90 repairs code-cache page-size selection, UTF-16 field printing in CDS maps,
+and SPARC CPU capability publication. The original two code-cache test files
+are restored byte-for-byte. No new existing-test changes are introduced.
+Use run-hotspot-tier1-v90.sh --remaining after rebuilding; --timing separately
+checks the two unresolved timeouts with diagnostic extra time. Native results
+are pending. See README-tier1-runtime-v90.txt for evidence and limitations.
+
 v89 corrects the v88 runner's missing jtreg environment forwarding, verifies
 limits inside a real test VM and nested child before starting, fixes grouped
 progress counts, and makes the two exact-size code-cache tests use ordinary

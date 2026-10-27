@@ -112,7 +112,10 @@ def run_live(command, env, log, deadline, progress=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--failed', action='store_true', help='rerun all 124 originally unsuccessful cases')
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument('--failed', action='store_true', help='rerun all 124 originally unsuccessful cases')
+    selection.add_argument('--remaining', action='store_true', help='four functional failures plus restored code-cache and supported-AES checks')
+    selection.add_argument('--timing', action='store_true', help='isolate the two slow cases with diagnostic timeout factor 4')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     os.chdir(root)
@@ -126,8 +129,13 @@ def main():
     tests = ['test/hotspot/jtreg:tier1']
     if args.failed:
         tests = (root / 'tests/tier1-unsuccessful-v88.txt').read_text().splitlines()
+    if args.remaining:
+        tests = (root / 'tests/tier1-remaining-v90.txt').read_text().splitlines()
+    if args.timing:
+        tests = (root / 'tests/tier1-timing-v90.txt').read_text().splitlines()
+    timeout_factor = 4 if args.timing else 1
     stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-    out = Path(tempfile.mkdtemp(prefix=f'hotspot-tier1-v89-{stamp}-', dir=root))
+    out = Path(tempfile.mkdtemp(prefix=f'hotspot-tier1-v90-{stamp}-', dir=root))
     env = os.environ.copy()
     # JAVA_TOOL_OPTIONS reaches nested Java processes and JNI gtest VMs too.
     # These are ergonomic defaults, not fixed Xmx/Xms: explicit test flags win.
@@ -135,12 +143,12 @@ def main():
     env['JAVA_TOOL_OPTIONS'] = defaults + (' ' + env['JAVA_TOOL_OPTIONS'] if env.get('JAVA_TOOL_OPTIONS') else '')
     (out / 'environment.txt').write_text('JAVA_TOOL_OPTIONS=' + env['JAVA_TOOL_OPTIONS'] + '\n'
                                       + 'runner=' + str(runner) + '\n'
-                                      + '24 jobs; max idle agent pool=24; timeoutFactor=1; two-hour total cap\n')
-    print(f'24 test jobs; timeoutFactor=1; two-hour total cap. Results: {out}', flush=True)
+                                      + f'24 jobs; max idle agent pool=24; timeoutFactor={timeout_factor}; two-hour total cap\n')
+    print(f'24 test jobs; timeoutFactor={timeout_factor}; two-hour total cap. Results: {out}', flush=True)
     print('Each VM defaults to 2 GiB ergonomic RAM / 8 processors; explicit test flags override.', flush=True)
     deadline = time.monotonic() + 7200
     common = [str(runner), '-Xms64m', '-Xmx512m', '-jar', str(jtreg / 'lib/jtreg.jar'),
-               f'-jdk:{jdk}', '-agentvm', '-conc:24', '--max-pool-size=24', '-timeoutFactor:1',
+               f'-jdk:{jdk}', '-agentvm', '-conc:24', '--max-pool-size=24', f'-timeoutFactor:{timeout_factor}',
                '-e:JAVA_TOOL_OPTIONS',
                '-retain:fail,error', '-verbose:summary',
                f'-nativepath:{build}/images/test/hotspot/jtreg/native']

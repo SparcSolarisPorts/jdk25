@@ -283,6 +283,9 @@ void VM_Version::initialize() {
   assert(strlen(buf) >= 2, "must be");
 
   _features_string = os::strdup(buf);
+  // WhiteBox/JFR consumers query cpu_info_string(), not features_string().
+  // Keep both views consistent with the detected SPARC hardware capabilities.
+  _cpu_info_string = _features_string;
 
   log_info(os, cpu)("SPARC features detected: %s", _features_string);
 

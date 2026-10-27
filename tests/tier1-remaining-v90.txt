@@ -1,0 +1,7 @@
+test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java
+test/hotspot/jtreg/compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java
+test/hotspot/jtreg/compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java
+test/hotspot/jtreg/compiler/cpuflags/TestAESIntrinsicsOnUnsupportedConfig.java
+test/hotspot/jtreg/compiler/cpuflags/TestAESIntrinsicsOnSupportedConfig.java
+test/hotspot/jtreg/runtime/cds/CDSMapTest.java
+test/hotspot/jtreg/runtime/cds/DeterministicDump.java

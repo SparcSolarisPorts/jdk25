@@ -1,0 +1,2 @@
+test/hotspot/jtreg/compiler/c2/irTests/ConvF2HFIdealizationTests.java
+test/hotspot/jtreg/compiler/loopopts/superword/TestAlignVectorFuzzer.java#CompileOnly
