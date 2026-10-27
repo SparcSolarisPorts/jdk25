@@ -1,3 +1,9 @@
+v89 corrects the v88 runner's missing jtreg environment forwarding, verifies
+limits inside a real test VM and nested child before starting, fixes grouped
+progress counts, and makes the two exact-size code-cache tests use ordinary
+pages. Native v88 confirmed 40 recovered cases; the new fixes need a rerun.
+See README-tier1-environment-v89.txt. Use run-hotspot-tier1-v89.sh --failed.
+
 v88 fixes SPARC C2 string scratch-register decoding and C1 AbortVMOnException
 checking, modernizes Test8004741 with JVMTI StopThread, and makes code-cache
 sizing tests independent of host compiler-thread count. The new tier1 runner

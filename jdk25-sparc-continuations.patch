@@ -7378,7 +7378,7 @@
 +}
 --- a/test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java
 +++ b/test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java
-@@ -48,6 +48,15 @@
+@@ -48,6 +48,18 @@
      private static final String NON_METHOD = "CodeHeap 'non-nmethods'";
      private static final String PROFILED = "CodeHeap 'profiled nmethods'";
      private static final String NON_PROFILED = "CodeHeap 'non-profiled nmethods'";
@@ -7386,15 +7386,18 @@
 +    // Fixed small heaps below are independent of host CPU count. Compiler
 +    // buffers are charged to the non-nmethod heap; bound their count explicitly.
 +    private static ProcessBuilder codeCacheProcess(String... args) throws Exception {
-+        String[] options = new String[args.length + 1];
++        String[] options = new String[args.length + 2];
 +        options[0] = "-XX:CICompilerCount=2";
-+        System.arraycopy(args, 0, options, 1, args.length);
++        // These checks compare exact byte sizes. Large-page rounding is tested
++        // separately; it can round three 10M segments to three 12M segments.
++        options[1] = "-XX:-UseLargePages";
++        System.arraycopy(args, 0, options, 2, args.length);
 +        return ProcessTools.createLimitedTestJavaProcessBuilder(options);
 +    }
  
      private static void verifySegmentedCodeCache(ProcessBuilder pb, boolean enabled) throws Exception {
          OutputAnalyzer out = new OutputAnalyzer(pb.start());
-@@ -119,31 +128,31 @@
+@@ -119,31 +131,31 @@
          ProcessBuilder pb;
  
          // Disabled with ReservedCodeCacheSize < 240MB
@@ -7431,7 +7434,7 @@
                                                                "-XX:-TieredCompilation",
                                                                "-XX:ReservedCodeCacheSize=239m",
                                                                "-XX:+PrintCodeCache",
-@@ -152,7 +161,7 @@
+@@ -152,7 +164,7 @@
  
          // The profiled and non-profiled code heaps should not be available in
          // interpreter-only mode
@@ -7440,7 +7443,7 @@
                                                                "-Xint",
                                                                "-XX:+PrintCodeCache",
                                                                "-version");
-@@ -160,24 +169,24 @@
+@@ -160,24 +172,24 @@
  
          // If we stop compilation at CompLevel_none or CompLevel_simple we
          // don't need a profiled code heap.
@@ -7469,7 +7472,7 @@
                                                                "-XX:ReservedCodeCacheSize=10M",
                                                                // After fixing a round_down issue with large page sizes (JDK-8334564),
                                                                // 5M is a bit too small for NonNMethodCodeHeap
-@@ -191,7 +200,7 @@
+@@ -191,7 +203,7 @@
          long minUseSpace = WHITE_BOX.getUintxVMFlag("CodeCacheMinimumUseSpace");
          // minimum size: CodeCacheMinimumUseSpace DEBUG_ONLY(* 3)
          long minSize = (Platform.isDebugBuild() ? 3 : 1) * minUseSpace;
@@ -7478,7 +7481,7 @@
                                                                "-XX:NonNMethodCodeHeapSize=" + minSize,
                                                                "-XX:ReservedCodeCacheSize=" + minSize,
                                                                "-XX:InitialCodeCacheSize=100K",
-@@ -202,7 +211,7 @@
+@@ -202,7 +214,7 @@
  
          // Fails if there is not enough space for code cache.
          // All segments are set to minimum allowed value, but VM still fails
@@ -7487,7 +7490,7 @@
                                                                "-XX:ReservedCodeCacheSize=" + minSize,
                                                                "-XX:InitialCodeCacheSize=100K",
                                                                "-version");
-@@ -211,7 +220,7 @@
+@@ -211,7 +223,7 @@
  
          // Reserved code cache is set but not equal to the sum of other segments
          // that are explicitly specified - fails
@@ -7496,7 +7499,7 @@
                                                                "-XX:ReservedCodeCacheSize=100M",
                                                                "-XX:NonNMethodCodeHeapSize=10M",
                                                                "-XX:ProfiledCodeHeapSize=10M",
-@@ -221,7 +230,7 @@
+@@ -221,7 +233,7 @@
  
          // Reserved code cache is not set - it's automatically adjusted to the sum of other segments
          // that are explicitly specified
@@ -7505,7 +7508,7 @@
                                                                "-XX:NonNMethodCodeHeapSize=10M",
                                                                "-XX:ProfiledCodeHeapSize=10M",
                                                                "-XX:NonProfiledCodeHeapSize=10M",
-@@ -231,7 +240,7 @@
+@@ -231,7 +243,7 @@
  
          // Reserved code cache is set, NonNmethod segment size is set, two other segments is automatically
          // adjusted to half of the remaining space
@@ -7514,7 +7517,7 @@
                                                                "-XX:ReservedCodeCacheSize=100M",
                                                                "-XX:NonNMethodCodeHeapSize=10M",
                                                                "-XX:+PrintFlagsFinal",
-@@ -240,7 +249,7 @@
+@@ -240,7 +252,7 @@
  
          // Reserved code cache is set but NonNmethodCodeHeapSize is not set.
          // It's calculated based on the number of compiler threads
@@ -7523,7 +7526,7 @@
                                                                "-XX:ReservedCodeCacheSize=100M",
                                                                "-XX:ProfiledCodeHeapSize=10M",
                                                                "-XX:NonProfiledCodeHeapSize=10M",
-@@ -250,7 +259,7 @@
+@@ -250,7 +262,7 @@
  
          // A large NonNMethodCodeHeapSize can make the total code cache exceed the platform limit.
          // The VM should fail fast during initialization.
@@ -7534,12 +7537,14 @@
          failsWith(pb, "Code cache size exceeds platform limit");
 --- a/test/hotspot/jtreg/compiler/codecache/cli/common/CodeCacheCLITestCase.java
 +++ b/test/hotspot/jtreg/compiler/codecache/cli/common/CodeCacheCLITestCase.java
-@@ -150,6 +150,8 @@
+@@ -150,6 +150,10 @@
          public String[] getTestOptions(CodeCacheOptions codeCacheOptions,
                  String... additionalOptions) {
              List<String> options = new LinkedList<>();
 +            // Size checks use fixed small heaps, not per-host compiler buffers.
 +            options.add("-XX:CICompilerCount=2");
++            // Fixed byte-size expectations must not acquire large-page padding.
++            options.add("-XX:-UseLargePages");
              Collections.addAll(options, testCaseSpecificOptions);
              Collections.addAll(options, additionalOptions);
              return codeCacheOptions.prepareOptions(

@@ -10,10 +10,10 @@ if len(sys.argv)>1:
     out=Path(sys.argv[1]).resolve()
 else:
     runs=sorted(root.glob('hotspot-tier1-*'),key=lambda p:p.stat().st_mtime,reverse=True)
-    runs=[p for p in runs if p.is_dir() and (p/'work').is_dir()]
+    runs=[p for p in runs if p.is_dir() and ((p/'work').is_dir() or (p/'preflight/work').is_dir())]
     if not runs: sys.exit('No hotspot-tier1 run found; pass its directory.')
     out=runs[0].resolve()
-if not (out/'work').is_dir():sys.exit('Missing work directory: '+str(out))
+if not (out/'work').is_dir() and not (out/'preflight/work').is_dir():sys.exit('Missing work directory: '+str(out))
 archive=out/'tier1-text-evidence.zip'
 since=((out/'list.log').stat().st_mtime-600 if (out/'list.log').exists() else out.stat().st_mtime-10800)
 LIMIT=48*1024*1024
@@ -53,6 +53,9 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
         except OSError as e:omitted.append(str(path)+': '+str(e))
     add_file('run.log',log,2*1024*1024)
     add_file('list.log',out/'list.log',512*1024)
+    add_file('preflight.log',out/'preflight.log',192*1024)
+    for p in (out/'preflight/work').rglob('*.jtr'):
+        add_file('preflight/'+str(p.relative_to(out/'preflight/work')),p)
     add_file('resource-history.log',out/'resource-history.log',512*1024)
     add_file('run-environment.txt',out/'environment.txt',64*1024)
     add_file('results.txt',out/'results.txt',64*1024)
@@ -104,7 +107,7 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
             fatal_index.append({'path':str(p),'JRE':version.group(1) if version else '', 'frame':frame.group(1) if frame else ''})
         except OSError:pass
     add('crash-index.json',json.dumps(fatal_index,indent=2))
-    commands=[['uname','-a'],['isainfo','-b'],['/usr/sbin/swap','-s'],['/usr/sbin/swap','-l'],['df','-h','/tmp'],
+    commands=[['uname','-a'],['isainfo','-b'],['/usr/bin/sh','-c','/usr/sbin/swap -s'],['/usr/bin/sh','-c','/usr/sbin/swap -l'],['df','-h','/tmp'],
               ['ps','-eo','pid,ppid,nlwp,pcpu,vsz,rss,comm'],
               ['git','rev-parse','HEAD'],['git','status','--short'],
               ['/usr/jdk/jdk-21/bin/java','-version'],

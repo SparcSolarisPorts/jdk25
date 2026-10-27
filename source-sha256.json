@@ -83,8 +83,8 @@
   "make/modules/jdk.javadoc/Gendata.gmk": "9687ef4d9e75effc98bfc058f23e8c50b8cff00baf7a6fd4ca9f4999cbc7ced8",
   "test/hotspot/jtreg/compiler/c2/Test8004741.java": "46c57e2074712c1476ef1e0a818ff27d4315933df721760c41404c4b7d5f509e",
   "test/hotspot/jtreg/compiler/c2/libTest8004741.cpp": "2bcd620b7d23c2dcb31223d8bd10495b02b826dea3a6cad07b6e9281f75be724",
-  "test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java": "8728f4b950f4eedeee7acdef1a5a2198b93446a7f60fac0f2004eec2bc3b343a",
-  "test/hotspot/jtreg/compiler/codecache/cli/common/CodeCacheCLITestCase.java": "77fb64be51b577f2c905573d232fe7725a61ecef3e217f555d3e05eaac3f1729",
+  "test/hotspot/jtreg/compiler/codecache/CheckSegmentedCodeCache.java": "6959961d08844c0adb12eb6d0dea653ff8f7d587b7c6df87c397e5476a398dd3",
+  "test/hotspot/jtreg/compiler/codecache/cli/common/CodeCacheCLITestCase.java": "0b9ce6445f5a85f8ecc5e7c3684cb79617d70651b1840ab2798ebf7326f65a56",
   "test/hotspot/jtreg/gc/g1/TestLargePageUseForAuxMemory.java": "1453d912d095e7761661157a84a3554c6e8c2a260e0c494e495a384f21733b77",
   "test/lib/jdk/test/lib/thread/VThreadPinner.java": "09f7ee94ed1f824fa2c351601a0d8b7a996907d40f6727caf01020c9c24bc942",
   "test/lib/jdk/test/lib/thread/libVThreadPinner.c": "f5df0bf8e3dd1f8ca18372902c5ba102577c50ed8719f99b676a2c21ab4b6ce6"

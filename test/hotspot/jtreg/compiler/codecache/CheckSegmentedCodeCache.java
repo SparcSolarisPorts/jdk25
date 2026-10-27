@@ -52,9 +52,12 @@ public class CheckSegmentedCodeCache {
     // Fixed small heaps below are independent of host CPU count. Compiler
     // buffers are charged to the non-nmethod heap; bound their count explicitly.
     private static ProcessBuilder codeCacheProcess(String... args) throws Exception {
-        String[] options = new String[args.length + 1];
+        String[] options = new String[args.length + 2];
         options[0] = "-XX:CICompilerCount=2";
-        System.arraycopy(args, 0, options, 1, args.length);
+        // These checks compare exact byte sizes. Large-page rounding is tested
+        // separately; it can round three 10M segments to three 12M segments.
+        options[1] = "-XX:-UseLargePages";
+        System.arraycopy(args, 0, options, 2, args.length);
         return ProcessTools.createLimitedTestJavaProcessBuilder(options);
     }
 

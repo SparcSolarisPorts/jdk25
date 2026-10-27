@@ -152,6 +152,8 @@ public class CodeCacheCLITestCase {
             List<String> options = new LinkedList<>();
             // Size checks use fixed small heaps, not per-host compiler buffers.
             options.add("-XX:CICompilerCount=2");
+            // Fixed byte-size expectations must not acquire large-page padding.
+            options.add("-XX:-UseLargePages");
             Collections.addAll(options, testCaseSpecificOptions);
             Collections.addAll(options, additionalOptions);
             return codeCacheOptions.prepareOptions(

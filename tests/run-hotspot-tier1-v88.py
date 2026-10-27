@@ -43,9 +43,9 @@ def run_live(command, env, log, deadline, progress=False):
         nonlocal total
         if progress or not re.match(r'^\s*\S+\.(?:java|sh)(?:#[^\s]+)?\s*$', line):
             print(line, flush=True)
-        match = re.search(r'Tests found:\s*(\d+)', line)
+        match = re.search(r'Tests found:\s*([\d,]+)', line)
         if match:
-            total = int(match.group(1))
+            total = int(match.group(1).replace(",", ""))
         match = re.match(r'^(Passed:|FAILED:|Error:)\s+', line)
         if match:
             counts[match.group(1)] += 1
@@ -54,7 +54,7 @@ def run_live(command, env, log, deadline, progress=False):
         nonlocal last_resource
         if env.get('JDK25_RESOURCE_HISTORY') and time.monotonic() - last_resource >= 30:
             try:
-                sample = subprocess.run(['/usr/sbin/swap', '-s'], capture_output=True, text=True, timeout=2)
+                sample = subprocess.run(['/usr/bin/sh', '-c', '/usr/sbin/swap -s'], capture_output=True, text=True, timeout=2)
                 with open(env['JDK25_RESOURCE_HISTORY'], 'a') as history:
                     history.write(datetime.datetime.now().isoformat() + ' ' + sample.stdout + sample.stderr)
             except (OSError, subprocess.TimeoutExpired) as error:
@@ -127,7 +127,7 @@ def main():
     if args.failed:
         tests = (root / 'tests/tier1-unsuccessful-v88.txt').read_text().splitlines()
     stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-    out = Path(tempfile.mkdtemp(prefix=f'hotspot-tier1-v88-{stamp}-', dir=root))
+    out = Path(tempfile.mkdtemp(prefix=f'hotspot-tier1-v89-{stamp}-', dir=root))
     env = os.environ.copy()
     # JAVA_TOOL_OPTIONS reaches nested Java processes and JNI gtest VMs too.
     # These are ergonomic defaults, not fixed Xmx/Xms: explicit test flags win.
@@ -139,19 +139,28 @@ def main():
     print(f'24 test jobs; timeoutFactor=1; two-hour total cap. Results: {out}', flush=True)
     print('Each VM defaults to 2 GiB ergonomic RAM / 8 processors; explicit test flags override.', flush=True)
     deadline = time.monotonic() + 7200
-    command = [str(runner), '-Xms64m', '-Xmx512m', '-jar', str(jtreg / 'lib/jtreg.jar'),
+    common = [str(runner), '-Xms64m', '-Xmx512m', '-jar', str(jtreg / 'lib/jtreg.jar'),
                f'-jdk:{jdk}', '-agentvm', '-conc:24', '--max-pool-size=24', '-timeoutFactor:1',
+               '-e:JAVA_TOOL_OPTIONS',
                '-retain:fail,error', '-verbose:summary',
-               f'-nativepath:{build}/images/test/hotspot/jtreg/native',
-               f'-w:{out}/work', f'-r:{out}/report']
+               f'-nativepath:{build}/images/test/hotspot/jtreg/native']
+    print('Verifying limits inside a jtreg test VM and its child...', flush=True)
+    preflight = common + [f'-w:{out}/preflight/work', f'-r:{out}/preflight/report',
+                          str(root / 'tests/tier1-environment')]
+    rc, _ = run_live(preflight, env, out / 'preflight.log', min(deadline, time.monotonic() + 120))
+    if rc:
+        (out / 'results.txt').write_text(f'preflight exit={rc}\nmain batch not started\n')
+        print(f'Environment preflight failed (exit={rc}); refusing the main batch. See {out}/preflight.log', flush=True)
+        return rc
+    command = common + [f'-w:{out}/work', f'-r:{out}/report']
     print('Enumerating selected tests (up to two minutes)...', flush=True)
     rc, _ = run_live(command + ['-listtests'] + tests, env, out / 'list.log', min(deadline, time.monotonic() + 120))
     if rc:
         print(f'Test enumeration failed: exit={rc}', flush=True)
         return rc
     text = (out / 'list.log').read_text(errors='replace')
-    match = re.search(r'Tests found:\s*(\d+)', text)
-    count = int(match.group(1)) if match else len(re.findall(r'^\s*\S+\.(?:java|sh)(?:#[^\s]+)?\s*$', text, re.M))
+    match = re.search(r'Tests found:\s*([\d,]+)', text)
+    count = int(match.group(1).replace(",", "")) if match else len(re.findall(r'^\s*\S+\.(?:java|sh)(?:#[^\s]+)?\s*$', text, re.M))
     if not count:
         print('No tests enumerated; refusing an empty run.', flush=True)
         return 1
